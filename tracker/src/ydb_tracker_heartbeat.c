@@ -83,13 +83,22 @@ spx_private err_t ydb_remote_storage_free(void **arg){
     return 0;
 }
 
+/*
+ * msg:groupname + machienid + ip + port + first-start-timestamp + disksize
+ *      + freesize + status
+ *
+ * length:GROUPNAMELEN + MACHINEIDLEN + SpxIpv4Size + sizeof(int) +
+ * sizeof(u64_t) + sizeof(u64_t) + sizeof(64_t) + sizeof(int)
+ *
+ *
+ */
 spx_private err_t ydb_remote_storage_report(int fd,int proto,struct spx_nio_context *nio_context){
-    struct spx_msg_header *header = nio_context->request_header;
+    struct spx_msg_header *header = nio_context->reader_header;
     struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
     if(NULL == ctx){
         return EINVAL;
     }
-    nio_context->request_body_ctx = ctx;
+    nio_context->reader_body_ctx = ctx;
     size_t len = 0;
     nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
     if(0 != nio_context->err){
@@ -167,11 +176,11 @@ spx_private err_t ydb_remote_storage_report(int fd,int proto,struct spx_nio_cont
         }
     }
 
+    storage->port = spx_msg_unpack_i32(ctx);
     u64_t first_start = spx_msg_unpack_u64(ctx);
     if(0 == storage->fisrt_start || first_start < storage->fisrt_start){
         storage->fisrt_start = first_start;
     }
-    storage->port = spx_msg_unpack_i32(ctx);
     storage->disksize = spx_msg_unpack_u64(ctx);
     storage->freesize = spx_msg_unpack_u64(ctx);
     storage->status = spx_msg_unpack_u32(ctx);
@@ -198,19 +207,19 @@ spx_private err_t ydb_remote_storage_report(int fd,int proto,struct spx_nio_cont
     if(NULL == response_header){
         return nio_context->err;
     }
-    nio_context->response_header = response_header;
+    nio_context->writer_header = response_header;
     response_header->protocol = proto;
     response_header->version = YDB_VERSION;
     response_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN + SpxIpv4Size + 3 * sizeof(u64_t) + 2 * sizeof(u32_t);
-    nio_context->response_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->response_header_ctx){
+    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
+    if(NULL == nio_context->writer_header_ctx){
         return nio_context->err;
     }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
     if(NULL == response_body_ctx){
         return nio_context->err;
     }
-    nio_context->response_body_ctx = response_body_ctx;
+    nio_context->writer_body_ctx = response_body_ctx;
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->groupname,YDB_GROUPNAME_LEN);
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->machineid,YDB_MACHINEID_LEN);
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->ip,SpxIpv4Size);
@@ -225,25 +234,15 @@ r1:
     spx_string_free(machineid);
     return nio_context->err;
 }
-/*
- * msg:groupname + machienid + first-start-timestamp + disksize
- *      + status + ip + port
- *
- *      YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN + SpxIpv4Size + sizeof(int)
- *      + sizeof(u64_t) + sizeof(u64_t) + sizeof(u32_t)
- *
- *
- *
- */
 err_t ydb_tracker_regedit_from_storage(int fd,struct spx_nio_context *nio_context) {
-    return ydb_remote_storage_report(fd,YDB_TRACKER_REGEDIT_FROM_STORAGE,nio_context);
+    return ydb_remote_storage_report(fd,YDB_REGEDIT_STORAGE,nio_context);
 }
 
 err_t ydb_tracker_heartbeat_from_storage(int fd,struct spx_nio_context *nio_context){
-    return ydb_remote_storage_report(fd,YDB_TRACKER_HEARTBEAT_FROM_STORAGE,nio_context);
+    return ydb_remote_storage_report(fd,YDB_HEARTBEAT_STORAGE,nio_context);
 }
 
 err_t ydb_tracker_shutdown_from_storage(int fd,struct spx_nio_context *nio_context){
-    return ydb_remote_storage_report(fd,YDB_TRACKER_SHUTDOWN_FROM_STORAGE,nio_context);
+    return ydb_remote_storage_report(fd,YDB_SHUTDOWN_STORAGE,nio_context);
 }
 

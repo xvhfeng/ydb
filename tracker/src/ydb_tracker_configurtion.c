@@ -83,7 +83,7 @@ err_t ydb_tracker_config_parser_before_handle(){
     ydb_tracker_config_loglevel_key = spx_string_new("loglevel",&err);
     ydb_tracker_config_balance_key = spx_string_new("balance",&err);
     ydb_tracker_config_master_key = spx_string_new("master",&err);
-    ydb_tracker_config_heartbeat_key = spx_string_new("beartbeat",&err);
+    ydb_tracker_config_heartbeat_key = spx_string_new("heartbeat",&err);
     ydb_tracker_config_daemon_key = spx_string_new("daemon",&err);
     ydb_tracker_config_siosize_key = spx_string_new("siosize",&err);
     ydb_tracker_config_niosize_key = spx_string_new("niosize",&err);
@@ -94,7 +94,7 @@ err_t ydb_tracker_config_parser_before_handle(){
 
 
 void ydb_tracker_config_line_deserialize(string_t line,struct spx_properties *p,err_t *err){
-    int count = 0;
+  int count = 0;
     string_t *kv = spx_string_splitlen(line,spx_string_len(line),"=",sizeof("="),&count,err);
     if(NULL == kv){
         return;

@@ -195,12 +195,12 @@ err_t ydb_tracker_query_upload_storage(int fd,struct spx_nio_context *nio_contex
         return EINVAL;
     }
 
-    struct spx_msg_header *header = nio_context->request_header;
+    struct spx_msg_header *header = nio_context->reader_header;
     struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
     if(NULL == ctx){
         return EINVAL;
     }
-    nio_context->request_body_ctx = ctx;
+    nio_context->reader_body_ctx = ctx;
     size_t len = 0;
     nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
     if(0 != nio_context->err){
@@ -256,19 +256,19 @@ err_t ydb_tracker_query_upload_storage(int fd,struct spx_nio_context *nio_contex
     if(NULL == response_header){
         return nio_context->err;
     }
-    nio_context->response_header = response_header;
+    nio_context->writer_header = response_header;
     response_header->protocol = YDB_TRACKER_QUERY_UPLOAD_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->response_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->response_header_ctx){
+    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
+    if(NULL == nio_context->writer_header_ctx){
         return nio_context->err;
     }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
     if(NULL == response_body_ctx){
         return nio_context->err;
     }
-    nio_context->response_body_ctx = response_body_ctx;
+    nio_context->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
 r1:
@@ -345,12 +345,12 @@ err_t ydb_tracker_query_modify_storage(int fd,struct spx_nio_context *nio_contex
         return EINVAL;
     }
 
-    struct spx_msg_header *header = nio_context->request_header;
+    struct spx_msg_header *header = nio_context->reader_header;
     struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
     if(NULL == ctx){
         return EINVAL;
     }
-    nio_context->request_body_ctx = ctx;
+    nio_context->reader_body_ctx = ctx;
     size_t len = 0;
     nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
     if(0 != nio_context->err){
@@ -380,19 +380,19 @@ err_t ydb_tracker_query_modify_storage(int fd,struct spx_nio_context *nio_contex
     if(NULL == response_header){
         return nio_context->err;
     }
-    nio_context->response_header = response_header;
+    nio_context->writer_header = response_header;
     response_header->protocol = YDB_TRACKER_QUERY_MODIFY_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->response_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->response_header_ctx){
+    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
+    if(NULL == nio_context->writer_header_ctx){
         return nio_context->err;
     }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
     if(NULL == response_body_ctx){
         return nio_context->err;
     }
-    nio_context->response_body_ctx = response_body_ctx;
+    nio_context->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
 
@@ -407,12 +407,12 @@ err_t ydb_tracker_query_delete_storage(int fd,struct spx_nio_context *nio_contex
         return EINVAL;
     }
 
-    struct spx_msg_header *header = nio_context->request_header;
+    struct spx_msg_header *header = nio_context->reader_header;
     struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
     if(NULL == ctx){
         return EINVAL;
     }
-    nio_context->request_body_ctx = ctx;
+    nio_context->reader_body_ctx = ctx;
     size_t len = 0;
     nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
     if(0 != nio_context->err){
@@ -442,19 +442,19 @@ err_t ydb_tracker_query_delete_storage(int fd,struct spx_nio_context *nio_contex
     if(NULL == response_header){
         return nio_context->err;
     }
-    nio_context->response_header = response_header;
+    nio_context->writer_header = response_header;
     response_header->protocol = YDB_TRACKER_QUERY_DELETE_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->response_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->response_header_ctx){
+    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
+    if(NULL == nio_context->writer_header_ctx){
         return nio_context->err;
     }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
     if(NULL == response_body_ctx){
         return nio_context->err;
     }
-    nio_context->response_body_ctx = response_body_ctx;
+    nio_context->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
 
@@ -469,12 +469,12 @@ err_t ydb_tracker_query_select_storage(int fd,struct spx_nio_context *nio_contex
         return EINVAL;
     }
 
-    struct spx_msg_header *header = nio_context->request_header;
+    struct spx_msg_header *header = nio_context->reader_header;
     struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
     if(NULL == ctx){
         return EINVAL;
     }
-    nio_context->request_body_ctx = ctx;
+    nio_context->reader_body_ctx = ctx;
     size_t len = 0;
     nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
     if(0 != nio_context->err){
@@ -504,19 +504,19 @@ err_t ydb_tracker_query_select_storage(int fd,struct spx_nio_context *nio_contex
     if(NULL == response_header){
         return nio_context->err;
     }
-    nio_context->response_header = response_header;
+    nio_context->writer_header = response_header;
     response_header->protocol = YDB_TRACKER_QUERY_SELECT_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->response_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->response_header_ctx){
+    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
+    if(NULL == nio_context->writer_header_ctx){
         return nio_context->err;
     }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
     if(NULL == response_body_ctx){
         return nio_context->err;
     }
-    nio_context->response_body_ctx = response_body_ctx;
+    nio_context->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
 
