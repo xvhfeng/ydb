@@ -22,31 +22,46 @@ extern "C" {
 #endif
 
 #include "include/spx_types.h"
-#include "include/spx_properties.h"
 
 #define YDB_TRACKER_BALANCE_LOOP 0
 #define YDB_TRACKER_BALANCE_MAXDISK 1
 #define YDB_TRACKER_BALANCE_TURN 2
 #define YDB_TRACKER_BALANCE_MASTER 3
 
-    extern string_t ydb_tracker_config_ip_key;
-    extern string_t ydb_tracker_config_port_key;
-    extern string_t ydb_tracker_config_timeout_key;
-    extern string_t ydb_tracker_config_basepath_key;
-    extern string_t ydb_tracker_config_logpath_key;
-    extern string_t ydb_tracker_config_logprefix_key;
-    extern string_t ydb_tracker_config_logsize_key;
-    extern string_t ydb_tracker_config_loglevel_key;
-    extern string_t ydb_tracker_config_balance_key;
-    extern string_t ydb_tracker_config_master_key;
-    extern string_t ydb_tracker_config_heartbeat_key;
-    extern string_t ydb_tracker_config_daemon_key ;
-    extern string_t ydb_tracker_config_niosize_key;
-    extern string_t ydb_tracker_config_siosize_key;
-    extern string_t ydb_tracker_config_stacksize_key;
+#define ToYdbTrackerConfigurtion(p) \
+    (struct ydb_tracker_configurtion *) p
 
-    err_t ydb_tracker_config_parser_before_handle();
-    void ydb_tracker_config_line_deserialize(string_t line,struct spx_properties *p,err_t *err);
+    const char *tracker_balance_mode_desc[]={
+        "loop",
+        "maxdisk",
+        "turn",
+        "master",
+    };
+
+    struct ydb_tracker_configurtion{
+        SpxLogDelegate *log;
+        string_t ip;
+        i32_t port;
+        u32_t timeout;
+        string_t basepath;
+        string_t logpath;
+        string_t logprefix;
+        u64_t logsize;
+        i8_t loglevel;
+        i8_t balance;
+        string_t master;
+        u32_t heartbeat;
+        bool_t daemon;
+        u64_t stacksize;
+        u32_t notifier_module_thread_size;
+        u32_t network_module_thread_size;
+        u32_t task_module_thread_size;
+        u32_t context_size;
+    };
+
+
+    void *ydb_tracker_config_before_handle(SpxLogDelegate *log,err_t *err);
+    void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err);
 
 #ifdef __cplusplus
 }

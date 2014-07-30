@@ -25,25 +25,29 @@
 #include "include/spx_types.h"
 #include "include/spx_string.h"
 #include "include/spx_defs.h"
-#include "include/spx_properties.h"
 #include "include/spx_log.h"
 #include "include/spx_socket.h"
-#include "include/spx_nio_context.h"
 #include "include/spx_env.h"
 #include "include/spx_nio.h"
-#include "include/spx_sio.h"
+#include "include/spx_configurtion.h"
+#include "include/spx_module.h"
+#include "include/spx_job.h"
+#include "include/spx_task.h"
+#include "include/spx_notifier_module.h"
+#include "include/spx_network_module.h"
+#include "include/spx_task_module.h"
 
 
 #include "ydb_tracker_configurtion.h"
-#include "ydb_tracker_service.h"
 #include "ydb_tracker_mainsocket.h"
+#include "ydb_tracker_network_module.h"
+#include "ydb_tracker_task_module.h"
 
 spx_private void ydb_tracker_regedit_signal(struct ev_loop *loop);
 spx_private void ydb_tracker_sig_empty (struct ev_loop *loop, ev_signal *w, int revents);
 spx_private void ydb_tracker_sig_abort (struct ev_loop *loop, ev_signal *w, int revents);
 
 int main(int argc,char **argv){
-
     umask(0);
     SpxLogDelegate *log = spx_log;
     if(0 != argc){
@@ -57,116 +61,107 @@ int main(int argc,char **argv){
         return err;
     }
 
-    struct spx_properties *configurtion = spx_properties_new(log,
-            ydb_tracker_config_line_deserialize,
-            NULL,
-            ydb_tracker_config_parser_before_handle,
-            NULL,
-            &err);
-    if(NULL == configurtion){
+    struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) \
+                                         spx_configurtion_parser(log,\
+                                                 ydb_tracker_config_before_handle,\
+                                                 NULL,\
+                                                 confname,\
+                                                 ydb_tracker_config_line_parser_handle,\
+                                                 &err);
+    if(NULL == c){
         SpxLogFmt2(log,SpxLogError,err,"parser the configurtion is fail.file name:%s.",confname);
         return err;
     }
 
-    bool_t *daemon = NULL;
-    err =  spx_properties_get(configurtion,\
-            ydb_tracker_config_daemon_key,\
-            (void **) &daemon,NULL);
-    if(NULL != daemon && *daemon){
+    if(c->daemon){
         spx_env_daemon();
     }
 
-    string_t logpath = NULL;
-    string_t logprefix = NULL;
-    u64_t *logsize = NULL;
-    u8_t *loglevel = NULL;
-    err =  spx_properties_get(configurtion,\
-            ydb_tracker_config_logpath_key,\
-            (void **) &logpath,NULL);
-    if(NULL == logpath){
-        SpxLog2(log,SpxLogError,err,"get logpath from config is fail.");
-        return err;
-    }
-    err =  spx_properties_get(configurtion,\
-            ydb_tracker_config_logprefix_key,\
-            (void **) &logprefix,NULL);
-    if(NULL == logprefix){
-        SpxLog2(log,SpxLogError,err,"get logprefix from config is fail.");
-        return err;
-    }
-    err =  spx_properties_get(configurtion,\
-            ydb_tracker_config_logsize_key,\
-            (void **) &logsize,NULL);
-    if(NULL == logsize){
-        SpxLog2(log,SpxLogError,err,"get logsize from config is fail.");
-        return err;
-    }
-    err =  spx_properties_get(configurtion,\
-            ydb_tracker_config_loglevel_key,\
-            (void **) &loglevel,NULL);
-    if(NULL == loglevel){
-        SpxLog2(log,SpxLogError,err,"get loglevel from config is fail.");
-        return err;
-    }
-    if(0 != ( err = spx_log_new(log,logpath,logprefix,*logsize,*loglevel))){
+    if(0 != ( err = spx_log_new(\
+                    log,\
+                    c->logpath,\
+                    c->logprefix,\
+                    c->logsize,\
+                    c->loglevel))){
         SpxLog2(log,SpxLogError,err,"init the logger is fail.");
         return err;
     }
 
     struct ev_loop *mainloop = NULL;
     mainloop = ev_default_loop(0);
+    if(NULL == mainloop){
+        SpxLog1(log,SpxLogError,\
+                "create main loop is fail.");
+        abort();
+    }
     ydb_tracker_regedit_signal(mainloop);
 
-
-    int *timeout = NULL;
-    err = spx_properties_get(configurtion,ydb_tracker_config_timeout_key,(void **)&timeout,NULL);
-    if(0 != err){
-        SpxLog2(log,SpxLogError,err,"get timeout config item is fail.");
-        return err;
-    }
-    int *niosize = NULL;
-    err = spx_properties_get(configurtion,ydb_tracker_config_niosize_key,(void **) &niosize,NULL);
-    if(0 != err){
-        SpxLog2(log,SpxLogError,err,"get niosize config item is fail.");
-        return err;
-    }
-
-    struct spx_nio_context_pool *g_spx_nio_context_pool = \
-                                                    spx_nio_context_pool_new(log,\
-                                                            configurtion,\
-                                                            *niosize,*timeout,\
-                                                            spx_nio_reader,\
-                                                            spx_nio_writer,\
-                                                            ydb_tracker_nio_header_validator_handler,\
-                                                            ydb_tracker_nio_header_validator_fail_handler,\
-                                                            ydb_tracker_nio_request_body_handler,\
-                                                            ydb_tracker_nio_response_body_handler,\
-                                                            &err);
-    if(NULL == g_spx_nio_context_pool){
-        SpxLog2(log,SpxLogError,err,"new the nio context pool is fail.");
+    g_spx_job_pool = spx_job_pool_new(log,\
+            c,\
+            c->context_size,\
+            c->timeout,\
+            spx_nio_reader,\
+            spx_nio_writer,\
+            ydb_tracker_network_module_header_validator_handler,\
+            ydb_tracker_network_module_header_validator_fail_handler,\
+            ydb_tracker_network_module_request_body_handler,\
+            ydb_tracker_network_module_response_body_handler,\
+            &err);
+    if(NULL == g_spx_job_pool){
+        SpxLog2(log,SpxLogError,err,\
+                "alloc job pool is fail.");
         return err;
     }
 
-
-    int *siosize = NULL;
-    err = spx_properties_get(configurtion,ydb_tracker_config_siosize_key,(void **)&siosize,NULL);
-    if(0 != err){
-        SpxLog2(log,SpxLogError,err,"get siosize config item is fail.");
-        return err;
-    }
-    size_t *stacksize = NULL;
-    err = spx_properties_get(configurtion,ydb_tracker_config_stacksize_key,(void **)&stacksize,NULL);
-    if(0 != err){
-        SpxLog2(log,SpxLogError,err,"get stacksize config item is fail.");
+    g_spx_task_pool = spx_task_pool_new(log,\
+            c->context_size,\
+            ydb_tracker_task_module_handler,\
+            NULL,\
+            &err);
+    if(NULL == g_spx_task_pool){
+        SpxLog2(log,SpxLogError,err,\
+                "alloc task pool is fail.");
         return err;
     }
 
-    err = spx_sio_init(log,*siosize,*stacksize,spx_sio_reader);
-    err_t spx_sio_init(SpxLogDelegate *log,\
-            size_t size,size_t stack_size,\
-            SpxSioDelegate *sio_reader);
+    g_spx_notifier_module = spx_module_new(log,\
+            c->notifier_module_thread_size,\
+            c->stacksize,\
+            spx_notifier_module_wakeup_handler,\
+            spx_notifier_module_receive_handler,\
+            &err);
+    if(NULL == g_spx_notifier_module){
+        SpxLog2(log,SpxLogError,err,\
+                "new notifier module is fail.");
+        return err;
+    }
 
-    pthread_t tid =  ydb_tracker_mainsocket_thread_new(log,configurtion,&err);
+    g_spx_network_module = spx_module_new(log,\
+            c->network_module_thread_size,\
+            c->stacksize,\
+            spx_network_module_wakeup_handler,\
+            spx_network_module_receive_handler,\
+            &err);
+    if(NULL == g_spx_network_module){
+        SpxLog2(log,SpxLogError,err,\
+                "new network module is fail.");
+        return err;
+    }
+
+    g_spx_task_module = spx_module_new(log,\
+            c->task_module_thread_size,\
+            c->stacksize,\
+            spx_task_module_wakeup_handler,\
+            spx_task_module_receive_handler,\
+            &err);
+    if(NULL == g_spx_task_module){
+        SpxLog2(log,SpxLogError,err,\
+                "new task module is fail.");
+        return err;
+    }
+
+
+    pthread_t tid =  ydb_tracker_mainsocket_thread_new(log,c,&err);
     if(NULL == tid){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
         return err;

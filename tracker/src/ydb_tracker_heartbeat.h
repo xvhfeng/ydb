@@ -21,8 +21,10 @@
 extern "C" {
 #endif
 
+#include <ev.h>
+
 #include "include/spx_types.h"
-#include "include/spx_nio_context.h"
+#include "include/spx_task.h"
 
     struct ydb_remote_storage{
         u64_t fisrt_start;
@@ -38,9 +40,9 @@ extern "C" {
 
 extern struct spx_map *ydb_remote_storages;
 
-err_t ydb_tracker_regedit_from_storage(int fd,struct spx_nio_context *nio_context);
-err_t ydb_tracker_heartbeat_from_storage(int fd,struct spx_nio_context *nio_context);
-err_t ydb_tracker_shutdown_from_storage(int fd,struct spx_nio_context *nio_context);
+err_t ydb_tracker_regedit_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
+err_t ydb_tracker_heartbeat_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
+err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
 
 #ifdef __cplusplus
 }

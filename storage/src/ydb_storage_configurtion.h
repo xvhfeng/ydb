@@ -22,9 +22,8 @@ extern "C" {
 #endif
 
 #include "include/spx_types.h"
-#include "include/spx_properties.h"
 
-    struct ydb_storage_mouintpoint{
+    struct ydb_storage_mountpoint{
         int idx;
         string_t path;
         u64_t disksize;
@@ -33,52 +32,90 @@ extern "C" {
 
 #define YDB_STORAGE_MOUNTPOINT_LOOP 0
 #define YDB_STORAGE_MOUNTPOINT_MAXSIZE 1
-#define YDB_STORAGE_MOUNTPOINT_TRUN 2
+#define YDB_STORAGE_MOUNTPOINT_TURN 2
 #define YDB_STORAGE_MOUNTPOINT_MASTER 3
+    const  char *mountpoint_balance_mode_desc[] = {
+        "loop",
+        "maxsize",
+        "turn",
+        "master"
+    };
+
 #define YDB_STORAGE_MOUNTPOINT_COUNT 256
 
 #define YDB_STORAGE_STOREMODE_LOOP 0
 #define YDB_STORAGE_STOREMODE_TURN 1
+    const char *storemode_desc[] = {
+        "loop",
+        "turn"
+    };
 
 #define YDB_STORAGE_OVERMODE_RELATIVE 0
 #define YDB_STORAGE_OVERMODE_ABSSOLUTE 1
+    const char *overmode_desc[]={
+        "relative",
+        "abssolute"
+    };
 
-    extern string_t ydb_storage_config_ip_key;
-    extern string_t ydb_storage_config_port_key;
-    extern string_t ydb_storage_config_timeout_key;
-    extern string_t ydb_storage_config_basepath_key;
-    extern string_t ydb_storage_config_logpath_key;
-    extern string_t ydb_storage_config_logprefix_key;
-    extern string_t ydb_storage_config_logsize_key;
-    extern string_t ydb_storage_config_loglevel_key;
-    extern string_t ydb_storage_config_balance_key;
-    extern string_t ydb_storage_config_master_key;
-    extern string_t ydb_storage_config_heartbeat_key;
-    extern string_t ydb_storage_config_daemon_key ;
-    extern string_t ydb_storage_config_niosize_key;
-    extern string_t ydb_storage_config_siosize_key;
-    extern string_t ydb_storage_config_stacksize_key;
-    extern string_t ydb_storage_config_groupname_key;
-    extern string_t ydb_storage_config_machineid_key;
-    extern string_t ydb_storage_config_diosize_key;
-    extern string_t ydb_storage_config_freedisk_key;
-    extern string_t ydb_storage_config_mountpoint_key;
-    extern string_t ydb_storage_config_tracker_key;
-    extern string_t ydb_storage_config_storepaths_key;
-    extern string_t ydb_storage_config_storemode_key;
-    extern string_t ydb_storage_config_storecount_key;
-    extern string_t ydb_storage_config_hole_key;
-    extern string_t ydb_storage_config_compress_key;
-    extern string_t ydb_storage_config_chunkfile_key;
-    extern string_t ydb_storage_config_chunksize_key;
-    extern string_t ydb_storage_config_overload_key;
-    extern string_t ydb_storage_config_overmode_key;//this operator is not config and from the oversize
-    extern string_t ydb_storage_config_oversize_key;
+#define YDB_STORAGE_HOLEREFRESH_FIXEDTIME 0
+#define YDB_STORAGE_HOLEREFRESH_TIMESTAMPS 1
+    const char *holerefresh_mode_desc[]={
+        "fixed",
+        "timestamps"
+    };
+
 
     extern int ydb_storage_status;
     extern u64_t ydb_storage_first_start;
 
-void ydb_storage_config_line_deserialize(string_t line,struct spx_properties *p,err_t *err);
+    struct ydb_storage_configurtion{
+        SpxLogDelegate *log;
+        string_t ip;
+        i32_t port;
+        u32_t timeout;
+        string_t basepath;
+        string_t logpath;
+        string_t logprefix;
+        u64_t logsize;
+        i8_t loglevel;
+        i8_t balance;
+        string_t master;
+        u32_t heartbeat;
+        bool_t daemon;
+        u32_t nio_thread_size;
+        u32_t nio_context_size;
+        u32_t sio_thread_size;
+        u64_t stacksize;
+        string_t groupname;
+        string_t machineid;
+        u64_t freedisk;
+        u32_t dio_thread_size;
+        u32_t dio_context_size;
+        struct spx_list *mountpoints;
+        struct spx_vector *trackers;
+        i32_t storerooms;
+        i8_t storemode;
+        u32_t storecount;
+        bool_t fillchunk;
+        i8_t holerefresh;
+        u64_t refreshtime;
+        bool_t compress;
+        bool_t chunkfile;
+        u64_t chunksize;
+        bool_t overload;
+        u64_t oversize;
+        i8_t overmode;
+        u64_t singlemin;
+        bool_t lazyrecv;
+        bool_t lazysize;
+        bool_t sendfile;
+
+    };
+
+
+    void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err);
+    void ydb_storage_config_line_parser(string_t line,void *config,err_t *err);
+
 
 #ifdef __cplusplus
 }

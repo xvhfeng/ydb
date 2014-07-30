@@ -26,76 +26,75 @@
 
 #include "ydb_tracker_configurtion.h"
 
+spx_private string_t ip_key = NULL;
+spx_private string_t port_key = NULL;
+spx_private string_t timeout_key = NULL;
+spx_private string_t basepath_key = NULL;
+spx_private string_t logpath_key = NULL;
+spx_private string_t logprefix_key = NULL;
+spx_private string_t logsize_key = NULL;
+spx_private string_t loglevel_key = NULL;
+spx_private string_t balance_key = NULL;
+spx_private string_t master_key = NULL;
+spx_private string_t heartbeat_key = NULL;
+spx_private string_t daemon_key  = NULL;
+spx_private string_t stacksize_key = NULL;
+spx_private string_t notifier_module_thread_size_key = NULL;
+spx_private string_t network_module_thread_size_key = NULL;
+spx_private string_t task_module_thread_size_key = NULL;
+spx_private string_t context_size_key = NULL;
 
-string_t ydb_tracker_config_ip_key = NULL;
-string_t ydb_tracker_config_port_key = NULL;
-string_t ydb_tracker_config_timeout_key = NULL;
-string_t ydb_tracker_config_basepath_key = NULL;
-string_t ydb_tracker_config_logpath_key = NULL;
-string_t ydb_tracker_config_logprefix_key = NULL;
-string_t ydb_tracker_config_logsize_key = NULL;
-string_t ydb_tracker_config_loglevel_key = NULL;
-string_t ydb_tracker_config_balance_key = NULL;
-string_t ydb_tracker_config_master_key = NULL;
-string_t ydb_tracker_config_heartbeat_key = NULL;
-string_t ydb_tracker_config_daemon_key = NULL;
-string_t ydb_tracker_config_niosize_key = NULL;
-string_t ydb_tracker_config_siosize_key =NULL ;
-string_t ydb_tracker_config_stacksize_key = NULL;
+void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){
 
-
-spx_private string_t tracker_default_ip = NULL;
-spx_private int tracker_default_timeout = 30;
-spx_private string_t tracker_default_logpath = NULL;
-spx_private string_t tracker_default_logprefix = NULL;
-spx_private int tracker_default_loglevel = SpxLogInfo;
-spx_private u64_t tracker_default_logsize = 10;
-spx_private int tracker_default_balance = YDB_TRACKER_BALANCE_LOOP;
-spx_private int tracker_default_heartbeat = 30;
-spx_private bool_t tracker_default_daemon = false;
-spx_private int tracker_default_siosize = 16;
-spx_private int tracker_default_niosize = 16;
-spx_private int tracker_default_stacksize = 128;
-
-err_t ydb_tracker_config_parser_before_handle(){
-    err_t err = 0;
-    tracker_default_ip = spx_string_empty(&err);
-    tracker_default_timeout = 30;
-    tracker_default_heartbeat = 30;
-    tracker_default_logpath = spx_string_new("/opt/ydb/log/tracker/",&err);
-    tracker_default_loglevel = SpxLogInfo;
-    tracker_default_logprefix = spx_string_new("log",&err);
-    tracker_default_logsize = 10;
-    tracker_default_balance = YDB_TRACKER_BALANCE_LOOP;
-    tracker_default_daemon = false;
-    tracker_default_siosize = 16;
-    tracker_default_niosize = 16;
-    tracker_default_stacksize = 128;
+    ip_key = spx_string_new("ip",err);
+    port_key = spx_string_new("port",err);
+    timeout_key = spx_string_new("timeout",err);
+    basepath_key = spx_string_new("basepath",err);
+    logpath_key = spx_string_new("logpath",err);
+    logprefix_key = spx_string_new("logprefix",err);
+    logsize_key = spx_string_new("logsize",err);
+    loglevel_key = spx_string_new("loglevel",err);
+    balance_key = spx_string_new("balance",err);
+    master_key = spx_string_new("master",err);
+    heartbeat_key = spx_string_new("heartbeat",err);
+    daemon_key = spx_string_new("daemon",err);
+    stacksize_key = spx_string_new("stacksize",err);
+    notifier_module_thread_size_key = spx_string_new("notifier_module_thread_size",err);
+    network_module_thread_size_key = spx_string_new("network_module_thread_size",err);
+    task_module_thread_size_key = spx_string_new("task_module_thread_size",err);
+    context_size_key = spx_string_new("context_size",err);
 
 
-    ydb_tracker_config_ip_key = spx_string_new("ip",&err);
-    ydb_tracker_config_port_key = spx_string_new("port",&err);
-    ydb_tracker_config_timeout_key = spx_string_new("timeout",&err);
-    ydb_tracker_config_basepath_key = spx_string_new("basepath",&err);
-    ydb_tracker_config_logpath_key = spx_string_new("logpath",&err);
-    ydb_tracker_config_logprefix_key = spx_string_new("logprefix",&err);
-    ydb_tracker_config_logsize_key = spx_string_new("logsize",&err);
-    ydb_tracker_config_loglevel_key = spx_string_new("loglevel",&err);
-    ydb_tracker_config_balance_key = spx_string_new("balance",&err);
-    ydb_tracker_config_master_key = spx_string_new("master",&err);
-    ydb_tracker_config_heartbeat_key = spx_string_new("heartbeat",&err);
-    ydb_tracker_config_daemon_key = spx_string_new("daemon",&err);
-    ydb_tracker_config_siosize_key = spx_string_new("siosize",&err);
-    ydb_tracker_config_niosize_key = spx_string_new("niosize",&err);
-    ydb_tracker_config_stacksize_key = spx_string_new("stacksize",&err);
+    struct ydb_tracker_configurtion *config = (struct ydb_tracker_configurtion *) \
+                                              spx_alloc_alone(sizeof(*config),err);
+    if(NULL == config){
+        SpxLog2(log,SpxLogError,*err,\
+                "alloc the tracker config is fail.");
+        return NULL;
+    }
+    config->log = log;
+    config->port = 1404;
+    config->timeout = 30;
+    config->logsize = 10 * SpxMB;
+    config->loglevel = SpxLogInfo;
+    config->balance = YDB_TRACKER_BALANCE_LOOP;
+    config->heartbeat = 30;
+    config->daemon = true;
+    config->stacksize = 128 * SpxKB;
+    config->network_module_thread_size = 8;
+    config->notifier_module_thread_size = 4;
+    config->task_module_thread_size = 4;
+    config->context_size = 64;
 
-    return err;
+    return config;
 }
 
 
-void ydb_tracker_config_line_deserialize(string_t line,struct spx_properties *p,err_t *err){
-  int count = 0;
-    string_t *kv = spx_string_splitlen(line,spx_string_len(line),"=",sizeof("="),&count,err);
+void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err){
+    struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) config;
+    int count = 0;
+    string_t *kv = spx_string_splitlen(line,\
+            spx_string_len(line),"=",sizeof("="),&count,err);
     if(NULL == kv){
         return;
     }
@@ -106,325 +105,336 @@ void ydb_tracker_config_line_deserialize(string_t line,struct spx_properties *p,
     }
 
     //ip
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_ip_key)){
+    if(0 == spx_string_casecmp_string(*kv,ip_key)){
         if(2 == count){
-            *err = spx_properties_set(p,*kv, *(kv + 1),spx_string_len((string_t) *(kv + 1)));
+            if(spx_socket_is_ip(*(kv + 1))){
+                c->ip =spx_string_dup(*(kv + 1),err);
+                if(NULL == c->ip){
+                    SpxLog2(c->log,SpxLogError,*err,\
+                            "dup the ip from config operator is fail.");
+                }
+            } else {
+                string_t ip = spx_socket_getipbyname(*(kv + 1),err);
+                if(NULL == ip){
+                    SpxLogFmt2(c->log,SpxLogError,*err,\
+                            "get local ip by hostname:%s is fail.",*(kv + 1));
+                    goto r1;
+                }
+                c->ip = ip;
+            }
         } else{
-            SpxLog1(p->log,SpxLogWarn,"use the default ip.");
-            spx_string_free_splitres(kv,count);
+            SpxLog1(c->log,SpxLogWarn,"use the default ip.");
+            string_t ip = spx_socket_getipbyname(NULL,err);
+            if(NULL == ip){
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "get local ip by default hostname is fail.");
+                goto r1;
+            }
+            c->ip = ip;
         }
-        return;
+        goto r1;
     }
 
     //port
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_port_key)){
-        if(2 != count){
-            *err = EINVAL;
-            SpxLog1(p->log,SpxLogError,"bad the configurtion item of port.the port is empty.");
+    if(0 == spx_string_casecmp_string(*kv,port_key)){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,"the port is use default:%d.",c->port);
             goto r1;
         }
-        int *port = spx_alloc_alone(sizeof(int),err);
-        if(NULL == port) goto r1;
-        *port = strtol(*(kv + 1),NULL,10);
-        if(ERANGE == *port) {
-            SpxLog1(p->log,SpxLogError,"bad the configurtion item of port.");
-            SpxFree(port);
+        i32_t port = strtol(*(kv + 1),NULL,10);
+        if(ERANGE == port) {
+            SpxLog1(c->log,SpxLogError,"bad the configurtion item of port.");
             goto r1;
         }
-        *err = spx_properties_set(p,ydb_tracker_config_port_key, port,sizeof(int));
-        if(0 != *err){
-            SpxFree(port);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        c->port = port;
+        goto r1;
     }
 
     //timeout
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_timeout_key)){
-        int *timeout = spx_alloc_alone(sizeof(int),err);
-        if(NULL == timeout) goto r1;
+    if(0 == spx_string_casecmp_string(*kv,timeout_key)){
         if(1 == count){
-            SpxLog1(p->log,SpxLogInfo,"the timeout default is 30s.");
-            *timeout = tracker_default_timeout;
+            SpxLogFmt1(c->log,SpxLogWarn,"use default timeout:%d.",c->timeout);
         } else {
-            *timeout = strtol(*(kv + 1),NULL,10);
-            if(ERANGE == *timeout) {
-                SpxLog1(p->log,SpxLogError,"bad the configurtion item of timeout.");
-                SpxFree(timeout);
-                goto r1;
+            u32_t timeout = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == timeout) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of timeout.");
             }
+            c->timeout = timeout;
         }
-        *err = spx_properties_set(p,ydb_tracker_config_timeout_key, timeout,sizeof(int));
-        if(0 != *err){
-            SpxFree(timeout);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
     //daemon
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_daemon_key)){
-        bool_t *is_daemon = spx_alloc_alone(sizeof(bool_t),err);
-        if(NULL == is_daemon) goto r1;
+    if(0 == spx_string_casecmp_string(*kv,daemon_key)){
         if(1 == count){
-            *is_daemon = tracker_default_daemon;
+            SpxLogFmt1(c->log,SpxLogWarn,"instance use default daemon:%d.",c->daemon);
         } else {
             string_t s = *(kv + 1);
-            if(0 == spx_string_casecmp(s,"false")){
-                *is_daemon = false;
-            } else if(0 == spx_string_casecmp(s,"true")){
-                *is_daemon = true;
+            if(0 == spx_string_casecmp(s,spx_bool_desc[false])){
+                c->daemon = false;
+            } else if(0 == spx_string_casecmp(s,spx_bool_desc[true])){
+                c->daemon = true;
             } else {
-                *is_daemon = false;
+                c->daemon = true;
             }
         }
-        *err = spx_properties_set(p,ydb_tracker_config_daemon_key, is_daemon,sizeof(bool_t));
-        if(0 != *err){
-            SpxFree(is_daemon);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
     //stacksize
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_stacksize_key)){
-        u64_t *size = spx_alloc_alone(sizeof(u64_t),err);
-        if(NULL == size) goto r1;
+    if(0 == spx_string_casecmp_string(*kv,stacksize_key)){
         if(1 == count){
-            *size = tracker_default_stacksize * SpxKB;
+            SpxLogFmt1(c->log,SpxLogWarn,"stacksize use default:%lld.",c->stacksize);
         } else {
-            *size = strtoul(*(kv + 1),NULL,10);
-            if(ERANGE == *size) {
-                SpxFree(size);
+            u64_t size = strtoul(*(kv + 1),NULL,10);
+            if(ERANGE == c->stacksize) {
+                SpxLog1(c->log,SpxLogError,\
+                        "convect stasksize is fail.");
                 goto r1;
             }
-            string_t unit = spx_string_range_new(*(kv + 1),-2,spx_string_len(*(kv + 1)),err);
+            string_t unit = spx_string_range_new(*(kv + 1),\
+                    -2,spx_string_len(*(kv + 1)),err);
             if(NULL == unit){
-                SpxFree(size);
-                goto r1;
+               c->stacksize =  size * SpxKB;
             }
             if(0 == spx_string_casecmp(unit,"GB")){
-                *size *= SpxGB;
+                size *= SpxGB;
             }
             else if( 0 == spx_string_casecmp(unit,"MB")){
-                *size *= SpxMB;
+                size *= SpxMB;
             }else if(0 == spx_string_casecmp(unit,"KB")){
-                *size *= SpxKB;
+                size *= SpxKB;
             }else {
-                *size *= SpxMB;
+                size *= SpxKB;
             }
             spx_string_free(unit);
+            c->stacksize = size;
         }
-        *err = spx_properties_set(p,ydb_tracker_config_stacksize_key, size,sizeof(u64_t));
-        if(0 != *err){
-            SpxFree(size);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
-    //niosize
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_niosize_key)){
-        int *niosize = spx_alloc_alone(sizeof(int),err);
-        if(NULL == niosize) goto r1;
+    //network_module_thread_size
+    if(0 == spx_string_casecmp_string(*kv,network_module_thread_size_key)){
         if(1 == count){
-            SpxLog1(p->log,SpxLogInfo,"the niosize default is 16.");
-            *niosize = tracker_default_niosize;
+            SpxLogFmt1(c->log,SpxLogWarn,"network module thread size use default:%d.",c->network_module_thread_size);
         } else {
-            *niosize = strtol(*(kv + 1),NULL,10);
-            if(ERANGE == *niosize) {
-                SpxLog1(p->log,SpxLogError,"bad the configurtion item of niosize.");
-                SpxFree(niosize);
+            u32_t network_module_thread_size = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == network_module_thread_size) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of network_module_thread_size.");
                 goto r1;
             }
+            c->network_module_thread_size = network_module_thread_size;
         }
-        *err = spx_properties_set(p,ydb_tracker_config_niosize_key, niosize,sizeof(int));
-        if(0 != *err){
-            SpxFree(niosize);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
-    //siosize
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_siosize_key)){
-        int *siosize = spx_alloc_alone(sizeof(int),err);
-        if(NULL == siosize) goto r1;
+    //notifier_module_thread_size
+    if(0 == spx_string_casecmp_string(*kv,notifier_module_thread_size_key)){
         if(1 == count){
-            SpxLog1(p->log,SpxLogInfo,"the siosize default is 16.");
-            *siosize = tracker_default_siosize;
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "notifier module thread size use default:%d.",c->notifier_module_thread_size);
         } else {
-            *siosize = strtol(*(kv + 1),NULL,10);
-            if(ERANGE == *siosize) {
-                SpxLog1(p->log,SpxLogError,"bad the configurtion item of siosize.");
-                SpxFree(siosize);
+            u32_t notifier_module_thread_size = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == notifier_module_thread_size) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of notifier_module_thread_size.");
                 goto r1;
             }
+            c->notifier_module_thread_size = notifier_module_thread_size;
         }
-        *err = spx_properties_set(p,ydb_tracker_config_siosize_key, siosize,sizeof(int));
-        if(0 != *err){
-            SpxFree(siosize);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
+    //task_module_thread_size
+    if(0 == spx_string_casecmp_string(*kv,task_module_thread_size_key)){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "task module thread size use default:%d.",c->task_module_thread_size);
+        } else {
+            u32_t task_module_thread_size = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == task_module_thread_size) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of task_module_thread_size.");
+                goto r1;
+            }
+            c->task_module_thread_size = task_module_thread_size;
+        }
+        goto r1;
+    }
+
+    //context size
+    if(0 == spx_string_casecmp_string(*kv,context_size_key)){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "context size use default:%d.",c->context_size);
+        } else {
+            u32_t context_size = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == context_size) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of context_size.");
+                goto r1;
+            }
+            c->context_size = context_size;
+        }
+        goto r1;
+    }
     //heartbeat
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_heartbeat_key)){
-        int *heartbeat = spx_alloc_alone(sizeof(int),err);
-        if(NULL == heartbeat) goto r1;
+    if(0 == spx_string_casecmp_string(*kv,heartbeat_key)){
         if(1 == count){
-            SpxLog1(p->log,SpxLogInfo,"the heartbeat default is 30s.");
-            *heartbeat = tracker_default_heartbeat;
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "heartbeat use default:%d.",c->heartbeat);
         } else {
-            *heartbeat = strtol(*(kv + 1),NULL,10);
-            if(ERANGE == *heartbeat) {
-                SpxLog1(p->log,SpxLogError,"bad the configurtion item of heartbeat.");
-                SpxFree(heartbeat);
+            u32_t heartbeat = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == heartbeat) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of heartbeat.");
                 goto r1;
             }
+            c->heartbeat = heartbeat;
         }
-        *err = spx_properties_set(p,ydb_tracker_config_heartbeat_key, heartbeat,sizeof(int));
-        if(0 != *err){
-            SpxFree(heartbeat);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
     //basepath
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_basepath_key)){
+    if(0 == spx_string_casecmp_string(*kv,basepath_key)){
         if(1 == count){
-            *err = EINVAL;
-            SpxLog1(p->log,SpxLogError,"bad the configurtion item of basepath.and basepath is empty.");
+            SpxLog1(c->log,SpxLogError,\
+                    "bad the configurtion item of basepath.and basepath is empty.");
             goto r1;
         }
-        *err = spx_properties_set(p,*kv, *(kv + 1),spx_string_len((string_t) *(kv + 1)));
         return;
     }
 
     //logpath
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_logpath_key)){
+    if(0 == spx_string_casecmp_string(*kv,logpath_key)){
         if(1 == count){
-            *err = spx_properties_set(p,*kv, tracker_default_logpath,spx_string_len(tracker_default_logpath));
-            spx_string_free_splitres(kv,count);
+            c->logpath = spx_string_new("/opt/ydb/log/storage/",err);
+            if(NULL == c->logpath){
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "alloc default logpath is fail.");
+                goto r1;
+            }
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "logpath use default:%s.",c->logpath);
         }else {
-            *err = spx_properties_set(p,*kv, *(kv + 1),spx_string_len((string_t) *(kv + 1)));
+            c->logpath = spx_string_dup(*(kv + 1),err);
+            if(NULL == c->logpath){
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "dup the string for logpath is fail.");
+            }
         }
-        return;
+        goto r1;
     }
 
     //logprefix
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_logprefix_key)){
+    if(0 == spx_string_casecmp_string(*kv,logprefix_key)){
         if( 1 == count){
-            *err = spx_properties_set(p,*kv,tracker_default_logprefix,spx_string_len(tracker_default_logprefix));
-            spx_string_free_splitres(kv,count);
+            c->logprefix = spx_string_new("ydb-storage",err);
+            if(NULL == c->logprefix){
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "alloc default logprefix is fail.");
+                goto r1;
+            }
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "logprefix use default:%s.",c->logprefix);
         } else {
-            *err = spx_properties_set(p,*kv, *(kv + 1),spx_string_len((string_t) *(kv + 1)));
+            c->logprefix = spx_string_dup(*(kv + 1),err);
+            if(NULL == c->logprefix){
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "dup the string for logprefix is fail.");
+            }
         }
-        return;
+        goto r1;
     }
 
     //logsize
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_logsize_key)){
-        u64_t *size = spx_alloc_alone(sizeof(u64_t),err);
-        if(NULL == size) goto r1;
+    if(0 == spx_string_casecmp_string(*kv,logsize_key)){
         if(1 == count){
-            *size = tracker_default_logsize * SpxMB;
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "logsize use default:%lld.",c->logsize);
         } else {
-            *size = strtoul(*(kv + 1),NULL,10);
-            if(ERANGE == *size) {
-                SpxFree(size);
+            u64_t size = strtoul(*(kv + 1),NULL,10);
+            if(ERANGE == size) {
+                SpxLog1(c->log,SpxLogError,\
+                        "convect logsize is fail.");
                 goto r1;
             }
             string_t unit = spx_string_range_new(*(kv + 1),-2,spx_string_len(*(kv + 1)),err);
             if(NULL == unit){
-                SpxFree(size);
-                goto r1;
+                c->logsize = size * SpxMB;
             }
             if(0 == spx_string_casecmp(unit,"GB")){
-                *size *= SpxGB;
+                size *= SpxGB;
             }
             else if( 0 == spx_string_casecmp(unit,"MB")){
-                *size *= SpxMB;
+                size *= SpxMB;
             }else if(0 == spx_string_casecmp(unit,"KB")){
-                *size *= SpxKB;
+                size *= SpxKB;
             }else {
-                *size *= SpxMB;
+                size *= SpxMB;
             }
             spx_string_free(unit);
+            c->logsize = size;
         }
-        *err = spx_properties_set(p,ydb_tracker_config_logsize_key, size,sizeof(u64_t));
-        if(0 != *err){
-            SpxFree(size);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
     //loglevel
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_loglevel_key)){
-        int *level = spx_alloc_alone(sizeof(int),err);
-        if(NULL == level) goto r1;
+    if(0 == spx_string_casecmp_string(*kv,loglevel_key)){
         if(1 == count){
-            *level = tracker_default_loglevel;
-        } else {
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "loglevel use default:%s",SpxLogDesc[c->loglevel]);
             string_t s = *(kv + 1);
             if(0 == spx_string_casecmp(s,"debug")){
-                *level = SpxLogDebug;
+                c->loglevel = SpxLogDebug;
             } else if(0 == spx_string_casecmp(s,"info")){
-                *level = SpxLogInfo;
+                c->loglevel = SpxLogInfo;
             }else if(0 == spx_string_casecmp(s,"warn")){
-                *level = SpxLogWarn;
+                c->loglevel = SpxLogWarn;
             }else if(0 == spx_string_casecmp(s,"error")){
-                *level = SpxLogError;
+                c->loglevel = SpxLogError;
             } else {
-                *level = tracker_default_loglevel;
+                c->loglevel = SpxLogInfo;
             }
         }
-        *err = spx_properties_set(p,ydb_tracker_config_loglevel_key, level,sizeof(int));
-        if(0 != *err){
-            SpxFree(level);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
     //balance
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_balance_key)){
-        int *balance = spx_alloc_alone(sizeof(int),err);
-        if(NULL == balance) goto r1;
+    if(0 == spx_string_casecmp_string(*kv,balance_key)){
         if(1 == count){
-            *balance = YDB_TRACKER_BALANCE_LOOP;
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "mountpoint balance use default:%s",\
+                    tracker_balance_mode_desc[c->balance]);
         } else {
             string_t s = *(kv + 1);
-            if(0 == spx_string_casecmp(s,"loop")){
-                *balance = YDB_TRACKER_BALANCE_LOOP;
-            } else if(0 == spx_string_casecmp(s,"maxdisk")){
-                *balance = YDB_TRACKER_BALANCE_MAXDISK;
-            }else if(0 == spx_string_casecmp(s,"turn")){
-                *balance = YDB_TRACKER_BALANCE_TURN;
-            }else if(0 == spx_string_casecmp(s,"master")){
-                *balance = YDB_TRACKER_BALANCE_MASTER;
+            if(0 == spx_string_casecmp(s,\
+                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_LOOP])){
+                c->balance = YDB_TRACKER_BALANCE_LOOP;
+            } else if(0 == spx_string_casecmp(s,\
+                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_TURN])){
+                c->balance = YDB_TRACKER_BALANCE_TURN;
+            }else if(0 == spx_string_casecmp(s,\
+                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_MAXDISK])){
+                c->balance = YDB_TRACKER_BALANCE_MAXDISK;
+            }else if(0 == spx_string_casecmp(s,\
+                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_MASTER])){
+                c->balance = YDB_TRACKER_BALANCE_MASTER;
             } else {
-                *balance = YDB_TRACKER_BALANCE_LOOP;
+                c->balance = YDB_TRACKER_BALANCE_LOOP;
             }
         }
-        *err = spx_properties_set(p,ydb_tracker_config_balance_key, balance,sizeof(int));
-        if(0 != *err){
-            SpxFree(balance);
-        }
-        spx_string_free_splitres(kv,count);
-        return;
+        goto r1;
     }
 
     //master
-    if(0 == spx_string_casecmp_string(*kv,ydb_tracker_config_master_key)){
+    if(0 == spx_string_casecmp_string(*kv,master_key)){
         if(1 == count){
             goto r1;
         }
-        *err = spx_properties_set(p,*kv, *(kv + 1),spx_string_len((string_t) *(kv + 1)));
-        return;
+        c->master = spx_string_dup(*(kv + 1),err);
+        if(NULL == c->master){
+            SpxLog2(c->log,SpxLogError,*err,\
+                    "dup master is fail.");
+        }
+        goto r1;
     }
+
 r1:
     spx_string_free_splitres(kv,count);
     return;

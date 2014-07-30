@@ -28,12 +28,8 @@
 #include "ydb_storage_configurtion.h"
 
 
-err_t ydb_storage_mountpoint_init(struct spx_properties *p){
+err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c){
     err_t err = 0;
-    struct spx_list *mountpoints = NULL;
-    spx_properties_get(p,ydb_storage_config_mountpoint_key,(void **) &mountpoints,NULL);
-    i32_t *storepath = NULL;
-    spx_properties_get(p,ydb_storage_config_storepaths_key,(void **) &storepath,NULL);
 
     string_t path = spx_string_newlen(NULL,SpxStringRealSize(SpxPathSize),&err);
     if(NULL == path){
@@ -41,24 +37,25 @@ err_t ydb_storage_mountpoint_init(struct spx_properties *p){
     }
     int i = 0;
     for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
-        struct ydb_storage_mouintpoint *mp = spx_list_get(mountpoints,i);
+        struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)){
             int out = 0;
-            for( ; out < *storepath; out++){
+            for( ; out < c->storerooms; out++){
                 int in = 0;
-                for( ; in < *storepath; in++){
+                for( ; in < c->storerooms; in++){
                     string_t new_path = spx_string_cat_printf(&err,path,"%s%s%02X/%02X/",\
-                            mp->path,SpxStringEndWith(mp->path,SpxPathDlmt) ? "" : SpxPathDlmtString,\
+                            mp->path,SpxStringEndWith(mp->path,SpxPathDlmt) \
+                            ? "" : SpxPathDlmtString,\
                             out,in);
                     if(NULL == new_path){
-                        SpxLogFmt1(p->log,SpxLogError,\
+                        SpxLogFmt1(c->log,SpxLogError,\
                                 "create new path is fail.path:%02X/&02X",\
                                 out,in);
                         continue;
                     }
                     if(!spx_is_dir(new_path,&err)){
-                        err = spx_mkdir(p->log,new_path,SpxPathMode);
-                        SpxLogFmt2(p->log,SpxLogError,err,\
+                        err = spx_mkdir(c->log,new_path,SpxPathMode);
+                        SpxLogFmt2(c->log,SpxLogError,err,\
                                 "mkdir %s is fail.",\
                                 new_path);
                     }
@@ -70,4 +67,5 @@ err_t ydb_storage_mountpoint_init(struct spx_properties *p){
     spx_string_free(path);
     return err;
 }
+
 

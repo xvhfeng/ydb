@@ -19,7 +19,6 @@
 
 #include "include/spx_types.h"
 #include "include/spx_defs.h"
-#include "include/spx_nio_context.h"
 #include "include/spx_message.h"
 #include "include/spx_io.h"
 #include "include/spx_alloc.h"
@@ -28,6 +27,8 @@
 #include "include/spx_map.h"
 #include "include/spx_collection.h"
 #include "include/spx_ref.h"
+#include "include/spx_job.h"
+#include "include/spx_task.h"
 
 #include "ydb_protocol.h"
 
@@ -42,39 +43,40 @@
  */
 
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(\
-        string_t groupname,struct spx_nio_context *nio_context);
+        string_t groupname,struct spx_job_context *jcontext);
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(\
-        string_t groupname,struct spx_nio_context *nio_context);
+        string_t groupname,struct spx_job_context *jcontext);
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(\
-        string_t groupname,struct spx_nio_context *nio_context);
+        string_t groupname,struct spx_job_context *jcontext);
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(
-        string_t groupname,struct spx_nio_context *nio_context);
+        string_t groupname,struct spx_job_context *jcontext);
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
-        string_t groupname,string_t machineid,struct spx_nio_context *nio_context,
+        string_t groupname,string_t machineid,struct spx_job_context *jcontext,
         bool_t check_freedisk);
 
 spx_private struct ydb_remote_storage *curr_storage = NULL;
-spx_private size_t ydb_remote_storage_idx = 0;
+//spx_private size_t ydb_remote_storage_idx = 0;
 spx_private struct spx_map_iter *curr_iter = NULL;
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t groupname,struct spx_nio_context *nio_context){
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t groupname,struct spx_job_context *jcontext){
     if(NULL == ydb_remote_storages){
-        nio_context->err = ENOENT;
+        jcontext->err = ENOENT;
         return NULL;
     }
 
+    struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) jcontext->config;
     struct spx_map *map = NULL;
-    nio_context-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
-    if(0 != nio_context->err){
+    jcontext-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
+    if(0 != jcontext->err){
         return NULL;
     }
     if(NULL == map){
-        nio_context->err = ENOENT;
+        jcontext->err = ENOENT;
         return NULL;
     }
 
     if(NULL == curr_iter){// not free and keep status
-        curr_iter = spx_map_iter_new(map,&(nio_context->err));
+        curr_iter = spx_map_iter_new(map,&(jcontext->err));
         if(NULL == curr_iter){
             return NULL;
         }
@@ -83,7 +85,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t
     struct ydb_remote_storage *storage = NULL;
     int trytimes = 1;
     while(true){
-        struct spx_map_node *n = spx_map_iter_next(curr_iter,&(nio_context->err));
+        struct spx_map_node *n = spx_map_iter_next(curr_iter,&(jcontext->err));
         if(NULL == n){
             if(!trytimes){
                 break;
@@ -98,12 +100,10 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t
             continue;
         }
 
-        size_t *heartbeat = 0;
-        spx_properties_get(nio_context->config,ydb_tracker_config_heartbeat_key,(void **) &heartbeat,NULL);
         time_t now = spx_now();
         if(YDB_STORAGE_RUNNING != storage->status
                 || 0 >= storage->freesize
-                || *heartbeat + storage->last_heartbeat <(u64_t) now){
+                || c->heartbeat + storage->last_heartbeat <(u64_t) now){
             continue;
         }
         break;
@@ -111,32 +111,33 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t
     return storage;
 }
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(string_t groupname,struct spx_nio_context *nio_context){
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(string_t groupname,struct spx_job_context *jcontext){
  if(NULL == ydb_remote_storages){
-        nio_context->err = ENOENT;
+        jcontext->err = ENOENT;
         return NULL;
     }
 
     struct spx_map *map = NULL;
-    nio_context-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
-    if(0 != nio_context->err){
+    jcontext-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
+    if(0 != jcontext->err){
         return NULL;
     }
     if(NULL == map){
-        nio_context->err = ENOENT;
+        jcontext->err = ENOENT;
         return NULL;
     }
 
-    struct spx_map_iter *iter = spx_map_iter_new(map,&(nio_context->err));
+    struct spx_map_iter *iter = spx_map_iter_new(map,&(jcontext->err));
         if(NULL == iter){
             return NULL;
         }
 
     struct ydb_remote_storage *storage = NULL;
     struct ydb_remote_storage *dest = NULL;
+    struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
     u64_t freedisk = 0;
     while(true){
-        struct spx_map_node *n = spx_map_iter_next(iter,&(nio_context->err));
+        struct spx_map_node *n = spx_map_iter_next(iter,&(jcontext->err));
         if(NULL == n){
             break;
         }
@@ -146,12 +147,10 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(stri
             continue;
         }
 
-        size_t *heartbeat = 0;
-        spx_properties_get(nio_context->config,ydb_tracker_config_heartbeat_key,(void **) &heartbeat,NULL);
         time_t now = spx_now();
         if(YDB_STORAGE_RUNNING != storage->status
                 || 0 >= storage->freesize
-                || *heartbeat + storage->last_heartbeat <(u64_t) now){
+                || c->heartbeat + storage->last_heartbeat <(u64_t) now){
             continue;
         }
         if(freedisk < storage->freesize){
@@ -165,115 +164,27 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(stri
     return dest;
 }
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(string_t groupname,struct spx_nio_context *nio_context){
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(string_t groupname,struct spx_job_context *jcontext){
     if(NULL == curr_storage){
-        curr_storage = ydb_tracker_find_storage_by_loop(groupname,nio_context);
+        curr_storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
     }
-    size_t *heartbeat = 0;
-    spx_properties_get(nio_context->config,ydb_tracker_config_heartbeat_key,(void **) &heartbeat,NULL);
     time_t now = spx_now();
+    struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
     if(YDB_STORAGE_RUNNING != curr_storage->status
             || 0 >= curr_storage->freesize
-            || *heartbeat + curr_storage->last_heartbeat <(u64_t) now){
-        curr_storage = ydb_tracker_find_storage_by_loop(groupname,nio_context);
+            || c->heartbeat + curr_storage->last_heartbeat <(u64_t) now){
+        curr_storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
     }
     return curr_storage;
 }
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(string_t groupname,struct spx_nio_context *nio_context){
-        string_t master = NULL;
-        spx_properties_get(nio_context->config,ydb_tracker_config_master_key,(void **) &master,NULL);
-        if(SpxStringIsNullOrEmpty(master)){
-            nio_context->err = ENOENT;
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(string_t groupname,struct spx_job_context *jcontext){
+    struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
+        if(SpxStringIsNullOrEmpty(c->master)){
+            jcontext->err = ENOENT;
             return NULL;
         }
-        return ydb_tracker_find_storage_for_operator(groupname,master,nio_context,true);
-}
-
-err_t ydb_tracker_query_upload_storage(int fd,struct spx_nio_context *nio_context){
-    if(NULL == nio_context){
-        return EINVAL;
-    }
-
-    struct spx_msg_header *header = nio_context->reader_header;
-    struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
-    if(NULL == ctx){
-        return EINVAL;
-    }
-    nio_context->reader_body_ctx = ctx;
-    size_t len = 0;
-    nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
-    if(0 != nio_context->err){
-        return nio_context->err;
-    }
-    if(header->bodylen != len){
-        nio_context->err = ENOENT;
-        return nio_context->err;
-    }
-
-    string_t groupname = NULL;
-    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(nio_context->err));
-    if(NULL == groupname){
-        return nio_context->err;
-    }
-
-    int *mode = NULL;
-    spx_properties_get(nio_context->config,ydb_tracker_config_balance_key,(void **) &mode,NULL);
-    if(NULL == mode){
-        nio_context->err = ENOENT;
-        goto r1;
-    }
-
-    struct ydb_remote_storage *storage = NULL;
-    switch(*mode){
-        case YDB_TRACKER_BALANCE_LOOP:{
-                                          storage = ydb_tracker_find_storage_by_loop(groupname,nio_context);
-                                          break;
-                                      }
-
-        case YDB_TRACKER_BALANCE_MAXDISK:{
-                                             storage = ydb_tracker_find_storage_by_freedisk(groupname,nio_context);
-                                             break;
-                                         }
-        case YDB_TRACKER_BALANCE_TURN :{
-                                           storage = ydb_tracker_find_storage_by_turn(groupname,nio_context);
-                                           break;
-                                       }
-        case YDB_TRACKER_BALANCE_MASTER :{
-                                             storage = ydb_tracker_find_storage_by_master(groupname,nio_context);
-                                             break;
-                                         }
-        default:{
-                    storage = ydb_tracker_find_storage_by_loop(groupname,nio_context);
-                    break;
-                }
-    }
-    if(NULL == storage){
-        nio_context->err = 0 == nio_context->err ? ENOENT : nio_context->err;
-        goto r1;
-    }
-    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(nio_context->err));
-    if(NULL == response_header){
-        return nio_context->err;
-    }
-    nio_context->writer_header = response_header;
-    response_header->protocol = YDB_TRACKER_QUERY_UPLOAD_STORAGE;
-    response_header->version = YDB_VERSION;
-    response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->writer_header_ctx){
-        return nio_context->err;
-    }
-    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
-    if(NULL == response_body_ctx){
-        return nio_context->err;
-    }
-    nio_context->writer_body_ctx = response_body_ctx;
-    spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
-    spx_msg_pack_u32(response_body_ctx,storage->port);
-r1:
-    spx_string_free(groupname);
-    return nio_context->err;
+        return ydb_tracker_find_storage_for_operator(groupname,c->master,jcontext,true);
 }
 
 /*
@@ -286,43 +197,42 @@ r1:
  */
 
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
-        string_t groupname,string_t machineid,struct spx_nio_context *nio_context,
+        string_t groupname,string_t machineid,struct spx_job_context *jcontext,
         bool_t check_freedisk){
     if(NULL == ydb_remote_storages){
-        nio_context->err = ENOENT;
+        jcontext->err = ENOENT;
         return NULL;
     }
 
     struct spx_map *map = NULL;
-    nio_context-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
-    if(0 != nio_context->err){
+    jcontext-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
+    if(0 != jcontext->err){
         return NULL;
     }
     if(NULL == map){
-        nio_context->err = ENOENT;
+        jcontext->err = ENOENT;
         return NULL;
     }
 
-    size_t *heartbeat = 0;
-    spx_properties_get(nio_context->config,ydb_tracker_config_heartbeat_key,(void **) &heartbeat,NULL);
 
     time_t now = spx_now();
     struct ydb_remote_storage *storage = NULL;
-    nio_context->err = spx_map_get(map,machineid,spx_string_len(machineid),(void **) storage,NULL);
+    struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
+    jcontext->err = spx_map_get(map,machineid,spx_string_len(machineid),(void **) storage,NULL);
     if(NULL != storage){
         if(YDB_STORAGE_RUNNING == storage->status
                 && (check_freedisk && 0 >= storage->freesize)//for modify
-                && *heartbeat + storage->last_heartbeat >= (u64_t) now){
+                && c->heartbeat + storage->last_heartbeat >= (u64_t) now){
             return storage;
         }
     }
 
-    struct spx_map_iter *iter = spx_map_iter_new(map,&(nio_context->err));
+    struct spx_map_iter *iter = spx_map_iter_new(map,&(jcontext->err));
     if(NULL == iter){
         return NULL;
     }
     struct spx_map_node *n = NULL;
-    while(NULL != (n = spx_map_iter_next(iter,&(nio_context->err)))){
+    while(NULL != (n = spx_map_iter_next(iter,&(jcontext->err)))){
         storage = (struct ydb_remote_storage *) n->v;
         if(NULL == storage){
             continue;
@@ -330,7 +240,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
 
         if(YDB_STORAGE_RUNNING != storage->status
                 || (check_freedisk && 0 >= storage->freesize)
-                || *heartbeat + storage->last_heartbeat <(u64_t) now){
+                || c->heartbeat + storage->last_heartbeat <(u64_t) now){
             continue;
         }
         break;
@@ -340,188 +250,296 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
 }
 
 
-err_t ydb_tracker_query_modify_storage(int fd,struct spx_nio_context *nio_context){
-    if(NULL == nio_context){
-        return EINVAL;
-    }
 
-    struct spx_msg_header *header = nio_context->reader_header;
-    struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
-    if(NULL == ctx){
+err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+    if(NULL == tcontext || NULL == tcontext->jcontext){
         return EINVAL;
     }
-    nio_context->reader_body_ctx = ctx;
-    size_t len = 0;
-    nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
-    if(0 != nio_context->err){
-        return nio_context->err;
-    }
-    if(header->bodylen != len){
-        nio_context->err = ENOENT;
-        return nio_context->err;
+    struct spx_job_context *jcontext = tcontext->jcontext;
+
+    struct spx_msg *ctx = jcontext->reader_body_ctx;
+    if(NULL == ctx){
+        SpxLog1(tcontext->log,SpxLogError,\
+                "reader body ctx is null.");
+        return EINVAL;
     }
 
     string_t groupname = NULL;
-    string_t machineid = NULL;
-    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(nio_context->err));
+    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jcontext->err));
     if(NULL == groupname){
-        return nio_context->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack groupname is fail.");
+        return jcontext->err;
     }
-    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(nio_context->err));
-    if(NULL == machineid){
-        goto r1;
+
+    struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
+
+    struct ydb_remote_storage *storage = NULL;
+    switch(c->balance){
+        case YDB_TRACKER_BALANCE_LOOP:{
+                                          storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
+                                          break;
+                                      }
+
+        case YDB_TRACKER_BALANCE_MAXDISK:{
+                                             storage = ydb_tracker_find_storage_by_freedisk(groupname,jcontext);
+                                             break;
+                                         }
+        case YDB_TRACKER_BALANCE_TURN :{
+                                           storage = ydb_tracker_find_storage_by_turn(groupname,jcontext);
+                                           break;
+                                       }
+        case YDB_TRACKER_BALANCE_MASTER :{
+                                             storage = ydb_tracker_find_storage_by_master(groupname,jcontext);
+                                             break;
+                                         }
+        default:{
+                    storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
+                    break;
+                }
     }
-    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,nio_context,true);
     if(NULL == storage){
-        nio_context->err = 0 == nio_context->err ? ENOENT : nio_context->err;
+        jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "find storage by %s from group:%s is fail.",\
+                tracker_balance_mode_desc[c->balance],groupname);
         goto r1;
     }
-    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(nio_context->err));
+    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
     if(NULL == response_header){
-        return nio_context->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc reponse for query storage is fail.");
+        goto r1;
     }
-    nio_context->writer_header = response_header;
+    jcontext->writer_header = response_header;
+    response_header->protocol = YDB_TRACKER_QUERY_UPLOAD_STORAGE;
+    response_header->version = YDB_VERSION;
+    response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
+    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+    if(NULL == jcontext->writer_header_ctx){
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "header of query storage to msg ctx is fail.");
+        goto r1;
+    }
+    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
+    if(NULL == response_body_ctx){
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc body buffer of query storage is fail."\
+                "the buffer length is %d.",
+                response_header->bodylen);
+        goto r1;
+    }
+    jcontext->writer_body_ctx = response_body_ctx;
+    spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
+    spx_msg_pack_u32(response_body_ctx,storage->port);
+r1:
+    spx_string_free(groupname);
+    return jcontext->err;
+}
+
+err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+    if(NULL == tcontext || NULL == tcontext->jcontext){
+        return EINVAL;
+    }
+
+    struct spx_job_context *jcontext = tcontext->jcontext;
+    string_t groupname = NULL;
+    string_t machineid = NULL;
+    struct spx_msg *ctx = jcontext->reader_body_ctx;
+    if(NULL == ctx){
+        SpxLog1(tcontext->log,SpxLogError,\
+                "reader body ctx is null.");
+        return EINVAL;
+    }
+
+    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jcontext->err));
+    if(NULL == groupname){
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack groupname from msg ctx is fail.");
+        return jcontext->err;
+    }
+    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jcontext->err));
+    if(NULL == machineid){
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack machineid from msg ctx in the group:%s is fail.",\
+                groupname);
+        goto r1;
+    }
+    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,jcontext,true);
+    if(NULL == storage){
+        jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "find storage for modify is fail.");
+        goto r1;
+    }
+    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
+    if(NULL == response_header){
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc reponse header for finding storage to mpdify is fail.");
+        goto r1;
+    }
+    jcontext->writer_header = response_header;
     response_header->protocol = YDB_TRACKER_QUERY_MODIFY_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->writer_header_ctx){
-        return nio_context->err;
+    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+    if(NULL == jcontext->writer_header_ctx){
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "convert response header to msg ctx is fail.");
+        goto r1;
     }
-    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
+    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
-        return nio_context->err;
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc reponse body buffer is fail."\
+                "body buffer length is %d.",\
+                response_header->bodylen);
+        goto r1;
     }
-    nio_context->writer_body_ctx = response_body_ctx;
+    jcontext->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
 
 r1:
     spx_string_free(machineid);
     spx_string_free(groupname);
-    return nio_context->err;
+    return jcontext->err;
 }
 
-err_t ydb_tracker_query_delete_storage(int fd,struct spx_nio_context *nio_context){
-    if(NULL == nio_context){
+err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+    if(NULL == tcontext || NULL == tcontext->jcontext){
         return EINVAL;
     }
 
-    struct spx_msg_header *header = nio_context->reader_header;
-    struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
+    struct spx_job_context *jcontext = tcontext->jcontext;
+    struct spx_msg *ctx = jcontext->reader_body_ctx;
     if(NULL == ctx){
+        SpxLog1(tcontext->log,SpxLogError,\
+                "reader body ctx is null.");
         return EINVAL;
-    }
-    nio_context->reader_body_ctx = ctx;
-    size_t len = 0;
-    nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
-    if(0 != nio_context->err){
-        return nio_context->err;
-    }
-    if(header->bodylen != len){
-        nio_context->err = ENOENT;
-        return nio_context->err;
     }
 
     string_t groupname = NULL;
     string_t machineid = NULL;
-    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(nio_context->err));
+    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jcontext->err));
     if(NULL == groupname){
-        return nio_context->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack groupname from msg ctx is fail.");
+        return jcontext->err;
     }
-    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(nio_context->err));
+    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jcontext->err));
     if(NULL == machineid){
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack machineid from msg ctx in the group:%s is fail.",\
+                groupname);
         goto r1;
     }
-    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,nio_context,true);
+    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,jcontext,true);
     if(NULL == storage){
-        nio_context->err = 0 == nio_context->err ? ENOENT : nio_context->err;
+        jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "find storage for delete is fail.");
         goto r1;
     }
-    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(nio_context->err));
+    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
     if(NULL == response_header){
-        return nio_context->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc response header for finding storage to deleting is fail.");
+        goto r1;
     }
-    nio_context->writer_header = response_header;
+    jcontext->writer_header = response_header;
     response_header->protocol = YDB_TRACKER_QUERY_DELETE_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->writer_header_ctx){
-        return nio_context->err;
+    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+    if(NULL == jcontext->writer_header_ctx){
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "convert response header to msg ctx is fail.");
+        goto r1;
     }
-    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
+    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
-        return nio_context->err;
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc reponse body buffer is fail."\
+                "body buffer length is %d.",\
+                response_header->bodylen);
+        goto r1;
     }
-    nio_context->writer_body_ctx = response_body_ctx;
+    jcontext->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
 
 r1:
     spx_string_free(machineid);
     spx_string_free(groupname);
-    return nio_context->err;
+    return jcontext->err;
 }
 
-err_t ydb_tracker_query_select_storage(int fd,struct spx_nio_context *nio_context){
-    if(NULL == nio_context){
+err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+    if(NULL == tcontext ||NULL == tcontext->jcontext){
         return EINVAL;
     }
 
-    struct spx_msg_header *header = nio_context->reader_header;
-    struct spx_msg *ctx = spx_msg_new(header->bodylen,&(nio_context->err));
+    struct spx_job_context *jcontext = tcontext->jcontext;
+    struct spx_msg *ctx = jcontext->reader_body_ctx;
     if(NULL == ctx){
+        SpxLog1(tcontext->log,SpxLogError,\
+                "reader body ctx is null.");
         return EINVAL;
-    }
-    nio_context->reader_body_ctx = ctx;
-    size_t len = 0;
-    nio_context->err = spx_read_to_msg_nb(fd,ctx,header->bodylen,&len);
-    if(0 != nio_context->err){
-        return nio_context->err;
-    }
-    if(header->bodylen != len){
-        nio_context->err = ENOENT;
-        return nio_context->err;
     }
 
     string_t groupname = NULL;
     string_t machineid = NULL;
-    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(nio_context->err));
+    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jcontext->err));
     if(NULL == groupname){
-        return nio_context->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack groupname from msg ctx is fail.");
+        return jcontext->err;
     }
-    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(nio_context->err));
+    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jcontext->err));
     if(NULL == machineid){
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack machineid from msg ctx in the group:%s is fail.",\
+                groupname);
         goto r1;
     }
-    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,nio_context,true);
+    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,jcontext,true);
     if(NULL == storage){
-        nio_context->err = 0 == nio_context->err ? ENOENT : nio_context->err;
+        jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "find storage for select is fail.");
         goto r1;
     }
-    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(nio_context->err));
+    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
     if(NULL == response_header){
-        return nio_context->err;
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc response header for finding storage to select is fail.");
+        goto r1;
     }
-    nio_context->writer_header = response_header;
+    jcontext->writer_header = response_header;
     response_header->protocol = YDB_TRACKER_QUERY_SELECT_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    nio_context->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(nio_context->err));
-    if(NULL == nio_context->writer_header_ctx){
-        return nio_context->err;
+    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+    if(NULL == jcontext->writer_header_ctx){
+        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
+                "convert response header to msg ctx is fail.");
+        goto r1;
     }
-    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(nio_context->err));
+    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
-        return nio_context->err;
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "alloc reponse body buffer is fail."\
+                "body buffer length is %d.",\
+                response_header->bodylen);
+        goto r1;
     }
-    nio_context->writer_body_ctx = response_body_ctx;
+    jcontext->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
 
 r1:
     spx_string_free(machineid);
     spx_string_free(groupname);
-    return nio_context->err;
+    return jcontext->err;
 }

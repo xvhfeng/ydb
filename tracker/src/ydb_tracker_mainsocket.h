@@ -24,9 +24,9 @@ extern "C" {
 #include <pthread.h>
 
 #include "include/spx_types.h"
-#include "include/spx_properties.h"
 
-pthread_t ydb_tracker_mainsocket_thread_new(SpxLogDelegate *log,struct spx_properties *configurtion,err_t *err);
+#include "ydb_tracker_configurtion.h"
+pthread_t ydb_tracker_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_tracker_configurtion *c,err_t *err);
 
 #ifdef __cplusplus
 }

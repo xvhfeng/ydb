@@ -45,6 +45,12 @@ extern "C" {
 #define YDB_STORAGE_CLOSING 4
 #define YDB_STORAGE_CLOSED 5
 
+#define YDB_STORAGE_UPLOAD 0
+#define YDB_STORAGE_FIND 1
+#define YDB_STORAGE_MODIFY 2
+#define YDB_STORAGE_DELETE 3
+#define YDB_STORAGE_SYNC 4
+
 #ifdef __cplusplus
 }
 #endif

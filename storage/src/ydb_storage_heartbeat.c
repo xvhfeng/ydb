@@ -28,7 +28,6 @@
 #include "include/spx_nio_context.h"
 #include "include/spx_nio.h"
 #include "include/spx_io.h"
-#include "include/spx_properties.h"
 #include "include/spx_list.h"
 #include "include/spx_defs.h"
 
@@ -80,7 +79,7 @@ spx_private err_t ydb_storage_heartbeat_send(int protocol,\
     writer_header->version = YDB_VERSION;
     writer_header->protocol = protocol;
     writer_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN + SpxIpv4Size + sizeof(i32_t)
-                            + sizeof(u64_t) + sizeof(u64_t) + sizeof(i64_t) + sizeof(int);
+        + sizeof(u64_t) + sizeof(u64_t) + sizeof(i64_t) + sizeof(int);
     struct spx_msg *ctx = spx_msg_new(writer_header->bodylen,&err);
     if(NULL == ctx){
         SpxLog2(nio_context->log,SpxLogError,err,\
@@ -135,38 +134,25 @@ r1:
 spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
         ev_timer *w,int revents){
     struct spx_nio_context *nio_context = (struct spx_nio_context *) w->data;
-
-    string_t groupname = NULL;
-    string_t machineid = NULL;
-    string_t ip = NULL;
-    i32_t *port = NULL;
-    struct spx_list *mountpoints = NULL;
-    struct spx_vector *trackers = NULL;
-    u64_t *minfreesize = NULL;
-
-    spx_properties_get(nio_context->config,ydb_storage_config_groupname_key,(void **) &groupname,NULL);
-    spx_properties_get(nio_context->config,ydb_storage_config_machineid_key,(void **) &machineid,NULL);
-    spx_properties_get(nio_context->config,ydb_storage_config_ip_key,(void **) &ip,NULL);
-    spx_properties_get(nio_context->config,ydb_storage_config_port_key,(void **) &port,NULL);
-    spx_properties_get(nio_context->config,ydb_storage_config_mountpoint_key,(void **) &mountpoints,NULL);
-    spx_properties_get(nio_context->config,ydb_storage_config_tracker_key,(void **) &trackers,NULL);
-    spx_properties_get(nio_context->config,ydb_storage_config_freedisk_key,(void **) &minfreesize,NULL);
+    struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) \
+                                         nio_context->config;
 
     u64_t disksize = 0;
     u64_t freesize = 0;
     int i = 0;
     for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
-        struct ydb_storage_mouintpoint *mp = spx_list_get(mountpoints,i);
+        struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)){
             mp->freesize = spx_mountpoint_freesize(mp->path,&(nio_context->err));
             mp->disksize = spx_mountpoint_size(mp->path,&(nio_context->err));
-            mp->freesize = 0 >= mp->freesize - *minfreesize ? 0 : mp->freesize - *minfreesize;
+            mp->freesize = 0 >= mp->freesize - c->freedisk \
+                           ? 0 : mp->freesize - c->freedisk;
             disksize += mp->disksize;
             freesize += mp->freesize;
         }
     }
 
-    struct spx_vector_iter *iter = spx_vector_iter_init(trackers,&(nio_context->err));
+    struct spx_vector_iter *iter = spx_vector_iter_init(c->trackers,&(nio_context->err));
     if(NULL == iter){
         SpxLog2(nio_context->log,SpxLogError,nio_context->err,\
                 "init the trackers iter is fail.");
@@ -176,7 +162,7 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     struct spx_host *host = NULL;
     while(NULL != (host = spx_vector_iter_next(iter))){
         ydb_storage_heartbeat_send( YDB_HEARTBEAT_STORAGE,
-                host,groupname,machineid,ip,*port,
+                host,c->groupname,c->machineid,c->ip,c->port,
                 ydb_storage_first_start,disksize,freesize,ydb_storage_status,
                 heartbeat_nio_context);
     }
@@ -271,7 +257,8 @@ void ydb_storage_shutdown(struct spx_host *tracker,string_t groupname,string_t m
     ydb_storage_status = YDB_STORAGE_CLOSED;
 }
 
-void ydb_storage_heartbeat_nio_writer_body_handler(int fd,struct spx_nio_context *nio_context){/*{{{*/
+void ydb_storage_heartbeat_nio_writer_body_handler(\
+        int fd,struct spx_nio_context *nio_context){/*{{{*/
     spx_nio_writer_body_handler(fd,nio_context);
     spx_nio_regedit_reader(nio_context);
 }/*}}}*/

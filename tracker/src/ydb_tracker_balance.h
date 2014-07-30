@@ -22,12 +22,12 @@ extern "C" {
 #endif
 
 #include "include/spx_types.h"
-#include "include/spx_nio_context.h"
+#include "include/spx_task.h"
 
-err_t ydb_tracker_query_upload_storage(int fd,struct spx_nio_context *nio_context);
-err_t ydb_tracker_query_modify_storage(int fd,struct spx_nio_context *nio_context);
-err_t ydb_tracker_query_delete_storage(int fd,struct spx_nio_context *nio_context);
-err_t ydb_tracker_query_select_storage(int fd,struct spx_nio_context *nio_context);
+err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
+err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
+err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
+err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
 
 #ifdef __cplusplus
 }

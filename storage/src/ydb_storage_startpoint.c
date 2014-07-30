@@ -27,31 +27,11 @@
 
 #include "ydb_storage_configurtion.h"
 
-err_t ydb_storage_startpoint_load(SpxLogDelegate *log,struct spx_properties *p){
+err_t ydb_storage_startpoint_load(SpxLogDelegate *log,\
+        struct ydb_storage_configurtion *c){
     err_t err = 0;
-    string_t basepath = NULL;
-    string_t groupname = NULL;
-    string_t machineid = NULL;
-    err = spx_properties_get(p,ydb_storage_config_basepath_key,(void **) &basepath,NULL);
-    if(SpxStringIsNullOrEmpty(basepath)){
-        SpxLog2(log,SpxLogError,err,"get the basepath is empty.");
-        return err;
-    }
 
-    err = spx_properties_get(p,ydb_storage_config_groupname_key,(void **) &groupname,NULL);
-    if(SpxStringIsNullOrEmpty(groupname)){
-        SpxLog2(log,SpxLogError,err,"get the groupname is empty.");
-        return err;
-    }
-
-    err = spx_properties_get(p,ydb_storage_config_machineid_key,(void **) &machineid,NULL);
-    if(SpxStringIsNullOrEmpty(machineid)){
-        SpxLog2(log,SpxLogError,err,"get the machineid is empty.");
-        return err;
-    }
-
-
-    string_t new_basepath = spx_string_dup(basepath,&err);
+    string_t new_basepath = spx_string_dup(c->basepath,&err);
     if(NULL == new_basepath){
         SpxLog2(log,SpxLogError,err,"dup the basepath is fail.");
         return err;
@@ -60,9 +40,13 @@ err_t ydb_storage_startpoint_load(SpxLogDelegate *log,struct spx_properties *p){
     string_t filename = NULL;
     string_t line = NULL;
     if(SpxStringEndWith(new_basepath,SpxPathDlmt)){
-        filename = spx_string_cat_printf(&err,new_basepath,"%s%s-%s-ydb-storage.mid",new_basepath,groupname,machineid);
+        filename = spx_string_cat_printf(&err,new_basepath,\
+                "%s%s-%s-ydb-storage.mid",\
+                new_basepath,c->groupname,c->machineid);
     } else {
-        filename = spx_string_cat_printf(&err,new_basepath,"%s/%s-%s-ydb-storage.mid",new_basepath,groupname,machineid);
+        filename = spx_string_cat_printf(&err,new_basepath,\
+                "%s/%s-%s-ydb-storage.mid",\
+                new_basepath,c->groupname,c->machineid);
     }
     if(NULL == filename){
         SpxLog2(log,SpxLogError,err,"get storage mid filename is fail.");
@@ -73,7 +57,8 @@ err_t ydb_storage_startpoint_load(SpxLogDelegate *log,struct spx_properties *p){
         FILE *fp = fopen(filename,"a+");
         if(NULL == fp) {
             err = errno;
-            SpxLogFmt2(log,SpxLogError,err,"open the mid file is fail.filename:&s.",filename);
+            SpxLogFmt2(log,SpxLogError,err,\
+                    "open the mid file is fail.filename:&s.",filename);
             goto r1;
         }
         line = spx_string_newlen(NULL,SpxStringRealSize(SpxLineSize),&err);
@@ -101,7 +86,8 @@ err_t ydb_storage_startpoint_load(SpxLogDelegate *log,struct spx_properties *p){
         FILE *fp = fopen(filename,"a+");
         if(NULL == fp) {
             err = errno;
-            SpxLogFmt2(log,SpxLogError,err,"create and open the mid file is fail.filename:&s.",filename);
+            SpxLogFmt2(log,SpxLogError,err,\
+                    "create and open the mid file is fail.filename:&s.",filename);
             goto r1;
         }
         ydb_storage_first_start = spx_now();
@@ -122,31 +108,10 @@ r1:
 }
 
 
-err_t ydb_storage_startpoint_reset(SpxLogDelegate *log,struct spx_properties *p){
+err_t ydb_storage_startpoint_reset(SpxLogDelegate *log,\
+        struct ydb_storage_configurtion *c){
     err_t err = 0;
-    string_t basepath = NULL;
-    string_t groupname = NULL;
-    string_t machineid = NULL;
-    err = spx_properties_get(p,ydb_storage_config_basepath_key,(void **) &basepath,NULL);
-    if(SpxStringIsNullOrEmpty(basepath)){
-        SpxLog2(log,SpxLogError,err,"get the basepath is empty.");
-        return err;
-    }
-
-    err = spx_properties_get(p,ydb_storage_config_groupname_key,(void **) &groupname,NULL);
-    if(SpxStringIsNullOrEmpty(groupname)){
-        SpxLog2(log,SpxLogError,err,"get the groupname is empty.");
-        return err;
-    }
-
-    err = spx_properties_get(p,ydb_storage_config_machineid_key,(void **) &machineid,NULL);
-    if(SpxStringIsNullOrEmpty(machineid)){
-        SpxLog2(log,SpxLogError,err,"get the machineid is empty.");
-        return err;
-    }
-
-
-    string_t new_basepath = spx_string_dup(basepath,&err);
+    string_t new_basepath = spx_string_dup(c->basepath,&err);
     if(NULL == new_basepath){
         SpxLog2(log,SpxLogError,err,"dup the basepath is fail.");
         return err;
@@ -160,9 +125,13 @@ err_t ydb_storage_startpoint_reset(SpxLogDelegate *log,struct spx_properties *p)
     }
     string_t filename = NULL;
     if(SpxStringEndWith(new_basepath,SpxPathDlmt)){
-        filename = spx_string_cat_printf(&err,new_basepath,"%s%s-%s-ydb-storage.mid",new_basepath,groupname,machineid);
+        filename = spx_string_cat_printf(&err,new_basepath,\
+                "%s%s-%s-ydb-storage.mid",\
+                new_basepath,c->groupname,c->machineid);
     } else {
-        filename = spx_string_cat_printf(&err,new_basepath,"%s/%s-%s-ydb-storage.mid",new_basepath,groupname,machineid);
+        filename = spx_string_cat_printf(&err,new_basepath,\
+                "%s/%s-%s-ydb-storage.mid",\
+                new_basepath,c->groupname,c->machineid);
     }
     if(NULL == filename){
         SpxLog2(log,SpxLogError,err,"get storage mid filename is fail.");
@@ -172,7 +141,8 @@ err_t ydb_storage_startpoint_reset(SpxLogDelegate *log,struct spx_properties *p)
     FILE *fp = fopen(filename,"w+");
     if(NULL == fp) {
         err = errno;
-        SpxLogFmt2(log,SpxLogError,err,"create and open the mid file is fail.filename:&s.",filename);
+        SpxLogFmt2(log,SpxLogError,err,\
+                "create and open the mid file is fail.filename:&s.",filename);
         goto r1;
     }
     ydb_storage_first_start = spx_now();
