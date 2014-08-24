@@ -4,8 +4,8 @@
  * this software or lib may be copied only under the terms of the gnu general
  * public license v3, which may be found in the source kit.
  *
- *       Filename:  ydb_tracker_network_module.c
- *        Created:  2014/07/28 16时49分35秒
+ *       Filename:  ydb_storage_network_module.c
+ *        Created:  2014/07/31 11时15分47秒
  *         Author:  Seapeak.Xu (seapeak.cnblog.com), xvhfeng@gmail.com
  *        Company:  Tencent Literature
  *         Remark:
@@ -15,29 +15,39 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <ev.h>
-#include <errno.h>
 
 #include "include/spx_types.h"
-#include "include/spx_defs.h"
 #include "include/spx_job.h"
-#include "include/spx_module.h"
-#include "include/spx_task_module.h"
-#include "include/spx_io.h"
 #include "include/spx_nio.h"
 #include "include/spx_task.h"
+#include "include/spx_module.h"
+#include "include/spx_network_module.h"
+#include "include/spx_task_module.h"
+#include "include/spx_message.h"
+#include "include/spx_io.h"
 
+#include "ydb_storage_configurtion.h"
 
-bool_t ydb_tracker_network_module_header_validator_handler(struct spx_job_context *jcontext){
+bool_t ydb_storage_network_module_header_validator_handler(struct spx_job_context *jcontext){
     return true;
 }
 
-void ydb_tracker_network_module_header_validator_fail_handler(struct spx_job_context *jcontext){
+void ydb_storage_network_module_header_validator_fail_handler(struct spx_job_context *jcontext){
     return;
 }
 
-void ydb_tracker_network_module_request_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_reader_body_handler(fd,jcontext,jcontext->reader_header->bodylen);
+void ydb_storage_network_module_request_body_before_handler(struct spx_job_context *jc){
+    jc->is_lazy_recv = false;
+    struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) jc->config;
+    if(c->lazyrecv){
+        if(c->lazysize < jc->reader_header->bodylen - jc->reader_header->offset){
+            jc->is_lazy_recv = true;
+        }
+    }
+}
+
+void ydb_storage_network_module_request_body_handler(int fd,struct spx_job_context *jcontext){
+    spx_nio_reader_body_handler(fd,jcontext);
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "read body is fail.");
@@ -56,12 +66,17 @@ void ydb_tracker_network_module_request_body_handler(int fd,struct spx_job_conte
     return;
 }
 
-void ydb_tracker_network_module_response_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_writer_body_handler(fd,jcontext,jcontext->writer_header->bodylen);
+void ydb_storage_network_module_response_body_handler(int fd,struct spx_job_context *jcontext){
+    spx_nio_writer_body_handler(fd,jcontext);//send data for explaning the body first
+    if(0 != jcontext->err){
+        SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
+                "send data for body explaning itself first that is fail.");
+        return;
+    }
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "write body buffer is fail.");
     }
+    spx_job_pool_push(g_spx_job_pool,jcontext);
     return;
 }
-

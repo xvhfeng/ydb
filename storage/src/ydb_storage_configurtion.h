@@ -65,8 +65,6 @@ extern "C" {
     };
 
 
-    extern int ydb_storage_status;
-    extern u64_t ydb_storage_first_start;
 
     struct ydb_storage_configurtion{
         SpxLogDelegate *log;
@@ -78,19 +76,20 @@ extern "C" {
         string_t logprefix;
         u64_t logsize;
         i8_t loglevel;
+        u64_t binlog_size;
+        u32_t runtime_flush_timespan;
         i8_t balance;
-        string_t master;
+        u8_t master;
         u32_t heartbeat;
         bool_t daemon;
-        u32_t nio_thread_size;
-        u32_t nio_context_size;
-        u32_t sio_thread_size;
+        u32_t notifier_module_thread_size;
+        u32_t network_module_thread_size;
+        u32_t task_module_thread_size;
+        u32_t context_size;
         u64_t stacksize;
         string_t groupname;
         string_t machineid;
         u64_t freedisk;
-        u32_t dio_thread_size;
-        u32_t dio_context_size;
         struct spx_list *mountpoints;
         struct spx_vector *trackers;
         i32_t storerooms;
@@ -109,7 +108,7 @@ extern "C" {
         bool_t lazyrecv;
         bool_t lazysize;
         bool_t sendfile;
-
+        size_t pagesize;
     };
 
 

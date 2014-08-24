@@ -95,6 +95,7 @@ int main(int argc,char **argv){
         abort();
     }
     ydb_tracker_regedit_signal(mainloop);
+    ev_loop(mainloop,0);
 
     g_spx_job_pool = spx_job_pool_new(log,\
             c,\

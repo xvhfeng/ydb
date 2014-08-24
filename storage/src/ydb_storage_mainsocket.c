@@ -1,20 +1,18 @@
 /*
  * =====================================================================================
  *
- *       Filename:  ydb_tracker_mainsocket.c
+ * this software or lib may be copied only under the terms of the gnu general
+ * public license v3, which may be found in the source kit.
  *
- *    Description:
- *
- *        Version:  1.0
- *        Created:  2014/06/30 18时06分04秒
- *       Revision:  none
- *       Compiler:  gcc
- *
- *         Author:  YOUR NAME (),
- *   Organization:
+ *       Filename:  ydb_storage_mainsocket.c
+ *        Created:  2014/07/31 10时48分05秒
+ *         Author:  Seapeak.Xu (seapeak.cnblog.com), xvhfeng@gmail.com
+ *        Company:  Tencent Literature
+ *         Remark:
  *
  * =====================================================================================
  */
+
 #include <stdlib.h>
 #include <pthread.h>
 
@@ -25,16 +23,16 @@
 #include "include/spx_socket.h"
 #include "include/spx_io.h"
 
-#include "ydb_tracker_configurtion.h"
+#include "ydb_storage_configurtion.h"
 
 struct mainsocket_thread_arg{
     SpxLogDelegate *log;
-    struct ydb_tracker_configurtion *c;
+    struct ydb_storage_configurtion *c;
 };
 
-spx_private void *ydb_tracker_mainsocket_create(void *arg);
+spx_private void *ydb_storage_mainsocket_create(void *arg);
 
-pthread_t ydb_tracker_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_tracker_configurtion *c,err_t *err){
+pthread_t ydb_storage_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err){
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     size_t ostack_size = 0;
@@ -49,17 +47,17 @@ pthread_t ydb_tracker_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_track
     arg.c = c;
 
     pthread_t tid = 0;
-    if (0 !=(*err =  pthread_create(&tid, &attr, ydb_tracker_mainsocket_create,
+    if (0 !=(*err =  pthread_create(&tid, &attr, ydb_storage_mainsocket_create,
                     &arg))){
         return NULL;
     }
     return tid;
 }
 
-spx_private void *ydb_tracker_mainsocket_create(void *arg){
+spx_private void *ydb_storage_mainsocket_create(void *arg){
     struct mainsocket_thread_arg *mainsocket_arg = (struct mainsocket_thread_arg *) arg;
     SpxLogDelegate *log = mainsocket_arg->log;
-    struct ydb_tracker_configurtion *c= mainsocket_arg->c;
+    struct ydb_storage_configurtion *c= mainsocket_arg->c;
     err_t err = 0;
     int mainsocket =  spx_socket_new(&err);
     if(0 == mainsocket){

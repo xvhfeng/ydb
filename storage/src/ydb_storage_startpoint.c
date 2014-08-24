@@ -26,6 +26,7 @@
 #include "include/spx_path.h"
 
 #include "ydb_storage_configurtion.h"
+#include "ydb_storage_state.h"
 
 err_t ydb_storage_startpoint_load(SpxLogDelegate *log,\
         struct ydb_storage_configurtion *c){
@@ -69,8 +70,8 @@ err_t ydb_storage_startpoint_load(SpxLogDelegate *log,\
         }
         line = fgets(line,SpxLineSize,fp);
         if(NULL == line){
-            ydb_storage_first_start = spx_now();
-            string_t time = spx_string_from_i64(ydb_storage_first_start,&err);
+            g_ydb_storage_state->ydb_storage_first_start = spx_now();
+            string_t time = spx_string_from_i64(g_ydb_storage_state->ydb_storage_first_start,&err);
             if(NULL == time){
                 SpxLog2(log,SpxLogError,err,"convect u64_t to string is fail.");
                 fclose(fp);
@@ -79,7 +80,7 @@ err_t ydb_storage_startpoint_load(SpxLogDelegate *log,\
             fwrite(time,sizeof(char),spx_string_len(time),fp);
             spx_string_free(time);
         } else {
-            ydb_storage_first_start = (u64_t)  strtoul(line,NULL,10);
+            g_ydb_storage_state->ydb_storage_first_start = (u64_t)  strtoul(line,NULL,10);
         }
         fclose(fp);
     } else {
@@ -90,8 +91,8 @@ err_t ydb_storage_startpoint_load(SpxLogDelegate *log,\
                     "create and open the mid file is fail.filename:&s.",filename);
             goto r1;
         }
-        ydb_storage_first_start = spx_now();
-        string_t time = spx_string_from_i64(ydb_storage_first_start,&err);
+        g_ydb_storage_state->ydb_storage_first_start = spx_now();
+        string_t time = spx_string_from_i64(g_ydb_storage_state->ydb_storage_first_start,&err);
         if(NULL == time){
             SpxLog2(log,SpxLogError,err,"convect u64_t to string is fail.");
             fclose(fp);
@@ -145,8 +146,8 @@ err_t ydb_storage_startpoint_reset(SpxLogDelegate *log,\
                 "create and open the mid file is fail.filename:&s.",filename);
         goto r1;
     }
-    ydb_storage_first_start = spx_now();
-    string_t time = spx_string_from_i64(ydb_storage_first_start,&err);
+    g_ydb_storage_state->ydb_storage_first_start = spx_now();
+    string_t time = spx_string_from_i64(g_ydb_storage_state->ydb_storage_first_start,&err);
     if(NULL == time){
         SpxLog2(log,SpxLogError,err,"convect u64_t to string is fail.");
         fclose(fp);
