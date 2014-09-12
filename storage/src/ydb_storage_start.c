@@ -16,14 +16,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "include/spx_types.h"
-#include "include/spx_properties.h"
-#include "include/spx_defs.h"
-#include "include/spx_io.h"
-#include "include/spx_time.h"
-#include "include/spx_path.h"
-#include "include/spx_list.h"
-#include "include/spx_string.h"
+#include "spx_types.h"
+#include "spx_properties.h"
+#include "spx_defs.h"
+#include "spx_io.h"
+#include "spx_time.h"
+#include "spx_path.h"
+#include "spx_list.h"
+#include "spx_string.h"
 
 #include "ydb_storage_configurtion.h"
 

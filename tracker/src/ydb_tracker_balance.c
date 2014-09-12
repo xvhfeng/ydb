@@ -17,18 +17,18 @@
  */
 #include <stdlib.h>
 
-#include "include/spx_types.h"
-#include "include/spx_defs.h"
-#include "include/spx_message.h"
-#include "include/spx_io.h"
-#include "include/spx_alloc.h"
-#include "include/spx_string.h"
-#include "include/spx_time.h"
-#include "include/spx_map.h"
-#include "include/spx_collection.h"
-#include "include/spx_ref.h"
-#include "include/spx_job.h"
-#include "include/spx_task.h"
+#include "spx_types.h"
+#include "spx_defs.h"
+#include "spx_message.h"
+#include "spx_io.h"
+#include "spx_alloc.h"
+#include "spx_string.h"
+#include "spx_time.h"
+#include "spx_map.h"
+#include "spx_collection.h"
+#include "spx_ref.h"
+#include "spx_job.h"
+#include "spx_task.h"
 
 #include "ydb_protocol.h"
 
@@ -51,14 +51,15 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(\
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(
         string_t groupname,struct spx_job_context *jcontext);
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
-        string_t groupname,string_t machineid,struct spx_job_context *jcontext,
-        bool_t check_freedisk);
+        string_t groupname,string_t machineid,string_t syncgroup,\
+        struct spx_job_context *jcontext,
+        bool_t check_freedisk,bool_t check_syncgroup);
 
 spx_private struct ydb_remote_storage *curr_storage = NULL;
 //spx_private size_t ydb_remote_storage_idx = 0;
 spx_private struct spx_map_iter *curr_iter = NULL;
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t groupname,struct spx_job_context *jcontext){
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t groupname,struct spx_job_context *jcontext){/*{{{*/
     if(NULL == ydb_remote_storages){
         jcontext->err = ENOENT;
         return NULL;
@@ -109,9 +110,9 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t
         break;
     }
     return storage;
-}
+}/*}}}*/
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(string_t groupname,struct spx_job_context *jcontext){
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(string_t groupname,struct spx_job_context *jcontext){/*{{{*/
  if(NULL == ydb_remote_storages){
         jcontext->err = ENOENT;
         return NULL;
@@ -162,9 +163,9 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(stri
     }
     spx_map_iter_free(&iter);
     return dest;
-}
+}/*}}}*/
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(string_t groupname,struct spx_job_context *jcontext){
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(string_t groupname,struct spx_job_context *jcontext){/*{{{*/
     if(NULL == curr_storage){
         curr_storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
     }
@@ -176,16 +177,16 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(string_t
         curr_storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
     }
     return curr_storage;
-}
+}/*}}}*/
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(string_t groupname,struct spx_job_context *jcontext){
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(string_t groupname,struct spx_job_context *jcontext){/*{{{*/
     struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
         if(SpxStringIsNullOrEmpty(c->master)){
             jcontext->err = ENOENT;
             return NULL;
         }
-        return ydb_tracker_find_storage_for_operator(groupname,c->master,jcontext,true);
-}
+        return ydb_tracker_find_storage_for_operator(groupname,c->master,NULL,jcontext,true,false);
+}/*}}}*/
 
 /*
  * file key:groupname + machineid + mount point idx + filename
@@ -197,8 +198,9 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(string
  */
 
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
-        string_t groupname,string_t machineid,struct spx_job_context *jcontext,
-        bool_t check_freedisk){
+        string_t groupname,string_t machineid,string_t syncgroup,\
+        struct spx_job_context *jcontext,
+        bool_t check_freedisk,bool_t check_syncgroup){/*{{{*/
     if(NULL == ydb_remote_storages){
         jcontext->err = ENOENT;
         return NULL;
@@ -240,18 +242,17 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
 
         if(YDB_STORAGE_RUNNING != storage->status
                 || (check_freedisk && 0 >= storage->freesize)
-                || c->heartbeat + storage->last_heartbeat <(u64_t) now){
+                || c->heartbeat + storage->last_heartbeat <(u64_t) now
+                || (check_syncgroup && 0 != spx_string_casecmp_string(syncgroup,storage->syncgroup))){
             continue;
         }
         break;
     }
     spx_map_iter_free(&iter);
     return storage;
-}
+}/*}}}*/
 
-
-
-err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext || NULL == tcontext->jcontext){
         return EINVAL;
     }
@@ -335,9 +336,9 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
 r1:
     spx_string_free(groupname);
     return jcontext->err;
-}
+}/*}}}*/
 
-err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext || NULL == tcontext->jcontext){
         return EINVAL;
     }
@@ -345,6 +346,7 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
     struct spx_job_context *jcontext = tcontext->jcontext;
     string_t groupname = NULL;
     string_t machineid = NULL;
+    string_t syncgroup = NULL;
     struct spx_msg *ctx = jcontext->reader_body_ctx;
     if(NULL == ctx){
         SpxLog1(tcontext->log,SpxLogError,\
@@ -365,7 +367,16 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
                 groupname);
         goto r1;
     }
-    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,jcontext,true);
+    syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jcontext->err));
+    if(NULL == syncgroup){
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack syncgroup from msg ctx in the group:%s is fail.",\
+                groupname);
+        goto r1;
+    }
+
+    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
+            groupname,machineid,syncgroup,jcontext,true,false);
     if(NULL == storage){
         jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
         SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
@@ -403,10 +414,11 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
 r1:
     spx_string_free(machineid);
     spx_string_free(groupname);
+    spx_string_free(syncgroup);
     return jcontext->err;
-}
+}/*}}}*/
 
-err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext || NULL == tcontext->jcontext){
         return EINVAL;
     }
@@ -421,6 +433,7 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
 
     string_t groupname = NULL;
     string_t machineid = NULL;
+    string_t syncgroup = NULL;
     groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jcontext->err));
     if(NULL == groupname){
         SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
@@ -434,7 +447,15 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
                 groupname);
         goto r1;
     }
-    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,jcontext,true);
+    syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jcontext->err));
+    if(NULL == syncgroup){
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack syncgroup from msg ctx in the group:%s is fail.",\
+                groupname);
+        goto r1;
+    }
+    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
+            groupname,machineid,syncgroup,jcontext,false,false);
     if(NULL == storage){
         jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
         SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
@@ -472,10 +493,11 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
 r1:
     spx_string_free(machineid);
     spx_string_free(groupname);
+    spx_string_free(syncgroup);
     return jcontext->err;
-}
+}/*}}}*/
 
-err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext ||NULL == tcontext->jcontext){
         return EINVAL;
     }
@@ -490,6 +512,7 @@ err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_cont
 
     string_t groupname = NULL;
     string_t machineid = NULL;
+    string_t syncgroup = NULL;
     groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jcontext->err));
     if(NULL == groupname){
         SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
@@ -503,7 +526,15 @@ err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_cont
                 groupname);
         goto r1;
     }
-    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(groupname,machineid,jcontext,true);
+    syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jcontext->err));
+    if(NULL == syncgroup){
+        SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
+                "unpack syncgroup from msg ctx in the group:%s is fail.",\
+                groupname);
+        goto r1;
+    }
+    struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
+            groupname,machineid,syncgroup,jcontext,false,false);
     if(NULL == storage){
         jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
         SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
@@ -541,5 +572,6 @@ err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_cont
 r1:
     spx_string_free(machineid);
     spx_string_free(groupname);
+    spx_string_free(syncgroup);
     return jcontext->err;
-}
+}/*}}}*/

@@ -1,0 +1,48 @@
+/*************************************************************
+ *                     _ooOoo_
+ *                    o8888888o
+ *                    88" . "88
+ *                    (| -_- |)
+ *                    O\  =  /O
+ *                 ____/`---'\____
+ *               .'  \\|     |//  `.
+ *              /  \\|||  :  |||//  \
+ *             /  _||||| -:- |||||-  \
+ *             |   | \\\  -  /// |   |
+ *             | \_|  ''\---/''  |   |
+ *             \  .-\__  `-`  ___/-. /
+ *           ___`. .'  /--.--\  `. . __
+ *        ."" '<  `.___\_<|>_/___.'  >'"".
+ *       | | :  `- \`.;`\ _ /`;.`/ - ` : | |
+ *       \  \ `-.   \_ __\ /__ _/   .-` /  /
+ *  ======`-.____`-.___\_____/___.-`____.-'======
+ *                     `=---='
+ *  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ *           佛祖保佑       永无BUG
+ *
+ * ==========================================================================
+ *
+ * this software or lib may be copied only under the terms of the gnu general
+ * public license v3, which may be found in the source kit.
+ *
+ *       Filename:  ydb_client_main.c
+ *        Created:  2014/09/10 13时50分28秒
+ *         Author:  Seapeak.Xu (seapeak.cnblog.com), xvhfeng@gmail.com
+ *        Company:  Tencent Literature
+ *         Remark:
+ *
+ ***********************************************************************/
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "spx_types.h"
+
+#include "ydb_client.h"
+
+int main(int argc,char **argv){
+    err_t err = 0;
+    byte_t *buff = ydb_client_find("127.0.0.1","g001:m001:g001-m001",&err);
+    printf("%s",buff);
+    return 0;
+}

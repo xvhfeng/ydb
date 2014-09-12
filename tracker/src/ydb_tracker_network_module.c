@@ -18,14 +18,14 @@
 #include <ev.h>
 #include <errno.h>
 
-#include "include/spx_types.h"
-#include "include/spx_defs.h"
-#include "include/spx_job.h"
-#include "include/spx_module.h"
-#include "include/spx_task_module.h"
-#include "include/spx_io.h"
-#include "include/spx_nio.h"
-#include "include/spx_task.h"
+#include "spx_types.h"
+#include "spx_defs.h"
+#include "spx_job.h"
+#include "spx_module.h"
+#include "spx_task_module.h"
+#include "spx_io.h"
+#include "spx_nio.h"
+#include "spx_task.h"
 
 
 bool_t ydb_tracker_network_module_header_validator_handler(struct spx_job_context *jcontext){
@@ -37,7 +37,7 @@ void ydb_tracker_network_module_header_validator_fail_handler(struct spx_job_con
 }
 
 void ydb_tracker_network_module_request_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_reader_body_handler(fd,jcontext,jcontext->reader_header->bodylen);
+    spx_nio_reader_body_handler(fd,jcontext);
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "read body is fail.");
@@ -57,7 +57,7 @@ void ydb_tracker_network_module_request_body_handler(int fd,struct spx_job_conte
 }
 
 void ydb_tracker_network_module_response_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_writer_body_handler(fd,jcontext,jcontext->writer_header->bodylen);
+    spx_nio_writer_body_handler(fd,jcontext);
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "write body buffer is fail.");

@@ -22,8 +22,8 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "include/spx_types.h"
-#include "include/spx_list.h"
+#include "spx_types.h"
+#include "spx_list.h"
 
 
 struct ydb_storage_storefile{

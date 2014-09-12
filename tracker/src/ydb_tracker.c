@@ -22,20 +22,20 @@
 #include <ev.h>
 
 
-#include "include/spx_types.h"
-#include "include/spx_string.h"
-#include "include/spx_defs.h"
-#include "include/spx_log.h"
-#include "include/spx_socket.h"
-#include "include/spx_env.h"
-#include "include/spx_nio.h"
-#include "include/spx_configurtion.h"
-#include "include/spx_module.h"
-#include "include/spx_job.h"
-#include "include/spx_task.h"
-#include "include/spx_notifier_module.h"
-#include "include/spx_network_module.h"
-#include "include/spx_task_module.h"
+#include "spx_types.h"
+#include "spx_string.h"
+#include "spx_defs.h"
+#include "spx_log.h"
+#include "spx_socket.h"
+#include "spx_env.h"
+#include "spx_nio.h"
+#include "spx_configurtion.h"
+#include "spx_module.h"
+#include "spx_job.h"
+#include "spx_task.h"
+#include "spx_notifier_module.h"
+#include "spx_network_module.h"
+#include "spx_task_module.h"
 
 
 #include "ydb_tracker_configurtion.h"
@@ -88,7 +88,7 @@ int main(int argc,char **argv){
     }
 
     struct ev_loop *mainloop = NULL;
-    mainloop = ev_default_loop(0);
+    mainloop = ev_loop_new(0);
     if(NULL == mainloop){
         SpxLog1(log,SpxLogError,\
                 "create main loop is fail.");
@@ -98,16 +98,17 @@ int main(int argc,char **argv){
     ev_loop(mainloop,0);
 
     g_spx_job_pool = spx_job_pool_new(log,\
-            c,\
-            c->context_size,\
-            c->timeout,\
-            spx_nio_reader,\
-            spx_nio_writer,\
+                     c,c->context_size,c->timeout,\
+                    spx_nio_reader,\
+                    spx_nio_writer,\
             ydb_tracker_network_module_header_validator_handler,\
             ydb_tracker_network_module_header_validator_fail_handler,\
+            NULL,\
             ydb_tracker_network_module_request_body_handler,\
             ydb_tracker_network_module_response_body_handler,\
             &err);
+
+
     if(NULL == g_spx_job_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc job pool is fail.");
@@ -117,7 +118,6 @@ int main(int argc,char **argv){
     g_spx_task_pool = spx_task_pool_new(log,\
             c->context_size,\
             ydb_tracker_task_module_handler,\
-            NULL,\
             &err);
     if(NULL == g_spx_task_pool){
         SpxLog2(log,SpxLogError,err,\

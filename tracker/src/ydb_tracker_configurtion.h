@@ -21,7 +21,7 @@
 extern "C" {
 #endif
 
-#include "include/spx_types.h"
+#include "spx_types.h"
 
 #define YDB_TRACKER_BALANCE_LOOP 0
 #define YDB_TRACKER_BALANCE_MAXDISK 1
@@ -31,7 +31,7 @@ extern "C" {
 #define ToYdbTrackerConfigurtion(p) \
     (struct ydb_tracker_configurtion *) p
 
-    const char *tracker_balance_mode_desc[]={
+    spx_private char *tracker_balance_mode_desc[]={
         "loop",
         "maxdisk",
         "turn",

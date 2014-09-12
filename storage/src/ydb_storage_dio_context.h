@@ -23,11 +23,11 @@ extern "C" {
 #include <stdio.h>
 #include <ev.h>
 
-#include "include/spx_types.h"
-#include "include/spx_job.h"
-#include "include/spx_task.h"
-#include "include/spx_fixed_vector.h"
-#include "include/spx_message.h"
+#include "spx_types.h"
+#include "spx_job.h"
+#include "spx_task.h"
+#include "spx_fixed_vector.h"
+#include "spx_message.h"
 
 #include "ydb_storage_configurtion.h"
 #include "ydb_storage_storefile.h"

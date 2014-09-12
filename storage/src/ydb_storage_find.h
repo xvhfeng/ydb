@@ -23,9 +23,10 @@ extern "C" {
 #include <stdio.h>
 #include <ev.h>
 
+#include "spx_types.h"
 #include "ydb_storage_dio_context.h"
 
-err_t ydb_storage_dio_delete(struct ev_loop *loop,\
+err_t ydb_storage_dio_find(struct ev_loop *loop,\
         struct ydb_storage_dio_context *dc);
 
 

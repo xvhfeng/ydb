@@ -18,12 +18,12 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-#include "include/spx_types.h"
-#include "include/spx_properties.h"
-#include "include/spx_defs.h"
-#include "include/spx_string.h"
-#include "include/spx_socket.h"
-#include "include/spx_io.h"
+#include "spx_types.h"
+#include "spx_properties.h"
+#include "spx_defs.h"
+#include "spx_string.h"
+#include "spx_socket.h"
+#include "spx_io.h"
 
 #include "ydb_tracker_configurtion.h"
 

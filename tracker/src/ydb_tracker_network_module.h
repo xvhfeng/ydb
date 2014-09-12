@@ -22,8 +22,8 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "include/spx_types.h"
-#include "include/spx_job.h"
+#include "spx_types.h"
+#include "spx_job.h"
 
 bool_t ydb_tracker_network_module_header_validator_handler(struct spx_job_context *jcontext);
 void ydb_tracker_network_module_header_validator_fail_handler(struct spx_job_context *jcontext);

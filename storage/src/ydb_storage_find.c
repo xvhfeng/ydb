@@ -22,29 +22,28 @@
 #include <fcntl.h>
 
 
-#include "include/spx_types.h"
-#include "include/spx_alloc.h"
-#include "include/spx_string.h"
-#include "include/spx_list.h"
-#include "include/spx_path.h"
-#include "include/spx_defs.h"
-#include "include/spx_job.h"
-#include "include/spx_task.h"
-#include "include/spx_message.h"
-#include "include/spx_nio.h"
-#include "include/spx_rand.h"
-#include "include/spx_time.h"
-#include "include/spx_io.h"
-#include "include/spx_message.h"
-#include "include/spx_queue.h"
-#include "include/spx_module.h"
-#include "include/spx_network_module.h"
-#include "include/spx_task.h"
+#include "spx_types.h"
+#include "spx_alloc.h"
+#include "spx_string.h"
+#include "spx_list.h"
+#include "spx_path.h"
+#include "spx_defs.h"
+#include "spx_job.h"
+#include "spx_task.h"
+#include "spx_message.h"
+#include "spx_nio.h"
+#include "spx_rand.h"
+#include "spx_time.h"
+#include "spx_io.h"
+#include "spx_message.h"
+#include "spx_queue.h"
+#include "spx_module.h"
+#include "spx_network_module.h"
+#include "spx_task.h"
 
 #include "ydb_protocol.h"
 
 #include "ydb_storage_configurtion.h"
-#include "ydb_storage_state.h"
 #include "ydb_storage_binlog.h"
 #include "ydb_storage_dio_context.h"
 #include "ydb_storage_dio.h"
@@ -54,7 +53,7 @@
 spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents);
 spx_private void ydb_storage_dio_do_find_form_signalfile(struct ev_loop *loop,ev_async *w,int revents);
 
-err_t ydb_storage_dio_delete(struct ev_loop *loop,\
+err_t ydb_storage_dio_find(struct ev_loop *loop,\
         struct ydb_storage_dio_context *dc){/*{{{*/
     err_t err = 0;
     struct spx_task_context *tc = dc->tc;
@@ -108,7 +107,7 @@ r1:
     return 0;
 }/*}}}*/
 
-spx_private void ydb_storage_dio_do_delete_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*//*{{{*/
+spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) w->data;
     struct spx_task_context *tc = dc->tc;
@@ -256,7 +255,7 @@ r1:
     return;
 }/*}}}*/
 
-spx_private void ydb_storage_dio_do_delete_form_signalfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+spx_private void ydb_storage_dio_do_find_form_signalfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) w->data;
     struct spx_task_context *tc = dc->tc;

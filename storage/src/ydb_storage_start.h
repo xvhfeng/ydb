@@ -18,14 +18,14 @@
 extern "C" {
 #endif
 
-#include "include/spx_types.h"
-#include "include/spx_properties.h"
-
-err_t ydb_storage_fixed_start_point_set(SpxLogDelegate *log,struct spx_properties *p);
-err_t ydb_storage_fixed_start_point_reset(SpxLogDelegate *log,struct spx_properties *p);
-
 #include <stdlib.h>
 #include <stdio.h>
+
+#include "spx_types.h"
+#include "ydb_storage_configurtion.h"
+
+
+err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c);
 
 #ifdef __cplusplus
 }

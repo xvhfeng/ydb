@@ -30,25 +30,40 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "include/spx_types.h"
 #include "include/spx_socket.h"
-    struct ydb_storage_slave_sync_runtime{
+#include "include/spx_vector.h"
+
+#include "ydb_storage_configurtion.h"
+
+    /*
+     * this struct is the runtime status of slave storage,
+     * it store in the master-stotage,and store into disk every 30 seconds
+     */
+    struct ydb_storage_slave{
         string_t machineid;
         int state;
         struct spx_host host;
-        u32_t read_binlog_idx;
+        struct spx_date read_binlog_date;
         u64_t read_binlog_offset;
+        u64_t timespan;
         bool_t is_syncing;
+        struct ydb_storage_configurtion *c;
     };
 
-    struct ydb_storage_master_sync_runtime{
+    /* this struct is the runtime status of the master storage,
+     * it store in the slave-storage,and storage into disk every 30 seconds,
+     * and it useful when starting syncing for judging the postion of the begin*/
+    struct ydb_storage_master{
         string_t machineid;
         u32_t remote_sync_binlog_idx;
         u64_t remote_sync_binlog_offet;
         u64_t sync_timespan;
     };
 
+extern struct spx_map *g_ydb_storage_slaves;
 
-
+string_t ydb_storage_make_marklog_filename(struct ydb_storage_configurtion *c,err_t *err);
 
 #ifdef __cplusplus
 }

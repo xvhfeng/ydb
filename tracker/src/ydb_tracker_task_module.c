@@ -19,18 +19,19 @@
 
 #include "ydb_protocol.h"
 
-#include "include/spx_task.h"
-#include "include/spx_job.h"
-#include "include/spx_message.h"
-#include "include/spx_alloc.h"
-#include "include/spx_network_module.h"
-#include "include/spx_module.h"
+#include "spx_task.h"
+#include "spx_job.h"
+#include "spx_message.h"
+#include "spx_alloc.h"
+#include "spx_network_module.h"
+#include "spx_module.h"
 
 
 #include "ydb_tracker_heartbeat.h"
 #include "ydb_tracker_balance.h"
+#include "ydb_tracker_sync.h"
 
-err_t ydb_tracker_task_module_handler(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_task_module_handler(struct ev_loop *loop,int idx,struct spx_task_context *tcontext){
     if(NULL == loop || NULL == tcontext){
         return EINVAL;
     }
@@ -69,7 +70,8 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,struct spx_task_conte
                                                   break;
                                               }
         case YDB_QUERY_SYNC_STORAGES:{
-                                         break;
+                                               err =  ydb_tracker_query_sync_storage(loop,tcontext);
+                                                break;
                                      }
         case YDB_QUERY_STORAGE_STATUS:{
                                           break;
@@ -116,8 +118,8 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,struct spx_task_conte
     }
 
     jcontext->moore = SpxNioMooreResponse;
-    size_t idx = jcontext->idx % g_spx_network_module->threadpool->curr_size;
-    err = spx_module_dispatch(g_spx_network_module,idx,jcontext);
+    size_t i = jcontext->idx % g_spx_network_module->threadpool->curr_size;
+    err = spx_module_dispatch(g_spx_network_module,i,jcontext);
     if(0 != err){
             SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                     "dispath network module from task module is fail."\

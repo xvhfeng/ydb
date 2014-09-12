@@ -24,8 +24,8 @@ extern "C" {
 #include <pthread.h>
 #include <ev.h>
 
-#include "include/spx_types.h"
-#include "include/spx_queue.h"
+#include "spx_types.h"
+#include "spx_queue.h"
 
 #include "ydb_storage_configurtion.h"
 
@@ -40,7 +40,7 @@ extern "C" {
         string_t path;
         string_t machineid;
         string_t filename;
-        u32_t idx;
+        struct spx_date d;
         size_t maxsize;
         SpxLogDelegate *log;
     };
@@ -53,8 +53,7 @@ extern "C" {
 
     struct ydb_storage_binlog *ydb_storage_binlog_new(SpxLogDelegate *log,\
             struct ydb_storage_configurtion *c,\
-            string_t path,string_t machineid,\
-            size_t maxsize);
+            string_t path,string_t machineid);
 
     void ydb_storage_binlog_write(struct ydb_storage_binlog *binlog,\
             char op,bool_t issinglefile,\
@@ -64,6 +63,8 @@ extern "C" {
             u32_t rand,u64_t begin,u64_t totalsize,u64_t realsize,string_t suffix);
 
     void ydb_storage_binlog_free(struct ydb_storage_binlog **binlog);
+    string_t ydb_storage_binlog_make_filename(SpxLogDelegate *log,string_t path,string_t machineid,
+        int year,int month,int day,err_t *err);
 
 #define YdbStorageBinlog(op,issinglefile,ver,opver,mid,fcreatetime,\
         createtime,lastmodifytime,mpidx,p1,p2,tid,rand,begin,totalsize,realsize,suffix) \
@@ -71,6 +72,10 @@ extern "C" {
              mid, fcreatetime, createtime,lastmodifytime, mpidx, p1, p2,  tid,\
              rand, begin, totalsize, realsize,suffix)
 
+err_t ydb_storage_binlog_context_parser(SpxLogDelegate *log,string_t line,i32_t *op,bool_t *issinglefile,
+        string_t *mid,u32_t *ver,u32_t *opver,u64_t *fcreatetime,u64_t *createtime,
+        u64_t *lastmodifytime,i32_t *mpidx,i32_t *p1,i32_t *p2,u32_t *tid,u32_t *rand,
+        u64_t *begin,u64_t *totalsize,u64_t *realsize,string_t *suffix);
 
 #ifdef __cplusplus
 }

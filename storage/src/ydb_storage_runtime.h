@@ -23,9 +23,13 @@ extern "C" {
 #include <stdio.h>
 #include <ev.h>
 
-#include "include/spx_types.h"
+#include "spx_types.h"
 
 #include "ydb_storage_configurtion.h"
+    struct ydb_mp_sync{
+        u64_t d;
+        u64_t offset;
+    };
 
     struct ydb_storage_runtime{
         ev_timer w;
@@ -38,9 +42,10 @@ extern "C" {
         u64_t first_start_time;
         u64_t total_disksize;
         u64_t total_freesize;
-        u32_t local_binlog_idx;
-        u32_t sync_binlog_idx;
+        struct spx_date sync_binlog_date;
         u32_t sync_binlog_offset;
+        u8_t status;
+    //    struct ydb_mp_sync *mp_sync;
     };
 
     extern struct ydb_storage_runtime *g_ydb_storage_runtime;

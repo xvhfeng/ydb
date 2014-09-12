@@ -22,29 +22,30 @@
 #include <ev.h>
 
 
-#include "include/spx_types.h"
-#include "include/spx_string.h"
-#include "include/spx_defs.h"
-#include "include/spx_log.h"
-#include "include/spx_socket.h"
-#include "include/spx_env.h"
-#include "include/spx_nio.h"
-#include "include/spx_configurtion.h"
-#include "include/spx_module.h"
-#include "include/spx_job.h"
-#include "include/spx_task.h"
-#include "include/spx_notifier_module.h"
-#include "include/spx_network_module.h"
-#include "include/spx_task_module.h"
+#include "spx_types.h"
+#include "spx_string.h"
+#include "spx_defs.h"
+#include "spx_log.h"
+#include "spx_socket.h"
+#include "spx_env.h"
+#include "spx_nio.h"
+#include "spx_configurtion.h"
+#include "spx_module.h"
+#include "spx_job.h"
+#include "spx_task.h"
+#include "spx_notifier_module.h"
+#include "spx_network_module.h"
+#include "spx_task_module.h"
 
 #include "ydb_storage_configurtion.h"
 #include "ydb_storage_mainsocket.h"
 #include "ydb_storage_network_module.h"
 #include "ydb_storage_task_module.h"
 #include "ydb_storage_heartbeat.h"
-#include "ydb_storage_startpoint.h"
-#include "ydb_storage_state.h"
 #include "ydb_storage_dio.h"
+#include "ydb_storage_runtime.h"
+
+#include "ydb_protocol.h"
 
 spx_private void ydb_storage_regedit_signal(struct ev_loop *loop);
 spx_private void ydb_storage_sig_empty (struct ev_loop *loop, ev_signal *w, int revents);
@@ -57,17 +58,7 @@ int main(int argc,char **argv){
         SpxLog1(log,SpxLogError,"no the configurtion file in the argument.");
         return ENOENT;
     }
-
-
     err_t err = 0;
-
-    g_ydb_storage_state = ydb_storage_state_init(log,&err);
-    if(NULL == g_ydb_storage_state){
-        SpxLog2(log,SpxLogError,err,
-                "init storage state is fail.");
-        return ENOMEM;
-    }
-
     string_t confname = spx_string_new(argv[1],&err);
     if(NULL == confname){
         SpxLog2(log,SpxLogError,err,"alloc the confname is fail.");
@@ -81,7 +72,7 @@ int main(int argc,char **argv){
                                                  confname,\
                                                  ydb_storage_config_line_parser,\
                                                  &err);
-    if(NULL == c){
+    if(NULL == c || 0 != err){
         SpxLogFmt2(log,SpxLogError,err,"parser the configurtion is fail.file name:%s.",confname);
         return err;
     }
@@ -89,6 +80,15 @@ int main(int argc,char **argv){
     if(c->daemon){
         spx_env_daemon();
     }
+
+    struct ev_loop *mainloop = NULL;
+    mainloop = ev_loop_new(0);
+    if(NULL == mainloop){
+        SpxLog1(log,SpxLogError,\
+                "create main loop is fail.");
+        abort();
+    }
+    ev_run(mainloop,0);
 
     if(0 != ( err = spx_log_new(\
                     log,\
@@ -100,12 +100,14 @@ int main(int argc,char **argv){
         return err;
     }
 
-    if(0 != (err =  ydb_storage_startpoint_load(log,c))){
+    g_ydb_storage_runtime = ydb_storage_runtime_init(mainloop,log,c,&err);
+    if(NULL == g_ydb_storage_runtime || 0 != err){
         SpxLog2(log,SpxLogError,err,
-                "load startpoint is fail.");
+                "init storage runtime is fail.");
         return err;
     }
 
+    g_ydb_storage_runtime->status = YDB_STORAGE_INITING;
 
     if(0 != (err = ydb_storage_dio_mountpoint_init(c))){
         SpxLog2(log,SpxLogError,err,
@@ -113,15 +115,7 @@ int main(int argc,char **argv){
         return err;
     }
 
-    struct ev_loop *mainloop = NULL;
-    mainloop = ev_default_loop(0);
-    if(NULL == mainloop){
-        SpxLog1(log,SpxLogError,\
-                "create main loop is fail.");
-        abort();
-    }
     ydb_storage_regedit_signal(mainloop);
-    ev_run(mainloop,0);
 
     g_spx_job_pool = spx_job_pool_new(log,\
             c,\
@@ -131,6 +125,7 @@ int main(int argc,char **argv){
             spx_nio_writer,\
             ydb_storage_network_module_header_validator_handler,\
             ydb_storage_network_module_header_validator_fail_handler,\
+            ydb_storage_network_module_request_body_before_handler,\
             ydb_storage_network_module_request_body_handler,\
             ydb_storage_network_module_response_body_handler,\
             &err);
@@ -143,7 +138,6 @@ int main(int argc,char **argv){
     g_spx_task_pool = spx_task_pool_new(log,\
             c->context_size,\
             ydb_storage_task_module_handler,\
-            NULL,\
             &err);
     if(NULL == g_spx_task_pool){
         SpxLog2(log,SpxLogError,err,\
@@ -194,23 +188,13 @@ int main(int argc,char **argv){
         return err;
     }
 
-    pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init(
-            log,\
-            c->timeout,\
-            spx_nio_reader,
-            spx_nio_writer,
-            NULL,
-            NULL,
-            spx_nio_reader_body_handler,
-            ydb_storage_heartbeat_nio_writer_body_handler,
-            c,
-            &err);
+    pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,c->timeout,c,&err);
+
     if(0 == heartbeat_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new heartbeat thread is fail.");
         return err;
     }
-
 
     //if have maneger code please input here
 

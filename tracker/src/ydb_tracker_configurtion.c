@@ -17,54 +17,17 @@
  */
 #include <stdlib.h>
 
-#include "include/spx_defs.h"
-#include "include/spx_types.h"
-#include "include/spx_properties.h"
-#include "include/spx_string.h"
-#include "include/spx_alloc.h"
-#include "include/spx_socket.h"
+#include "spx_defs.h"
+#include "spx_types.h"
+#include "spx_properties.h"
+#include "spx_string.h"
+#include "spx_alloc.h"
+#include "spx_socket.h"
 
 #include "ydb_tracker_configurtion.h"
 
-spx_private string_t ip_key = NULL;
-spx_private string_t port_key = NULL;
-spx_private string_t timeout_key = NULL;
-spx_private string_t basepath_key = NULL;
-spx_private string_t logpath_key = NULL;
-spx_private string_t logprefix_key = NULL;
-spx_private string_t logsize_key = NULL;
-spx_private string_t loglevel_key = NULL;
-spx_private string_t balance_key = NULL;
-spx_private string_t master_key = NULL;
-spx_private string_t heartbeat_key = NULL;
-spx_private string_t daemon_key  = NULL;
-spx_private string_t stacksize_key = NULL;
-spx_private string_t notifier_module_thread_size_key = NULL;
-spx_private string_t network_module_thread_size_key = NULL;
-spx_private string_t task_module_thread_size_key = NULL;
-spx_private string_t context_size_key = NULL;
 
-void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){
-
-    ip_key = spx_string_new("ip",err);
-    port_key = spx_string_new("port",err);
-    timeout_key = spx_string_new("timeout",err);
-    basepath_key = spx_string_new("basepath",err);
-    logpath_key = spx_string_new("logpath",err);
-    logprefix_key = spx_string_new("logprefix",err);
-    logsize_key = spx_string_new("logsize",err);
-    loglevel_key = spx_string_new("loglevel",err);
-    balance_key = spx_string_new("balance",err);
-    master_key = spx_string_new("master",err);
-    heartbeat_key = spx_string_new("heartbeat",err);
-    daemon_key = spx_string_new("daemon",err);
-    stacksize_key = spx_string_new("stacksize",err);
-    notifier_module_thread_size_key = spx_string_new("notifier_module_thread_size",err);
-    network_module_thread_size_key = spx_string_new("network_module_thread_size",err);
-    task_module_thread_size_key = spx_string_new("task_module_thread_size",err);
-    context_size_key = spx_string_new("context_size",err);
-
-
+void *ydb_tracker_config_before_handle(SpxLogDelegate *log,err_t *err){
     struct ydb_tracker_configurtion *config = (struct ydb_tracker_configurtion *) \
                                               spx_alloc_alone(sizeof(*config),err);
     if(NULL == config){
@@ -90,7 +53,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){
 }
 
 
-void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err){
+void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err){
     struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) config;
     int count = 0;
     string_t *kv = spx_string_splitlen(line,\
@@ -105,7 +68,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //ip
-    if(0 == spx_string_casecmp_string(*kv,ip_key)){
+    if(0 == spx_string_casecmp(*kv,"ip")){
         if(2 == count){
             if(spx_socket_is_ip(*(kv + 1))){
                 c->ip =spx_string_dup(*(kv + 1),err);
@@ -136,7 +99,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //port
-    if(0 == spx_string_casecmp_string(*kv,port_key)){
+    if(0 == spx_string_casecmp(*kv,"port")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"the port is use default:%d.",c->port);
             goto r1;
@@ -151,7 +114,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //timeout
-    if(0 == spx_string_casecmp_string(*kv,timeout_key)){
+    if(0 == spx_string_casecmp(*kv,"timeout")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"use default timeout:%d.",c->timeout);
         } else {
@@ -165,7 +128,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //daemon
-    if(0 == spx_string_casecmp_string(*kv,daemon_key)){
+    if(0 == spx_string_casecmp(*kv,"daemon")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"instance use default daemon:%d.",c->daemon);
         } else {
@@ -182,7 +145,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //stacksize
-    if(0 == spx_string_casecmp_string(*kv,stacksize_key)){
+    if(0 == spx_string_casecmp(*kv,"stacksize")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"stacksize use default:%lld.",c->stacksize);
         } else {
@@ -214,7 +177,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //network_module_thread_size
-    if(0 == spx_string_casecmp_string(*kv,network_module_thread_size_key)){
+    if(0 == spx_string_casecmp(*kv,"network_module_thread_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"network module thread size use default:%d.",c->network_module_thread_size);
         } else {
@@ -229,7 +192,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //notifier_module_thread_size
-    if(0 == spx_string_casecmp_string(*kv,notifier_module_thread_size_key)){
+    if(0 == spx_string_casecmp(*kv,"notifier_module_thread_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "notifier module thread size use default:%d.",c->notifier_module_thread_size);
@@ -245,7 +208,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //task_module_thread_size
-    if(0 == spx_string_casecmp_string(*kv,task_module_thread_size_key)){
+    if(0 == spx_string_casecmp(*kv,"task_module_thread_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "task module thread size use default:%d.",c->task_module_thread_size);
@@ -261,7 +224,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //context size
-    if(0 == spx_string_casecmp_string(*kv,context_size_key)){
+    if(0 == spx_string_casecmp(*kv,"context_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "context size use default:%d.",c->context_size);
@@ -276,7 +239,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
         goto r1;
     }
     //heartbeat
-    if(0 == spx_string_casecmp_string(*kv,heartbeat_key)){
+    if(0 == spx_string_casecmp(*kv,"heartbeat")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "heartbeat use default:%d.",c->heartbeat);
@@ -291,7 +254,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
         goto r1;
     }
     //basepath
-    if(0 == spx_string_casecmp_string(*kv,basepath_key)){
+    if(0 == spx_string_casecmp(*kv,"basepath")){
         if(1 == count){
             SpxLog1(c->log,SpxLogError,\
                     "bad the configurtion item of basepath.and basepath is empty.");
@@ -301,9 +264,9 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //logpath
-    if(0 == spx_string_casecmp_string(*kv,logpath_key)){
+    if(0 == spx_string_casecmp(*kv,"logpath")){
         if(1 == count){
-            c->logpath = spx_string_new("/opt/ydb/log/storage/",err);
+            c->logpath = spx_string_new("/opt/ydb/log/tracker/",err);
             if(NULL == c->logpath){
                 SpxLog2(c->log,SpxLogError,*err,\
                         "alloc default logpath is fail.");
@@ -322,7 +285,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //logprefix
-    if(0 == spx_string_casecmp_string(*kv,logprefix_key)){
+    if(0 == spx_string_casecmp(*kv,"logprefix")){
         if( 1 == count){
             c->logprefix = spx_string_new("ydb-storage",err);
             if(NULL == c->logprefix){
@@ -343,7 +306,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //logsize
-    if(0 == spx_string_casecmp_string(*kv,logsize_key)){
+    if(0 == spx_string_casecmp(*kv,"logsize")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "logsize use default:%lld.",c->logsize);
@@ -375,7 +338,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //loglevel
-    if(0 == spx_string_casecmp_string(*kv,loglevel_key)){
+    if(0 == spx_string_casecmp(*kv,"loglevel")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "loglevel use default:%s",SpxLogDesc[c->loglevel]);
@@ -396,7 +359,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //balance
-    if(0 == spx_string_casecmp_string(*kv,balance_key)){
+    if(0 == spx_string_casecmp(*kv,"balance")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "mountpoint balance use default:%s",\
@@ -423,7 +386,7 @@ void ydb_storage_config_line_parser_handle(string_t line,void *config,err_t *err
     }
 
     //master
-    if(0 == spx_string_casecmp_string(*kv,master_key)){
+    if(0 == spx_string_casecmp(*kv,"master")){
         if(1 == count){
             goto r1;
         }

@@ -19,19 +19,19 @@
 #include <ev.h>
 
 
-#include "include/spx_types.h"
-#include "include/spx_defs.h"
-#include "include/spx_message.h"
-#include "include/spx_io.h"
-#include "include/spx_alloc.h"
-#include "include/spx_string.h"
-#include "include/spx_time.h"
-#include "include/spx_map.h"
-#include "include/spx_collection.h"
-#include "include/spx_ref.h"
-#include "include/spx_job.h"
-#include "include/spx_module.h"
-#include "include/spx_network_module.h"
+#include "spx_types.h"
+#include "spx_defs.h"
+#include "spx_message.h"
+#include "spx_io.h"
+#include "spx_alloc.h"
+#include "spx_string.h"
+#include "spx_time.h"
+#include "spx_map.h"
+#include "spx_collection.h"
+#include "spx_ref.h"
+#include "spx_job.h"
+#include "spx_module.h"
+#include "spx_network_module.h"
 
 #include "ydb_protocol.h"
 
@@ -78,6 +78,9 @@ spx_private err_t ydb_remote_storage_free(void **arg){
         if(NULL != (*s)->groupname){
             spx_string_free((*s)->groupname);
         }
+        if(NULL != (*s)->syncgroup){
+            spx_string_free((*s)->syncgroup);
+        }
         if(NULL != (*s)->ip){
             spx_string_free((*s)->ip);
         }
@@ -107,6 +110,7 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
 
     string_t groupname = NULL;
     string_t machineid = NULL;
+    string_t syncgroup = NULL;
     string_t ip = NULL;
     struct spx_map *map = NULL;
     struct ydb_remote_storage *storage = NULL;
@@ -118,6 +122,11 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
 
     machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jcontext->err));
     if(NULL == machineid){
+        goto r1;
+    }
+
+    syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jcontext->err));
+    if(NULL == syncgroup){
         goto r1;
     }
 
@@ -181,32 +190,39 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     storage->freesize = spx_msg_unpack_u64(ctx);
     storage->status = spx_msg_unpack_u32(ctx);
     storage->last_heartbeat = spx_now();
-    if(NULL == storage->groupname && NULL == storage->machineid){
-        storage->machineid = machineid;
-        storage->groupname = groupname;
-    }else {
-        spx_string_free(groupname);
-        spx_string_free(machineid);
+
+    if(NULL != storage->groupname){
+        spx_string_free(storage->groupname);
     }
+    storage->groupname = groupname;
+
+    if(NULL != storage->machineid){
+        spx_string_free(storage->machineid);
+    }
+    storage->machineid = machineid;
+
+    if(NULL != storage->syncgroup){
+        spx_string_free(storage->syncgroup);
+    }
+    storage->syncgroup = syncgroup;
 
     if(NULL == storage->ip){
         storage->ip = ip;
     }else {
-        if(0 != spx_string_cmp(ip,storage->ip)){
-            spx_string_free(storage->ip);
-            storage->ip = ip;
-        } else {
-            spx_string_free(ip);
-        }
+        spx_string_free(storage->ip);
+        storage->ip = ip;
     }
     struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
     if(NULL == response_header){
         return jcontext->err;
     }
+
     jcontext->writer_header = response_header;
     response_header->protocol = proto;
     response_header->version = YDB_VERSION;
-    response_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN + SpxIpv4Size + 3 * sizeof(u64_t) + 2 * sizeof(u32_t);
+    response_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN \
+                               + YDB_SYNCGROUP_LEN + SpxIpv4Size \
+                               + 3 * sizeof(u64_t) + 2 * sizeof(u32_t);
     jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
     if(NULL == jcontext->writer_header_ctx){
         return jcontext->err;
@@ -218,6 +234,7 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     jcontext->writer_body_ctx = response_body_ctx;
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->groupname,YDB_GROUPNAME_LEN);
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->machineid,YDB_MACHINEID_LEN);
+    spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->syncgroup,YDB_SYNCGROUP_LEN);
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->ip,SpxIpv4Size);
     spx_msg_pack_i32(response_body_ctx,storage->port);
     spx_msg_pack_u64(response_body_ctx,storage->fisrt_start);
@@ -226,8 +243,18 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     spx_msg_pack_u32(response_body_ctx,storage->status);
     return 0;
 r1:
-    spx_string_free(groupname);
-    spx_string_free(machineid);
+    if(NULL != groupname){
+        spx_string_free(groupname);
+    }
+    if(NULL != machineid){
+        spx_string_free(machineid);
+    }
+    if(NULL != syncgroup){
+        spx_string_free(syncgroup);
+    }
+    if(NULL != ip){
+        spx_string_free(ip);
+    }
     return jcontext->err;
 }
 
@@ -263,4 +290,3 @@ err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_con
     }
     return  ydb_remote_storage_report(loop,YDB_SHUTDOWN_STORAGE,tcontext);
 }
-

@@ -23,10 +23,10 @@ extern "C" {
 #include <stdio.h>
 #include <ev.h>
 
-#include "include/spx_types.h"
-#include "include/spx_task.h"
+#include "spx_types.h"
+#include "spx_task.h"
 
-err_t ydb_tracker_task_module_handler(struct ev_loop *loop,struct spx_task_context *tcontext);
+err_t ydb_tracker_task_module_handler(struct ev_loop *loop,int idx,struct spx_task_context *tcontext);
 
 
 #ifdef __cplusplus

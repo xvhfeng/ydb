@@ -23,8 +23,8 @@ extern "C" {
 
 #include <ev.h>
 
-#include "include/spx_types.h"
-#include "include/spx_task.h"
+#include "spx_types.h"
+#include "spx_task.h"
 
     struct ydb_remote_storage{
         u64_t fisrt_start;
@@ -34,6 +34,7 @@ extern "C" {
         u32_t status;
         string_t machineid;
         string_t groupname;
+        string_t syncgroup;
         string_t ip;
         int port;
     };

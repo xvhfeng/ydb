@@ -27,13 +27,14 @@ extern "C" {
 #include <ev.h>
 
 
-#include "include/spx_types.h"
-#include "include/spx_task.h"
-#include "include/spx_job.h"
-#include "include/spx_task_module.h"
-#include "include/spx_network_module.h"
+#include "spx_types.h"
+#include "spx_task.h"
+#include "spx_job.h"
+#include "spx_task_module.h"
+#include "spx_network_module.h"
 
-err_t ydb_storage_task_module_handler(struct ev_loop *loop,struct spx_task_context *tcontext);
+
+err_t ydb_storage_task_module_handler(struct ev_loop *loop,int idx,struct spx_task_context *tcontext);
 
 #ifdef __cplusplus
 }

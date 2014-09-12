@@ -23,7 +23,7 @@ extern "C" {
 #include <stdio.h>
 #include <pthread.h>
 
-#include "include/spx_types.h"
+#include "spx_types.h"
 
 #include "ydb_storage_configurtion.h"
 

@@ -19,61 +19,21 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "include/spx_types.h"
-#include "include/spx_defs.h"
-#include "include/spx_string.h"
-#include "include/spx_alloc.h"
-#include "include/spx_list.h"
-#include "include/spx_path.h"
-#include "include/spx_socket.h"
-#include "include/spx_time.h"
-#include "include/spx_path.h"
+#include "spx_types.h"
+#include "spx_defs.h"
+#include "spx_string.h"
+#include "spx_alloc.h"
+#include "spx_list.h"
+#include "spx_path.h"
+#include "spx_socket.h"
+#include "spx_time.h"
+#include "spx_path.h"
+#include "spx_job.h"
 
 #include "ydb_protocol.h"
 
 #include "ydb_storage_configurtion.h"
 
-spx_private string_t ip_key = NULL;
-spx_private string_t port_key = NULL;
-spx_private string_t timeout_key = NULL;
-spx_private string_t basepath_key = NULL;
-spx_private string_t logpath_key = NULL;
-spx_private string_t logprefix_key = NULL;
-spx_private string_t logsize_key = NULL;
-spx_private string_t loglevel_key = NULL;
-spx_private string_t balance_key = NULL;
-spx_private string_t master_key = NULL;
-spx_private string_t heartbeat_key = NULL;
-spx_private string_t daemon_key  = NULL;
-spx_private string_t notifier_module_thread_size_key = NULL;
-spx_private string_t network_module_thread_size_key = NULL;
-spx_private string_t task_module_thread_size_key = NULL;
-spx_private string_t context_size_key = NULL;
-spx_private string_t stacksize_key = NULL;
-spx_private string_t groupname_key = NULL;
-spx_private string_t machineid_key = NULL;
-spx_private string_t freedisk_key = NULL;
-spx_private string_t mountpoint_key = NULL;
-spx_private string_t tracker_key = NULL;
-spx_private string_t storerooms_key = NULL;
-spx_private string_t storemode_key = NULL;
-spx_private string_t storecount_key = NULL;
-spx_private string_t fillchunk_key = NULL;
-spx_private string_t compress_key = NULL;
-spx_private string_t chunkfile_key = NULL;
-spx_private string_t chunksize_key = NULL;
-spx_private string_t overload_key = NULL;
-spx_private string_t oversize_key = NULL;
-    //this operator iom the oversize
-spx_private string_t overmode_key = NULL;
-spx_private string_t singlemin_key = NULL;
-spx_private string_t lazyrecv_key = NULL;
-spx_private string_t lazysize_key = NULL;
-spx_private string_t sendfile_key = NULL;
-spx_private string_t holerefresh_key = NULL;
-spx_private string_t refreshtime_key = NULL;
-spx_private string_t binlog_size_key = NULL;
-spx_private string_t runtime_flush_timespan_key = NULL;
 
 spx_private void *ydb_mountpoint_new(SpxLogDelegate *log,size_t i,void *arg,err_t *err);
 spx_private err_t ydb_mountpoint_free(void **arg);
@@ -133,11 +93,16 @@ spx_private err_t ydb_mountpoint_free(void **arg){
 }
 
 spx_private err_t ydb_tracker_free(void **arg){
-    struct spx_host **host = (struct spx_host **) arg;
-    SpxFree(*host);
+    struct ydb_tracker ** t = (struct ydb_tracker **) arg;
+    if(NULL != (*t)->sjc){
+        spx_job_context_free((void **) &((*t)->sjc));
+    }
+    if(NULL != (*t)->hjc){
+        spx_job_context_free((void **) &((*t)->hjc));
+    }
+    SpxFree(*t);
     return 0;
 }
-
 
 spx_private u64_t ydb_storage_hole_idx_refresh_timeout(\
         int hour,int min,int sec,err_t *err){
@@ -163,48 +128,6 @@ spx_private u64_t ydb_storage_hole_idx_refresh_timeout(\
 
 void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){
 
-    ip_key = spx_string_new("ip",err);
-    port_key = spx_string_new("port",err);
-    timeout_key = spx_string_new("timeout",err);
-    basepath_key = spx_string_new("basepath",err);
-    logpath_key = spx_string_new("logpath",err);
-    logprefix_key = spx_string_new("logprefix",err);
-    logsize_key = spx_string_new("logsize",err);
-    loglevel_key = spx_string_new("loglevel",err);
-    balance_key = spx_string_new("balance",err);
-    master_key = spx_string_new("master",err);
-    heartbeat_key = spx_string_new("heartbeat",err);
-    daemon_key = spx_string_new("daemon",err);
-    stacksize_key = spx_string_new("stacksize",err);
-    groupname_key = spx_string_new("groupname",err);
-    machineid_key = spx_string_new("machineid",err);
-    notifier_module_thread_size_key = spx_string_new("notifier_module_thread_size",err);
-    network_module_thread_size_key = spx_string_new("network_module_thread_size",err);
-    task_module_thread_size_key = spx_string_new("task_module_thread_size",err);
-    context_size_key = spx_string_new("context_size",err);
-    freedisk_key = spx_string_new("freedisk",err);
-    mountpoint_key = spx_string_new("mp",err);
-    tracker_key = spx_string_new("tracker",err);
-    storerooms_key = spx_string_new("storerooms",err);
-    storemode_key = spx_string_new("storemode",err);
-    storecount_key = spx_string_new("storecount",err);
-    fillchunk_key = spx_string_new("fillchunk",err);
-    compress_key = spx_string_new("compress",err);
-    chunkfile_key = spx_string_new("chunkfile",err);
-    chunksize_key = spx_string_new("chunksize",err);
-    overload_key = spx_string_new("overload",err);
-    oversize_key = spx_string_new("oversize",err);
-    overmode_key = spx_string_new("overmode",err);
-    singlemin_key = spx_string_new("singlemin",err);
-    lazyrecv_key = spx_string_new("lazyrecv",err);
-    lazysize_key = spx_string_new("lazysize",err);
-    sendfile_key = spx_string_new("sendfile",err);
-    holerefresh_key = spx_string_new("holerefresh",err);
-    refreshtime_key = spx_string_new("refreshtime",err);
-    binlog_size_key = spx_string_new("binlog_size",err);
-    runtime_flush_timespan_key = spx_string_new("runtime_flush_timespan",err);
-
-
     struct ydb_storage_configurtion *config = (struct ydb_storage_configurtion *) \
                                               spx_alloc_alone(sizeof(*config),err);
     if(NULL == config){
@@ -225,7 +148,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){
     config->network_module_thread_size = 8;
     config->task_module_thread_size = 4;
     config->context_size = 256;
-    config->freedisk = 4 * SpxGB;
+    config->freedisk =(u64_t) 4 * SpxGB;
     config->mountpoints = spx_list_new(log,\
             YDB_STORAGE_MOUNTPOINT_COUNT,ydb_mountpoint_free,err);
     config->trackers = spx_vector_init(log,\
@@ -247,9 +170,19 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){
     config->lazyrecv = true;
     config->lazysize = 1 * SpxMB;
     config->sendfile = true;
-    config->binlog_size = 2 * SpxGB;
+    config->binlog_size =(u64_t) 2 * SpxGB;
     config->runtime_flush_timespan = 60;
     config->pagesize = getpagesize();
+    config->query_sync_timespan = 30;
+    config->sync = YDB_STORAGE_SYNC_REALTIME;
+    config->sync_wait = 1;
+    config->sync_begin.hour =4;
+    config->sync_begin.min = 0;
+    config->sync_begin.sec = 0;
+    config->sync_end.hour = 6;
+    config->sync_end.min = 0;
+    config->sync_end.sec = 0;
+    config->sync_threads = 3;
 
     return config;
 }
@@ -270,7 +203,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //ip
-    if(0 == spx_string_casecmp_string(*kv,ip_key)){
+    if(0 == spx_string_casecmp(*kv,"ip")){
         if(2 == count){
             if(spx_socket_is_ip(*(kv + 1))){
                 c->ip =spx_string_dup(*(kv + 1),err);
@@ -301,7 +234,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //port
-    if(0 == spx_string_casecmp_string(*kv,port_key)){
+    if(0 == spx_string_casecmp(*kv,"port")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"the port is use default:%d.",c->port);
             goto r1;
@@ -316,7 +249,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //timeout
-    if(0 == spx_string_casecmp_string(*kv,timeout_key)){
+    if(0 == spx_string_casecmp(*kv,"timeout")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"use default timeout:%d.",c->timeout);
         } else {
@@ -330,7 +263,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //runtime flush timespan
-    if(0 == spx_string_casecmp_string(*kv,runtime_flush_timespan_key)){
+    if(0 == spx_string_casecmp(*kv,"runtime_flush_timespan")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"use default runtime flush timespan:%d.",c->timeout);
         } else {
@@ -345,7 +278,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
 
 
     //daemon
-    if(0 == spx_string_casecmp_string(*kv,daemon_key)){
+    if(0 == spx_string_casecmp(*kv,"daemon")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"instance use default daemon:%d.",c->daemon);
         } else {
@@ -362,7 +295,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //stacksize
-    if(0 == spx_string_casecmp_string(*kv,stacksize_key)){
+    if(0 == spx_string_casecmp(*kv,"stacksize")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"stacksize use default:%lld.",c->stacksize);
         } else {
@@ -375,7 +308,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
             string_t unit = spx_string_range_new(*(kv + 1),\
                     -2,spx_string_len(*(kv + 1)),err);
             if(NULL == unit){
-               c->stacksize =  size * SpxKB;
+                c->stacksize =  size * SpxKB;
             }
             if(0 == spx_string_casecmp(unit,"GB")){
                 size *= SpxGB;
@@ -394,7 +327,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //notifier_module_thread_size
-    if(0 == spx_string_casecmp_string(*kv,notifier_module_thread_size_key)){
+    if(0 == spx_string_casecmp(*kv,"notifier_module_thread_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "notifier module_thread_size use default:%d.",\
@@ -412,7 +345,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //network_module_thread_size
-    if(0 == spx_string_casecmp_string(*kv,network_module_thread_size_key)){
+    if(0 == spx_string_casecmp(*kv,"network_module_thread_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "network module thread size use default:%d.",\
@@ -430,7 +363,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //task_module_thread_size
-    if(0 == spx_string_casecmp_string(*kv,task_module_thread_size_key)){
+    if(0 == spx_string_casecmp(*kv,"task_module_thread_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "task_module_thread_size use default:%d.",c->task_module_thread_size);
@@ -447,7 +380,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //heartbeat
-    if(0 == spx_string_casecmp_string(*kv,heartbeat_key)){
+    if(0 == spx_string_casecmp(*kv,"heartbeat")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "heartbeat use default:%d.",c->heartbeat);
@@ -462,7 +395,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         goto r1;
     }
     //basepath
-    if(0 == spx_string_casecmp_string(*kv,basepath_key)){
+    if(0 == spx_string_casecmp(*kv,"basepath")){
         if(1 == count){
             SpxLog1(c->log,SpxLogError,"bad the configurtion item of basepath.and basepath is empty.");
             goto r1;
@@ -471,7 +404,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //logpath
-    if(0 == spx_string_casecmp_string(*kv,logpath_key)){
+    if(0 == spx_string_casecmp(*kv,"logpath")){
         if(1 == count){
             c->logpath = spx_string_new("/opt/ydb/log/storage/",err);
             if(NULL == c->logpath){
@@ -492,7 +425,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //logprefix
-    if(0 == spx_string_casecmp_string(*kv,logprefix_key)){
+    if(0 == spx_string_casecmp(*kv,"logprefix")){
         if( 1 == count){
             c->logprefix = spx_string_new("ydb-storage",err);
             if(NULL == c->logprefix){
@@ -513,7 +446,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //logsize
-    if(0 == spx_string_casecmp_string(*kv,logsize_key)){
+    if(0 == spx_string_casecmp(*kv,"logsize")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "logsize use default:%lld.",c->logsize);
@@ -545,7 +478,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //loglevel
-    if(0 == spx_string_casecmp_string(*kv,loglevel_key)){
+    if(0 == spx_string_casecmp(*kv,"loglevel")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "loglevel use default:%s",SpxLogDesc[c->loglevel]);
@@ -566,7 +499,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //binlog size
-    if(0 == spx_string_casecmp_string(*kv,binlog_size_key)){
+    if(0 == spx_string_casecmp(*kv,"binlog_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "logsize use default:%lld.",c->binlog_size);
@@ -598,7 +531,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //balance
-    if(0 == spx_string_casecmp_string(*kv,balance_key)){
+    if(0 == spx_string_casecmp(*kv,"balance")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "mountpoint balance use default:%s",\
@@ -621,16 +554,17 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //master
-    if(0 == spx_string_casecmp_string(*kv,master_key)){
-        if(spx_string_begin_casewith_string(*kv,mountpoint_key)){
-        int idx = strtol((*kv) + spx_string_len(mountpoint_key),\
-                NULL,16);
-        c->master = idx;
-        goto r1;
+    if(0 == spx_string_casecmp(*kv,"master")){
+        if(spx_string_begin_casewith(*kv,"mp")){
+            int idx = strtol((*kv) + strlen("mp"),\
+                    NULL,16);
+            c->master = idx;
+            goto r1;
+        }
     }
 
     //groupname
-    if(0 == spx_string_casecmp_string(*kv,groupname_key)){
+    if(0 == spx_string_casecmp(*kv,"groupname")){
         if(1 == count){
             *err = EINVAL;
             SpxLog1(c->log,SpxLogError,\
@@ -646,7 +580,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //machineid
-    if(0 == spx_string_casecmp_string(*kv,machineid_key)){
+    if(0 == spx_string_casecmp(*kv,"machineid")){
         if(1 == count){
             *err = EINVAL;
             SpxLog1(c->log,SpxLogError,\
@@ -663,7 +597,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
 
 
     //context_size
-    if(0 == spx_string_casecmp_string(*kv,context_size_key)){
+    if(0 == spx_string_casecmp(*kv,"context_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "context_size use default:%d.",\
@@ -680,7 +614,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //freedisk
-    if(0 == spx_string_casecmp_string(*kv,freedisk_key)){
+    if(0 == spx_string_casecmp(*kv,"freedisk")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "freedisk use default:%lld.",c->freedisk);
@@ -713,12 +647,12 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //mount point
-    if(spx_string_begin_casewith_string(*kv,mountpoint_key)){
-        int idx = strtol((*kv) + spx_string_len(mountpoint_key),\
+    if(spx_string_begin_casewith(*kv,"mp")){
+        int idx = strtol((*kv) + strlen("mp"),\
                 NULL,16);
 
         struct ydb_storage_mountpoint *mp = (struct ydb_storage_mountpoint *) \
-                                             ydb_mountpoint_new(c->log,idx,*(kv+1),err);
+                                            ydb_mountpoint_new(c->log,idx,*(kv+1),err);
         if(NULL == mp){
             return;
         }
@@ -727,37 +661,37 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //tracker
-    if(0 == spx_string_casecmp_string(*kv,tracker_key)){
+    if(0 == spx_string_casecmp(*kv,"tracker")){
         int sum = 0;
         string_t *kv1 = spx_string_splitlen(*(kv + 1),\
                 spx_string_len(*(kv + 1)),":",sizeof(":"),&sum,err);
-        struct spx_host *tracker = spx_alloc_alone(sizeof(*tracker),err);
-        if(NULL == tracker){
+        struct ydb_tracker *t = spx_alloc_alone(sizeof(*t),err);
+        if(NULL == t){
             spx_string_free_splitres(kv1,sum);
             goto r1;
         }
         if(spx_socket_is_ip(*kv)){
-            tracker->ip = spx_string_dup(*kv,err);
-            if(NULL == tracker->ip){
+            t->host.ip = spx_string_dup(*kv,err);
+            if(NULL == t->host.ip){
                 SpxLog2(c->log,SpxLogError,*err,\
-                        "dup tracker ip is fail.");
+                        "dup t ip is fail.");
             }
         }else {
-            tracker->ip = spx_socket_getipbyname(*kv,err);
-            if(NULL == tracker->ip){
+            t->host.ip = spx_socket_getipbyname(*kv,err);
+            if(NULL == t->host.ip){
                 SpxLogFmt2(c->log,SpxLogError,*err,\
-                        "get tracker ip by hostname:%s is fail.",\
+                        "get t ip by hostname:%s is fail.",\
                         *kv);
             }
         }
-        tracker->port = strtol(*(kv1 + 1),NULL,10);
-        spx_vector_add(c->trackers,tracker);
+        t->host.port = strtol(*(kv1 + 1),NULL,10);
+        spx_vector_add(c->trackers,t);
         spx_string_free_splitres(kv1,sum);
         goto r1;
     }
 
     //storerooms
-    if(0 == spx_string_casecmp_string(*kv,storerooms_key)){
+    if(0 == spx_string_casecmp(*kv,"storerooms")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "storerooms use default:%d.",\
@@ -775,7 +709,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //storemode
-    if(0 == spx_string_casecmp_string(*kv,storemode_key)){
+    if(0 == spx_string_casecmp(*kv,"storemode")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "storemode use default:%s.",\
@@ -794,7 +728,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //storecount
-    if(0 == spx_string_casecmp_string(*kv,storecount_key)){
+    if(0 == spx_string_casecmp(*kv,"storecount")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "storecount use default:%d.",c->storecount);
@@ -811,7 +745,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //fillchunk
-    if(0 == spx_string_casecmp_string(*kv,fillchunk_key)){
+    if(0 == spx_string_casecmp(*kv,"fillchunk")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "fillchunk use default:%s.",spx_bool_desc[c->fillchunk]);
@@ -829,7 +763,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //compress
-    if(0 == spx_string_casecmp_string(*kv,compress_key)){
+    if(0 == spx_string_casecmp(*kv,"compress")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "compress use default:%s.",spx_bool_desc[c->compress]);
@@ -856,7 +790,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //chunkfile
-    if(0 == spx_string_casecmp_string(*kv,chunkfile_key)){
+    if(0 == spx_string_casecmp(*kv,"chunkfile")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "chunkfile use default:%s.",spx_bool_desc[c->chunkfile]);
@@ -874,7 +808,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //chunksize
-    if(0 == spx_string_casecmp_string(*kv,chunksize_key)){
+    if(0 == spx_string_casecmp(*kv,"chunksize")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "chunksize use default:%lld.",c->chunksize);
@@ -907,7 +841,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //overload
-    if(0 == spx_string_casecmp_string(*kv,overload_key)){
+    if(0 == spx_string_casecmp(*kv,"overload")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "overload use default:%s/",\
@@ -926,7 +860,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //oversize & overmode
-    if(0 == spx_string_casecmp_string(*kv,oversize_key)){
+    if(0 == spx_string_casecmp(*kv,"oversize")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "oversize use default:%s,and ovvermode use default:%s too",\
@@ -963,7 +897,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //singlemin
-    if(0 == spx_string_casecmp_string(*kv,singlemin_key)){
+    if(0 == spx_string_casecmp(*kv,"singlemin")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "single min use default:%lld.",c->singlemin);
@@ -996,7 +930,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //lazyrecv
-    if(0 == spx_string_casecmp_string(*kv,lazyrecv_key)){
+    if(0 == spx_string_casecmp(*kv,"lazyrecv")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "lazyrecv use default:%s.",spx_bool_desc[c->lazyrecv]);
@@ -1015,7 +949,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
 
 
     //lazysize
-    if(0 == spx_string_casecmp_string(*kv,lazysize_key)){
+    if(0 == spx_string_casecmp(*kv,"lazysize")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "single min use default:%lld.",c->lazysize);
@@ -1048,7 +982,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //sendfile
-    if(0 == spx_string_casecmp_string(*kv,sendfile_key)){
+    if(0 == spx_string_casecmp(*kv,"sendfile")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "sendfile use default:%s.",spx_bool_desc[c->sendfile]);
@@ -1066,7 +1000,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //holerefresh
-    if(0 == spx_string_casecmp_string(*kv,holerefresh_key)){
+    if(0 == spx_string_casecmp(*kv,"holerefresh")){
         if(1 ==  count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "holerefresh use default:%s.",\
@@ -1086,7 +1020,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //refreshtime
-    if(0 == spx_string_casecmp_string(*kv,refreshtime_key)){
+    if(0 == spx_string_casecmp(*kv,"refreshtime")){
         string_t s = *(kv + 1);
         int sum = 0;
         if(spx_string_exist(s,':')){
@@ -1137,9 +1071,73 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         goto r1;
     }
 
+
+    //sync
+    if(0 == spx_string_casecmp(*kv,"sync")){
+        if(1 ==  count){
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "sync use default:%s.",\
+                    sync_mode_desc[c->sync]);
+        }
+        string_t s = *(kv + 1);
+        if(0 == spx_string_casecmp(s,\
+                    sync_mode_desc[YDB_STORAGE_SYNC_REALTIME])){
+            c->sync = YDB_STORAGE_SYNC_REALTIME;
+        } else if(0 == spx_string_casecmp(s,\
+                    sync_mode_desc[YDB_STORAGE_SYNC_REALTIME])){
+            c->sync = YDB_STORAGE_SYNC_REALTIME;
+        } else {
+            c->sync = YDB_STORAGE_SYNC_FIXEDTIME;
+        }
+        goto r1;
+    }
+
+    //query_sync_timespan
+    if(0 == spx_string_casecmp(*kv,"query_sync_timespan")){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,"use default query_sync_timespan:%d.",c->query_sync_timespan);
+        } else {
+            u32_t timespan = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == timespan) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of query_sync_timespan.");
+            }
+            c->query_sync_timespan = timespan;
+        }
+        goto r1;
+    }
+
+    //sync_wait
+    if(0 == spx_string_casecmp(*kv,"sync_wait")){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,"use default sync_wait:%d.",c->sync_wait);
+        } else {
+            u32_t timespan = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == timespan) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of sync_wait.");
+            }
+            c->sync_wait = timespan;
+        }
+        goto r1;
+    }
+
+    //sync_threads
+    if(0 == spx_string_casecmp(*kv,"sync_threads")){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,"use default sync_threads:%d.",c->sync_threads);
+        } else {
+            u32_t sync_threads = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == sync_threads) {
+                SpxLog1(c->log,SpxLogError,"bad the configurtion item of sync_threads.");
+            }
+            c->sync_threads = sync_threads;
+        }
+        goto r1;
+    }
+
 r1:
     spx_string_free_splitres(kv,count);
 }
+
 
 
 

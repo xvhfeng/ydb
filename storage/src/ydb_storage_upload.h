@@ -23,9 +23,9 @@ extern "C" {
 #include <stdio.h>
 #include <ev.h>
 
-#include "include/spx_types.h"
-#include "include/spx_job.h"
-#include "include/spx_task.h"
+#include "spx_types.h"
+#include "spx_job.h"
+#include "spx_task.h"
 
 #include "ydb_storage_configurtion.h"
 

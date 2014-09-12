@@ -21,7 +21,9 @@
 extern "C" {
 #endif
 
-#include "include/spx_types.h"
+#include "spx_types.h"
+#include "spx_job.h"
+#include "spx_socket.h"
 
     struct ydb_storage_mountpoint{
         int idx;
@@ -34,7 +36,7 @@ extern "C" {
 #define YDB_STORAGE_MOUNTPOINT_MAXSIZE 1
 #define YDB_STORAGE_MOUNTPOINT_TURN 2
 #define YDB_STORAGE_MOUNTPOINT_MASTER 3
-    const  char *mountpoint_balance_mode_desc[] = {
+    spx_private  char *mountpoint_balance_mode_desc[] = {
         "loop",
         "maxsize",
         "turn",
@@ -45,26 +47,37 @@ extern "C" {
 
 #define YDB_STORAGE_STOREMODE_LOOP 0
 #define YDB_STORAGE_STOREMODE_TURN 1
-    const char *storemode_desc[] = {
+    spx_private char *storemode_desc[] = {
         "loop",
         "turn"
     };
 
 #define YDB_STORAGE_OVERMODE_RELATIVE 0
 #define YDB_STORAGE_OVERMODE_ABSSOLUTE 1
-    const char *overmode_desc[]={
+    spx_private char *overmode_desc[]={
         "relative",
         "abssolute"
     };
 
 #define YDB_STORAGE_HOLEREFRESH_FIXEDTIME 0
 #define YDB_STORAGE_HOLEREFRESH_TIMESTAMPS 1
-    const char *holerefresh_mode_desc[]={
+    spx_private char *holerefresh_mode_desc[]={
         "fixed",
         "timestamps"
     };
 
+#define YDB_STORAGE_SYNC_REALTIME 0
+#define YDB_STORAGE_SYNC_FIXEDTIME 1
+    spx_private char *sync_mode_desc[] = {
+        "realtime",
+        "fixedtime"
+    };
 
+struct ydb_tracker{
+    struct spx_host host;
+    struct spx_job_context *hjc;//heartbeat job context
+    struct spx_job_context *sjc;//query sync storages job context
+};
 
     struct ydb_storage_configurtion{
         SpxLogDelegate *log;
@@ -109,8 +122,14 @@ extern "C" {
         bool_t lazysize;
         bool_t sendfile;
         size_t pagesize;
+        u8_t sync;
+        u32_t query_sync_timespan;
+        string_t syncgroup;
+        u32_t sync_wait;
+        u32_t sync_threads;
+        struct spx_time sync_begin;
+        struct spx_time sync_end;
     };
-
 
     void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err);
     void ydb_storage_config_line_parser(string_t line,void *config,err_t *err);

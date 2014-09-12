@@ -17,19 +17,20 @@
 #include <stdio.h>
 #include <ev.h>
 
-#include "include/spx_io.h"
-#include "include/spx_time.h"
-#include "include/spx_path.h"
-#include "include/spx_types.h"
-#include "include/spx_alloc.h"
-#include "include/spx_defs.h"
-#include "include/spx_string.h"
+#include "spx_io.h"
+#include "spx_time.h"
+#include "spx_path.h"
+#include "spx_types.h"
+#include "spx_alloc.h"
+#include "spx_defs.h"
+#include "spx_string.h"
 
 #include "ydb_storage_configurtion.h"
 #include "ydb_storage_runtime.h"
 
 
 struct ydb_storage_runtime *g_ydb_storage_runtime = NULL;
+
 spx_private void ydb_storage_runtime_line_parser(string_t line,\
         struct ydb_storage_runtime *rt,err_t *err);
 spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int revents);
@@ -46,9 +47,17 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     }
     string_t new_basepath = NULL;
     string_t line = NULL;
+    string_t filename = NULL;
     rt->c = c;
     rt->log = log;
-    string_t filename = NULL;
+    /*
+    rt->mp_sync = spx_alloc(YDB_STORAGE_MOUNTPOINT_MAXSIZE,sizeof(struct ydb_mp_sync),err);
+    if(NULL == rt->mp_sync){
+        SpxLog2(log,SpxLogError,*err,
+                "new sync state of mp is fail.");
+        goto r1;
+    }
+    */
     new_basepath = spx_string_dup(c->basepath,err);
     if(NULL == new_basepath){
         SpxLog2(log,SpxLogError,*err,"dup the basepath is fail.");
@@ -106,6 +115,11 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     return rt;
 
 r1:
+    /*
+    if(NULL != rt->mp_sync){
+        SpxFree(rt->mp_sync);
+    }
+    */
     if(NULL != rt){
         SpxFree(rt);
     }
@@ -197,19 +211,6 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         rt->storecount = v;
         goto r1;
     }
-    if(0 == spx_string_casecmp(*kv,"local_binlog_idx")){
-        if(2 != count){
-            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of local_binlog_idx.");
-            goto r1;
-        }
-        u32_t v = strtoul(*(kv + 1),NULL,10);
-        if(ERANGE == v) {
-            SpxLog1(rt->log,SpxLogError,"bad the runtime item of local_binlog_idx.");
-            goto r1;
-        }
-        rt->local_binlog_idx = v;
-        goto r1;
-    }
     if(0 == spx_string_casecmp(*kv,"total_disksize")){
         if(2 != count){
             SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of total_disksize.");
@@ -236,17 +237,17 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         rt->total_freesize = v;
         goto r1;
     }
-    if(0 == spx_string_casecmp(*kv,"sync_binlog_idx")){
+    if(0 == spx_string_casecmp(*kv,"sync_binlog_date")){
         if(2 != count){
-            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of sync_binlog_idx.");
+            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of sync_binlog_date.");
             goto r1;
         }
-        u32_t v = strtoul(*(kv + 1),NULL,10);
+        u64_t v = strtoul(*(kv + 1),NULL,10);
         if(ERANGE == v) {
-            SpxLog1(rt->log,SpxLogError,"bad the runtime item of sync_binlog_idx.");
+            SpxLog1(rt->log,SpxLogError,"bad the runtime item of sync_binlog_date.");
             goto r1;
         }
-        rt->first_start_time = v;
+        spx_get_date((time_t *) &v,&(rt->sync_binlog_date));
         goto r1;
     }
     if(0 == spx_string_casecmp(*kv,"sync_binlog_offset")){
@@ -263,6 +264,30 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         rt->sync_binlog_offset = v;
         goto r1;
     }
+    /*
+    if(0 == spx_string_begin_with(*kv,"mp")){
+        if(2 != count){
+            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of mp sync state.");
+            goto r1;
+        }
+        int idx = atol((*kv) + sizeof("mp"));
+        char *p = index(*(kv + 1),':');
+        if(NULL == p){
+            SpxLogFmt1(rt->log,SpxLogError,"bad value of mp sync state.value:%s.",*(kv + 1));
+            goto r1;
+        }
+        u64_t v1 = strtoul(*(kv + 1),NULL,10);
+        u64_t v2 = strtoul(p + 1,NULL,10);
+        if(ERANGE == v1 || ERANGE == v2) {
+            SpxLog1(rt->log,SpxLogError,"bad the runtime item of sync_binlog_offset.");
+            goto r1;
+        }
+        struct ydb_mp_sync *mp = rt->mp_sync + idx;
+        mp->d = v1;
+        mp->offset = v2;
+        goto r1;
+    }
+    */
 r1:
     spx_string_free_splitres(kv,count);
 }/*}}}*/
@@ -282,25 +307,46 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
         return;
     }
 
-    spx_string_cat_printf(&err,buf,\
+    string_t newbuf = spx_string_cat_printf(&err,buf,\
             "first_start_time = %ulld \n" \
             "mpidx = %d \n" \
             "p1 = %d \n" \
             "p2 = %d \n" \
             "storecount = %ud \n" \
-            "local_binlog_idx = %ud \n" \
             "total_disksize = %ulld \n" \
             "total_freesize = %ulld \n" \
-            "sync_binlog_idx = %ud \n" \
+            "sync_binlog_date = %ud \n" \
             "sync_binlog_offset = %ulld ",\
             rt->first_start_time,\
             rt->mpidx,rt->p1,rt->p2,\
             rt->storecount,\
-            rt->local_binlog_idx,\
             rt->total_disksize,\
             rt->total_freesize,\
-            rt->sync_binlog_idx,\
+            spx_zero(&(rt->sync_binlog_date)),\
             rt->sync_binlog_offset);
+    if(NULL == newbuf){
+        SpxLog2(rt->log,SpxLogError,err,
+                "cat line context of runtime is fail.");
+        goto r1;
+    }
+    buf = newbuf;
+    /*
+    int i = 0;
+    for( ; i< YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
+        struct ydb_mp_sync *mp = rt->mp_sync + i;
+        if(0 != mp->d){
+            newbuf = spx_string_cat_printf(&err,buf,
+                    "mp%d = %ulld:%ulld\n",
+                    i,mp->d,mp->offset);
+            if(NULL == newbuf){
+                SpxLog2(rt->log,SpxLogError,err,
+                        "cat mp sync stat to line is fail.");
+            }else {
+                buf = newbuf;
+            }
+        }
+    }
+    */
 
     new_basepath = spx_string_dup(c->basepath,&err);
     if(NULL == new_basepath){
@@ -321,6 +367,7 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
         SpxLog2(rt->log,SpxLogError,err,"get storage mid filename is fail.");
         goto r1;
     }
+    new_basepath = filename;
     FILE *fp = fopen(filename,"w+");
     if(NULL == fp) {
         err = errno;

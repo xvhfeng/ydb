@@ -18,17 +18,19 @@
 #include <ev.h>
 
 
-#include "include/spx_types.h"
-#include "include/spx_task.h"
-#include "include/spx_job.h"
-#include "include/spx_task_module.h"
-#include "include/spx_network_module.h"
+#include "spx_types.h"
+#include "spx_task.h"
+#include "spx_job.h"
+#include "spx_task_module.h"
+#include "spx_network_module.h"
+#include "spx_io.h"
 
 #include "ydb_protocol.h"
 
 #include "ydb_storage_dio_context.h"
 #include "ydb_storage_storefile.h"
 #include "ydb_storage_dio.h"
+#include "ydb_storage_upload.h"
 
 err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
         int tidx,struct spx_task_context *tc){
@@ -78,22 +80,12 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
             {
                 break;
             }
-        case (YDB_STORAGE_SYNC):
-            {
-                break;
-            }
         default:{
                     break;
                 }
     }
-//    if(0 != err){
-//        spx_task_pool_push(g_spx_task_pool,tc);
-//        ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-//        jc->err = err;
-//        jc->moore = SpxNioMooreResponse;
-//        size_t idx = spx_network_module_wakeup_idx(jc);
-//        err = spx_module_dispatch(g_spx_network_module,idx,jc);
-//    }
     return err;
 }
+
+
 
