@@ -65,6 +65,8 @@ install:
 clean:
 	rm -f $(SHARED_OBJS) $(TARGET)
 uninstall:
-	rm -f $(TARGET) $(TARGET_PATH)
-	rm -f $(HEADER_FILE) $(HEADER_TARGET_PATH)
+	cd $(TARGET_PATH)
+	rm -f $(TARGET)
+	cd $(HEADER_TARGET_PATH)
+	rm -f $(HEADER_FILE)
 

@@ -50,7 +50,7 @@ spx_private void ydb_tracker_sig_abort (struct ev_loop *loop, ev_signal *w, int 
 int main(int argc,char **argv){
     umask(0);
     SpxLogDelegate *log = spx_log;
-    if(0 != argc){
+    if(2 != argc){
         SpxLog1(log,SpxLogError,"no the configurtion file in the argument.");
         return ENOENT;
     }

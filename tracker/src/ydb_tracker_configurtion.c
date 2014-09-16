@@ -57,19 +57,19 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
     struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) config;
     int count = 0;
     string_t *kv = spx_string_splitlen(line,\
-            spx_string_len(line),"=",sizeof("="),&count,err);
+            spx_string_len(line),"=",strlen("="),&count,err);
     if(NULL == kv){
         return;
     }
 
-    spx_string_trim(*kv," ");
+    spx_string_rtrim(*kv," ");
     if(2 == count){
-        spx_string_trim(*(kv + 1)," ");
+        spx_string_ltrim(*(kv + 1)," ");
     }
 
     //ip
     if(0 == spx_string_casecmp(*kv,"ip")){
-        if(2 == count){
+        if(2 == count && !SpxStringIsEmpty(*(kv + 1))){
             if(spx_socket_is_ip(*(kv + 1))){
                 c->ip =spx_string_dup(*(kv + 1),err);
                 if(NULL == c->ip){
@@ -100,7 +100,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //port
     if(0 == spx_string_casecmp(*kv,"port")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,"the port is use default:%d.",c->port);
             goto r1;
         }
@@ -115,7 +115,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //timeout
     if(0 == spx_string_casecmp(*kv,"timeout")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,"use default timeout:%d.",c->timeout);
         } else {
             u32_t timeout = strtol(*(kv + 1),NULL,10);
@@ -129,7 +129,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //daemon
     if(0 == spx_string_casecmp(*kv,"daemon")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,"instance use default daemon:%d.",c->daemon);
         } else {
             string_t s = *(kv + 1);
@@ -146,7 +146,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //stacksize
     if(0 == spx_string_casecmp(*kv,"stacksize")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,"stacksize use default:%lld.",c->stacksize);
         } else {
             u64_t size = strtoul(*(kv + 1),NULL,10);
@@ -178,7 +178,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //network_module_thread_size
     if(0 == spx_string_casecmp(*kv,"network_module_thread_size")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,"network module thread size use default:%d.",c->network_module_thread_size);
         } else {
             u32_t network_module_thread_size = strtol(*(kv + 1),NULL,10);
@@ -193,7 +193,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //notifier_module_thread_size
     if(0 == spx_string_casecmp(*kv,"notifier_module_thread_size")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "notifier module thread size use default:%d.",c->notifier_module_thread_size);
         } else {
@@ -209,7 +209,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //task_module_thread_size
     if(0 == spx_string_casecmp(*kv,"task_module_thread_size")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "task module thread size use default:%d.",c->task_module_thread_size);
         } else {
@@ -225,7 +225,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //context size
     if(0 == spx_string_casecmp(*kv,"context_size")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "context size use default:%d.",c->context_size);
         } else {
@@ -240,7 +240,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
     }
     //heartbeat
     if(0 == spx_string_casecmp(*kv,"heartbeat")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "heartbeat use default:%d.",c->heartbeat);
         } else {
@@ -255,17 +255,22 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
     }
     //basepath
     if(0 == spx_string_casecmp(*kv,"basepath")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLog1(c->log,SpxLogError,\
                     "bad the configurtion item of basepath.and basepath is empty.");
             goto r1;
         }
-        return;
+        c->basepath = spx_string_dup(*(kv + 1),err);
+        if(NULL == c->basepath){
+            SpxLog2(c->log,SpxLogError,*err,\
+                    "dup the string for basepath is fail.");
+        }
+        goto r1;
     }
 
     //logpath
     if(0 == spx_string_casecmp(*kv,"logpath")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             c->logpath = spx_string_new("/opt/ydb/log/tracker/",err);
             if(NULL == c->logpath){
                 SpxLog2(c->log,SpxLogError,*err,\
@@ -286,7 +291,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //logprefix
     if(0 == spx_string_casecmp(*kv,"logprefix")){
-        if( 1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             c->logprefix = spx_string_new("ydb-storage",err);
             if(NULL == c->logprefix){
                 SpxLog2(c->log,SpxLogError,*err,\
@@ -307,7 +312,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //logsize
     if(0 == spx_string_casecmp(*kv,"logsize")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "logsize use default:%lld.",c->logsize);
         } else {
@@ -339,9 +344,10 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //loglevel
     if(0 == spx_string_casecmp(*kv,"loglevel")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "loglevel use default:%s",SpxLogDesc[c->loglevel]);
+        } else {
             string_t s = *(kv + 1);
             if(0 == spx_string_casecmp(s,"debug")){
                 c->loglevel = SpxLogDebug;
@@ -360,34 +366,36 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
 
     //balance
     if(0 == spx_string_casecmp(*kv,"balance")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "mountpoint balance use default:%s",\
                     tracker_balance_mode_desc[c->balance]);
+            goto r1;
+        }
+        string_t s = *(kv + 1);
+        if(0 == spx_string_casecmp(s,\
+                    tracker_balance_mode_desc[YDB_TRACKER_BALANCE_LOOP])){
+            c->balance = YDB_TRACKER_BALANCE_LOOP;
+        } else if(0 == spx_string_casecmp(s,\
+                    tracker_balance_mode_desc[YDB_TRACKER_BALANCE_TURN])){
+            c->balance = YDB_TRACKER_BALANCE_TURN;
+        }else if(0 == spx_string_casecmp(s,\
+                    tracker_balance_mode_desc[YDB_TRACKER_BALANCE_MAXDISK])){
+            c->balance = YDB_TRACKER_BALANCE_MAXDISK;
+        }else if(0 == spx_string_casecmp(s,\
+                    tracker_balance_mode_desc[YDB_TRACKER_BALANCE_MASTER])){
+            c->balance = YDB_TRACKER_BALANCE_MASTER;
         } else {
-            string_t s = *(kv + 1);
-            if(0 == spx_string_casecmp(s,\
-                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_LOOP])){
-                c->balance = YDB_TRACKER_BALANCE_LOOP;
-            } else if(0 == spx_string_casecmp(s,\
-                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_TURN])){
-                c->balance = YDB_TRACKER_BALANCE_TURN;
-            }else if(0 == spx_string_casecmp(s,\
-                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_MAXDISK])){
-                c->balance = YDB_TRACKER_BALANCE_MAXDISK;
-            }else if(0 == spx_string_casecmp(s,\
-                        tracker_balance_mode_desc[YDB_TRACKER_BALANCE_MASTER])){
-                c->balance = YDB_TRACKER_BALANCE_MASTER;
-            } else {
-                c->balance = YDB_TRACKER_BALANCE_LOOP;
-            }
+            c->balance = YDB_TRACKER_BALANCE_LOOP;
         }
         goto r1;
     }
 
     //master
     if(0 == spx_string_casecmp(*kv,"master")){
-        if(1 == count){
+        if(1 == count || SpxStringIsEmpty(*(kv + 1))){
+            SpxLog1(c->log,SpxLogWarn,
+                    "disable the master.");
             goto r1;
         }
         c->master = spx_string_dup(*(kv + 1),err);
