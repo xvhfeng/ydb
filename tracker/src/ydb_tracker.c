@@ -95,7 +95,7 @@ int main(int argc,char **argv){
         abort();
     }
     ydb_tracker_regedit_signal(mainloop);
-    ev_loop(mainloop,0);
+    ev_run(mainloop,EVRUN_NOWAIT);
 
     g_spx_job_pool = spx_job_pool_new(log,\
                      c,c->context_size,c->timeout,\
@@ -163,13 +163,14 @@ int main(int argc,char **argv){
 
 
     pthread_t tid =  ydb_tracker_mainsocket_thread_new(log,c,&err);
-    if(NULL == tid){
+    if(0 != err){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
         return err;
     }
 
     //if have maneger code please input here
 
+    sleep(10);
     pthread_join(tid,NULL);
 
     return 0;

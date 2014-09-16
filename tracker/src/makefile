@@ -1,16 +1,20 @@
 .SUFFIXES: .c .o
 
+SPX_SRC_PATH = /opt/src/spx/src/
+SPX_HEADER_PATH = /opt/src/spx/src/include/
+YDB_COMMON_HEADER_PATH = /opt/src/ydb/common/src/
+TARGET = ydb_trackerd
+TARGET_PATH = /usr/local/bin
+HEADER_TARGET_PATH = /usr/local/include/
+
 CC = gcc
 CFLAG = -pipe -o0  -W -Wall -Werror -g \
  		-Wpointer-arith -Wno-unused-parameter -Wno-unused-function -Wno-unused-variable -Wunused-value 
 INC_PATH = -I/usr/local/include \
-			-I/Users/Seapeak/src/spx/src/include/ \
-			-I/Users/Seapeak/src/ydb/common/src/
-LIB_PATH = -L/usr/local/lib -lev
+			-I$(SPX_HEADER_PATH) \
+			-I$(YDB_COMMON_HEADER_PATH)
+LIB_PATH = -L/usr/local/lib -lev -lpthread
 DEFS := 
-TARGET_PATH = ./
-TARGET = ydb_trackerd
-DIRS = -I/Users/Seapeak/src/spx/src/
 
 SYS := $(strip $(shell uname -s | tr '[:upper:]' '[:lower:]'))
 ifeq ($(SYS), linux)
@@ -37,7 +41,10 @@ else
 endif
 
 SRC_FILE = $(wildcard *.c) \
-			$(wildcard /Users/Seapeak/src/spx/src/*.c)
+			$(wildcard $(SPX_SRC_PATH)/*.c)
+
+HEADER_FILE = $(wildcard *.h) \
+			$(wildcard $(SPX_HEADER_PATH)/*.h)
 
 SHARED_OBJS = $(patsubst %.c,%.o,$(SRC_FILE) )
 
@@ -51,5 +58,11 @@ $(TARGET) : $(SHARED_OBJS)
 
 install:
 	cp -f $(TARGET) $(TARGET_PATH)
+	cp -f $(HEADER_FILE) $(HEADER_TARGET_PATH)
 clean:
 	rm -f $(SHARED_OBJS) $(TARGET)
+uninstall:
+	cd $(TARGET_PATH)
+	rm -f $(TARGET)
+	cd $(HEADER_TARGET_PATH)
+	rm -f $(HEADER_FILE)

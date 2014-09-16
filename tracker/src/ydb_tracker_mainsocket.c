@@ -24,6 +24,8 @@
 #include "spx_string.h"
 #include "spx_socket.h"
 #include "spx_io.h"
+#include "spx_log.h"
+#include "spx_alloc.h"
 
 #include "ydb_tracker_configurtion.h"
 
@@ -41,18 +43,24 @@ pthread_t ydb_tracker_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_track
     pthread_attr_getstacksize(&attr, &ostack_size);
     if (ostack_size != c->stacksize
             && (0 != (*err = pthread_attr_setstacksize(&attr,c->stacksize)))){
-        return NULL;
+        return *err;
     }
-    struct mainsocket_thread_arg arg;
-    SpxZero(arg);
-    arg.log = log;
-    arg.c = c;
+    struct mainsocket_thread_arg *arg =(struct mainsocket_thread_arg *) spx_alloc_alone(sizeof(*arg),err);
+    if(NULL == arg){
+        pthread_attr_destroy(&attr);
+        return *err;
+    }
+    arg->log = log;
+    arg->c = c;
 
     pthread_t tid = 0;
     if (0 !=(*err =  pthread_create(&tid, &attr, ydb_tracker_mainsocket_create,
-                    &arg))){
-        return NULL;
+                    arg))){
+        pthread_attr_destroy(&attr);
+        SpxFree(arg);
+        return *err;
     }
+    pthread_attr_destroy(&attr);
     return tid;
 }
 
@@ -60,6 +68,7 @@ spx_private void *ydb_tracker_mainsocket_create(void *arg){
     struct mainsocket_thread_arg *mainsocket_arg = (struct mainsocket_thread_arg *) arg;
     SpxLogDelegate *log = mainsocket_arg->log;
     struct ydb_tracker_configurtion *c= mainsocket_arg->c;
+    SpxFree(mainsocket_arg);
     err_t err = 0;
     int mainsocket =  spx_socket_new(&err);
     if(0 == mainsocket){
@@ -80,6 +89,11 @@ spx_private void *ydb_tracker_mainsocket_create(void *arg){
                     true,c->timeout,
                     1024))){
         SpxLog2(log,SpxLogError,err,"start main socket is fail.");
+/*
+        spx_log(SpxLogError,((string_t) "File:%s,Line:%d,Func:%s.errno:%d,info:%s.%s."),\
+                __FILE__,__LINE__,__FUNCTION__,err,err >= SpxSuccess ?  spx_strerror(err) : strerror(err)
+        ,"start main socket is fail.");
+        */
         goto r1;
     }
 
