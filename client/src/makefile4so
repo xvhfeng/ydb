@@ -1,14 +1,18 @@
 .SUFFIXES: .c .o
 
-SPX_SRC_PATH = /Users/Seapeak/src/spx/src/
-SPX_HEADER_PATH = /Users/Seapeak/src/spx/src/include/
-YDB_COMMON_HEADER_PATH = /Users/Seapeak/src/ydb/common/src/
-TARGET = libydbclient.so
+#type means the progame type
+#if type is so means the .so file
+#if type is exe means the execute file
+TYPE=so
+SPX_SRC_PATH = /opt/src/spx/src/
+SPX_HEADER_PATH = /opt/src/spx/src/include/
+YDB_COMMON_HEADER_PATH = /opt/src/ydb/common/src/
+NAME = ydbclient
 TARGET_PATH = /usr/local/lib/
 HEADER_TARGET_PATH = /usr/local/include/
 
 CC = gcc
-CFLAG = -pipe -o0  -W -Wall -Werror -g \
+CFLAG = -pipe -o0  -W -Wall -Werror -g  \
  		-Wpointer-arith -Wno-unused-parameter -Wno-unused-function -Wno-unused-variable -Wunused-value 
 INC_PATH = -I/usr/local/include \
 			-I$(SPX_HEADER_PATH) \
@@ -17,7 +21,15 @@ INC_PATH = -I/usr/local/include \
 LIB_PATH = -L/usr/local/lib -lev -lpthread
 
 DEFS := 
-SO= -fPIC -shared
+TARGET := 
+
+
+ifeq ($(TYPE),so)
+	CFLAG += -fPIC -shared
+	TARGET = $(addprefix lib,$(addsuffix .so,$(NAME)))
+else
+	TARGET = $(NAME)
+endif
 
 SYS := $(strip $(shell uname -s | tr '[:upper:]' '[:lower:]'))
 ifeq ($(SYS), linux)
@@ -54,10 +66,10 @@ SHARED_OBJS = $(patsubst %.c,%.o,$(SRC_FILE) )
 all:$(TARGET)
 
 %.o: %.c
-	$(CC) $(CFLAG) $(SO) -c $< -o $@ $(LIB_PATH) $(INC_PATH) $(DEFS)
+	$(CC) $(CFLAG) -c $< -o $@ $(LIB_PATH) $(INC_PATH) $(DEFS)
 
 $(TARGET) : $(SHARED_OBJS)
-	$(CC) $(CFLAG) $(SHARED_OBJS) $(LIB_PATH) $(INC_PATH) $(SO) -o $(TARGET) $(DEFS)
+	$(CC) $(CFLAG) $(SHARED_OBJS) $(LIB_PATH) $(INC_PATH) -o $(TARGET) $(DEFS)
 
 install:
 	cp -f $(TARGET) $(TARGET_PATH)

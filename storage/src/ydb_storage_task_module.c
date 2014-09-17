@@ -31,6 +31,9 @@
 #include "ydb_storage_storefile.h"
 #include "ydb_storage_dio.h"
 #include "ydb_storage_upload.h"
+#include "ydb_storage_find.h"
+#include "ydb_storage_delete.h"
+#include "ydb_storage_modify.h"
 
 err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
         int tidx,struct spx_task_context *tc){
@@ -70,6 +73,10 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
             }
         case (YDB_STORAGE_FIND):
             {
+                if(0 != (err = ydb_storage_dio_find(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,
+                            "find file is fail.");
+                }
                 break;
             }
         case (YDB_STORAGE_MODIFY):
@@ -78,9 +85,15 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
             }
         case (YDB_STORAGE_DELETE):
             {
+                if(0 != (err = ydb_storage_dio_delete(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,
+                            "delete file is fail.");
+                }
                 break;
             }
         default:{
+                    SpxLog1(jc->log,SpxLogWarn,
+                            "no the protocol for operation.");
                     break;
                 }
     }

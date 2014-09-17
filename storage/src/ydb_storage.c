@@ -44,6 +44,7 @@
 #include "ydb_storage_heartbeat.h"
 #include "ydb_storage_dio.h"
 #include "ydb_storage_runtime.h"
+#include "ydb_storage_binlog.h"
 
 #include "ydb_protocol.h"
 
@@ -88,7 +89,8 @@ int main(int argc,char **argv){
                 "create main loop is fail.");
         abort();
     }
-    ev_run(mainloop,0);
+    ydb_storage_regedit_signal(mainloop);
+    ev_run(mainloop,EVRUN_NOWAIT);
 
     if(0 != ( err = spx_log_new(\
                     log,\
@@ -115,7 +117,28 @@ int main(int argc,char **argv){
         return err;
     }
 
-    ydb_storage_regedit_signal(mainloop);
+    g_ydb_storage_storefile_pool =
+        ydb_storage_storefile_pool_new(log,c->task_module_thread_size,&err);
+    if(NULL == g_ydb_storage_storefile_pool || 0 != err){
+        SpxLog2(log,SpxLogError,err,
+                "new storefile pool is fail,");
+        return err;
+    }
+
+    g_ydb_storage_dio_pool =
+        ydb_storage_dio_pool_new(log,c->context_size,&err);
+    if(NULL == g_ydb_storage_dio_pool || 0 != err){
+        SpxLog2(log,SpxLogError,err,
+                "new storage dio pool is fail.");
+        return err;
+    }
+
+    g_ydb_storage_binlog = ydb_storage_binlog_new(log,c,c->basepath,c->machineid);
+    if(NULL == g_ydb_storage_binlog || 0 != err){
+        SpxLog2(log,SpxLogError,err,
+                "new storage binlog is fail.");
+        return err;
+    }
 
     g_spx_job_pool = spx_job_pool_new(log,\
             c,\
@@ -183,13 +206,12 @@ int main(int argc,char **argv){
 
 
     pthread_t socket_tid =  ydb_storage_mainsocket_thread_new(log,c,&err);
-    if(NULL == socket_tid){
+    if(0 == socket_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
         return err;
     }
 
     pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,c->timeout,c,&err);
-
     if(0 == heartbeat_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new heartbeat thread is fail.");

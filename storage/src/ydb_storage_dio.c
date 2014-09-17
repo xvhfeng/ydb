@@ -137,7 +137,7 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
     }
     int count = 0;
     string_t *fids = spx_string_splitlen(fid,\
-            spx_string_len(fid),":",sizeof(":"),\
+            spx_string_len(fid),":",strlen(":"),\
             &count,&(dc->err));
     if(NULL == fids || 0 == count){
         SpxLogFmt2(dc->log,SpxLogError,dc->err,\

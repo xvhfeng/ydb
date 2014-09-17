@@ -43,12 +43,12 @@ pthread_t ydb_tracker_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_track
     pthread_attr_getstacksize(&attr, &ostack_size);
     if (ostack_size != c->stacksize
             && (0 != (*err = pthread_attr_setstacksize(&attr,c->stacksize)))){
-        return *err;
+        return 0;
     }
     struct mainsocket_thread_arg *arg =(struct mainsocket_thread_arg *) spx_alloc_alone(sizeof(*arg),err);
     if(NULL == arg){
         pthread_attr_destroy(&attr);
-        return *err;
+        return 0;
     }
     arg->log = log;
     arg->c = c;
@@ -58,7 +58,7 @@ pthread_t ydb_tracker_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_track
                     arg))){
         pthread_attr_destroy(&attr);
         SpxFree(arg);
-        return *err;
+        return 0;
     }
     pthread_attr_destroy(&attr);
     return tid;

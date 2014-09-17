@@ -197,7 +197,7 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c,\
     struct ydb_tracker *t = NULL;
     while(NULL != (t = spx_vector_iter_next(iter))){
         if(NULL == t->hjc){
-            t->hjc = (struct spx_job_context *) spx_job_context_new(0,&arg,&err);
+            t->hjc = (struct spx_job_context *) spx_job_context_new(0,arg,&err);
             if(NULL == t->hjc){
                 SpxLog2(c->log,SpxLogError,err,"alloc heartbeat nio context is fail.");
                 continue;

@@ -136,7 +136,7 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         struct ydb_storage_runtime *rt,err_t *err){/*{{{*/
     int count = 0;
     string_t *kv = spx_string_splitlen(line,\
-            spx_string_len(line),"=",sizeof("="),&count,err);
+            spx_string_len(line),"=",strlen("="),&count,err);
     if(NULL == kv){
         return;
     }

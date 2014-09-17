@@ -274,7 +274,7 @@ err_t ydb_storage_binlog_context_parser(SpxLogDelegate *log,string_t line,i32_t 
 
     int count = 0;
     err_t err = 0;
-    string_t *contexts = spx_string_split(line,";",sizeof(":"),&count,&err);
+    string_t *contexts = spx_string_split(line,";",strlen(":"),&count,&err);
     if(NULL == contexts){
         return err;
     }

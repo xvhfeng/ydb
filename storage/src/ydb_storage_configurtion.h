@@ -119,7 +119,7 @@ struct ydb_tracker{
         i8_t overmode;
         u64_t singlemin;
         bool_t lazyrecv;
-        bool_t lazysize;
+        u64_t lazysize;
         bool_t sendfile;
         size_t pagesize;
         u8_t sync;

@@ -192,7 +192,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) config;
     int count = 0;
     string_t *kv = spx_string_splitlen(line,\
-            spx_string_len(line),"=",sizeof("="),&count,err);
+            spx_string_len(line),"=",strlen("="),&count,err);
     if(NULL == kv){
         return;
     }
@@ -400,7 +400,13 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
             SpxLog1(c->log,SpxLogError,"bad the configurtion item of basepath.and basepath is empty.");
             goto r1;
         }
-        return;
+
+        c->basepath = spx_string_dup(*(kv + 1),err);
+        if(NULL == c->basepath){
+            SpxLog2(c->log,SpxLogError,*err,\
+                    "dup the string for basepath is fail.");
+        }
+        goto r1;
     }
 
     //logpath
@@ -664,24 +670,24 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     if(0 == spx_string_casecmp(*kv,"tracker")){
         int sum = 0;
         string_t *kv1 = spx_string_splitlen(*(kv + 1),\
-                spx_string_len(*(kv + 1)),":",sizeof(":"),&sum,err);
+                spx_string_len(*(kv + 1)),":",strlen(":"),&sum,err);
         struct ydb_tracker *t = spx_alloc_alone(sizeof(*t),err);
         if(NULL == t){
             spx_string_free_splitres(kv1,sum);
             goto r1;
         }
-        if(spx_socket_is_ip(*kv)){
-            t->host.ip = spx_string_dup(*kv,err);
+        if(spx_socket_is_ip(*kv1)){
+            t->host.ip = spx_string_dup(*kv1,err);
             if(NULL == t->host.ip){
                 SpxLog2(c->log,SpxLogError,*err,\
                         "dup t ip is fail.");
             }
         }else {
-            t->host.ip = spx_socket_getipbyname(*kv,err);
+            t->host.ip = spx_socket_getipbyname(*kv1,err);
             if(NULL == t->host.ip){
                 SpxLogFmt2(c->log,SpxLogError,*err,\
                         "get t ip by hostname:%s is fail.",\
-                        *kv);
+                        *kv1);
             }
         }
         t->host.port = strtol(*(kv1 + 1),NULL,10);
@@ -1025,7 +1031,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         int sum = 0;
         if(spx_string_exist(s,':')){
             string_t *kv1 = spx_string_splitlen(s,
-                    spx_string_len(s),":",sizeof(":"),&sum,err);
+                    spx_string_len(s),":",strlen(":"),&sum,err);
             if(sum <= 0){
                 SpxLog1(c->log,SpxLogError,\
                         "parser fixed time is fail.");
@@ -1091,6 +1097,24 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         }
         goto r1;
     }
+
+
+    //syncgroup
+    if(0 == spx_string_casecmp(*kv,"syncgroup")){
+        if(1 == count){
+            *err = EINVAL;
+            SpxLog1(c->log,SpxLogError,\
+                    "bad the configurtion item of syncgroup.and syncgroup is empty.");
+            goto r1;
+        }
+        c->syncgroup = spx_string_dup(*(kv + 1),err);
+        if(NULL == c->syncgroup){
+            SpxLog2(c->log,SpxLogError,*err,\
+                    "dup the syncgroup is fail.");
+        }
+        goto r1;
+    }
+
 
     //query_sync_timespan
     if(0 == spx_string_casecmp(*kv,"query_sync_timespan")){
