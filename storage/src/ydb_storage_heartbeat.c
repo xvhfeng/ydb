@@ -44,8 +44,7 @@ spx_private void ydb_storage_heartbeat_nio_body_writer(\
         int fd,struct spx_job_context *jc);
 spx_private void ydb_storage_heartbeat_nio_body_reader(int fd,struct spx_job_context *jc);
 
-spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c,\
-        struct spx_job_context_transport *arg);
+spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c);
 spx_private void *ydb_storage_report();
 spx_private err_t ydb_storage_heartbeat_send(int protocol,\
         struct ydb_tracker *tracker,string_t groupname,string_t machineid,\
@@ -122,9 +121,9 @@ r1:
 
 spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
         ev_timer *w,int revents){/*{{{*/
-    struct spx_job_context *jc = (struct spx_job_context *) w->data;
     struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) \
-                                         jc->config;
+                                         w->data;
+    err_t err = 0;
 
     u64_t disksize = 0;
     u64_t freesize = 0;
@@ -132,8 +131,8 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
         struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)){
-            mp->freesize = spx_mountpoint_freesize(mp->path,&(jc->err));
-            mp->disksize = spx_mountpoint_size(mp->path,&(jc->err));
+            mp->freesize = spx_mountpoint_freesize(mp->path,&(err));
+            mp->disksize = spx_mountpoint_size(mp->path,&(err));
             mp->freesize = 0 >= mp->freesize - c->freedisk \
                            ? 0 : mp->freesize - c->freedisk;
             disksize += mp->disksize;
@@ -144,9 +143,9 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     g_ydb_storage_runtime->total_freesize = freesize;
     g_ydb_storage_runtime->total_disksize = disksize;
 
-    struct spx_vector_iter *iter = spx_vector_iter_new(c->trackers,&(jc->err));
+    struct spx_vector_iter *iter = spx_vector_iter_new(c->trackers,&(err));
     if(NULL == iter){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
+        SpxLog2(c->log,SpxLogError,err,\
                 "init the trackers iter is fail.");
         return;
     }
@@ -161,12 +160,11 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     }
     spx_vector_iter_free(&iter);
 
-    ev_timer_set (heartbeat_timer, (double) 30, 0.);
-    ev_timer_again(hloop,heartbeat_timer);
+//    ev_timer_set (heartbeat_timer, (double) 10, 0.);
+//    ev_timer_again(hloop,heartbeat_timer);
 }/*}}}*/
 
-spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c,\
-        struct spx_job_context_transport *arg){/*{{{*/
+spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c){/*{{{*/
     err_t err = 0;
     u64_t disksize = 0;
     u64_t freesize = 0;
@@ -196,19 +194,11 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c,\
     bool_t can_run = false;
     struct ydb_tracker *t = NULL;
     while(NULL != (t = spx_vector_iter_next(iter))){
-        if(NULL == t->hjc){
-            t->hjc = (struct spx_job_context *) spx_job_context_new(0,arg,&err);
-            if(NULL == t->hjc){
-                SpxLog2(c->log,SpxLogError,err,"alloc heartbeat nio context is fail.");
-                continue;
-            }
-        }
         err = ydb_storage_heartbeat_send( YDB_REGEDIT_STORAGE,\
                 t,c->groupname,c->machineid,c->syncgroup,c->ip,c->port,
                 g_ydb_storage_runtime->first_start_time,\
                 disksize,freesize,g_ydb_storage_runtime->status);
         if(0 != err){
-            t->hjc->err = err;
             SpxLogFmt2(t->hjc->log,SpxLogError,err,\
                     "regedit to tracker %s:%d is fail.",\
                     t->host.ip,t->host.port);
@@ -219,7 +209,7 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c,\
     spx_vector_iter_free(&iter);
 
     if(!can_run){
-        SpxLog1(t->hjc->log,SpxLogError,\
+        SpxLog1(c->log,SpxLogError,\
                 "regedit to all tracker is fail,"
                 "so storage cannot run.");
     }
@@ -227,7 +217,8 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c,\
 }/*}}}*/
 
 spx_private void *ydb_storage_report(){/*{{{*/
-    ev_timer_init(heartbeat_timer,ydb_storage_heartbeat_handler,(double) 30,(double) 0);
+    ev_timer_init(heartbeat_timer,ydb_storage_heartbeat_handler,(double) 10,(double) 10);
+    ev_timer_start(hloop,heartbeat_timer);
     ev_run(hloop,0);
     return NULL;
 }/*}}}*/
@@ -298,6 +289,7 @@ pthread_t ydb_storage_heartbeat_service_init(
         SpxLog2(log,SpxLogError,*err,"alloc heartbeat timer is fail.");
         goto r1;
     }
+    heartbeat_timer->data = config;
     hloop = ev_loop_new(0);
     if(NULL == hloop){
         *err = errno;
@@ -305,9 +297,34 @@ pthread_t ydb_storage_heartbeat_service_init(
                 "new event loop for heartbeat is fail.");
         goto r1;
     }
-    if(!ydb_storage_regedit(config,&arg)){
+
+    struct spx_vector_iter *iter = spx_vector_iter_new(config->trackers ,err);
+    if(NULL == iter){
+        SpxLog2(log,SpxLogError,*err,\
+                "init the trackers iter is fail.");
         goto r1;
     }
+
+    bool_t isrun = true;
+    do{
+        struct ydb_tracker *t = NULL;
+        while(NULL != (t = spx_vector_iter_next(iter))){
+            if(NULL == t->hjc){
+                t->hjc = (struct spx_job_context *) spx_job_context_new(0,&arg,err);
+                if(NULL == t->hjc){
+                    isrun = false;
+                    SpxLog2(log,SpxLogError,*err,"alloc heartbeat nio context is fail.");
+                    break;
+                }
+            }
+        }
+    }while(false);
+    spx_vector_iter_free(&iter);
+    if(!isrun){
+        goto r1;
+    }
+
+    ydb_storage_regedit(config);
 
     pthread_t tid = 0;
     pthread_attr_t attr;

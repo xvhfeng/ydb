@@ -32,7 +32,7 @@
 err_t ydb_storage_dio_mountpoint_init(struct ydb_storage_configurtion *c){/*{{{*/
     err_t err = 0;
     int i = 0;
-    string_t path = spx_string_newlen(NULL,SpxPathSize,&err);
+    string_t path = spx_string_emptylen(SpxPathSize,&err);
     if(NULL == path){
         SpxLog2(c->log,SpxLogError,err,\
                 "new path is fail.");
@@ -60,11 +60,12 @@ err_t ydb_storage_dio_mountpoint_init(struct ydb_storage_configurtion *c){/*{{{*
                                 "cat store path is fail.");
                         goto r1;
                     }
-                    if(!spx_is_dir(newpath,&err)){
-                        if(0 != (err = spx_mkdir(c->log,newpath,SpxPathMode))){
+                    path = newpath;
+                    if(!spx_is_dir(path,&err)){
+                        if(0 != (err = spx_mkdir(c->log,path,SpxPathMode))){
                             SpxLogFmt2(c->log,SpxLogError,err,
                                     "create store path:%s is fail.",
-                                    newpath);
+                                    path);
                             goto r1;
                         }
                         printf("mountpoint idz:%02X,store path:%02X/%02X/ is created.\n",

@@ -66,12 +66,12 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
 
     if(SpxStringEndWith(new_basepath,SpxPathDlmt)){
         filename = spx_string_cat_printf(err,new_basepath,\
-                "%s%s-%s-ydb-storage.rtf",\
-                new_basepath,c->groupname,c->machineid);
+                "%s-%s-ydb-storage.rtf",\
+                c->groupname,c->machineid);
     } else {
         filename = spx_string_cat_printf(err,new_basepath,\
-                "%s/%s-%s-ydb-storage.rtf",\
-                new_basepath,c->groupname,c->machineid);
+                "/%s-%s-ydb-storage.rtf",\
+                c->groupname,c->machineid);
     }
     if(NULL == filename){
         SpxLog2(log,SpxLogError,*err,"get storage mid filename is fail.");

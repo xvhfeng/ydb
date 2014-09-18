@@ -205,11 +205,6 @@ int main(int argc,char **argv){
     }
 
 
-    pthread_t socket_tid =  ydb_storage_mainsocket_thread_new(log,c,&err);
-    if(0 == socket_tid && 0 != err){
-        SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
-        return err;
-    }
 
     pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,c->timeout,c,&err);
     if(0 == heartbeat_tid && 0 != err){
@@ -218,8 +213,14 @@ int main(int argc,char **argv){
         return err;
     }
 
-    //if have maneger code please input here
+    pthread_t socket_tid =  ydb_storage_mainsocket_thread_new(log,c,&err);
+    if(0 == socket_tid && 0 != err){
+        SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
+        return err;
+    }
 
+    //if have maneger code please input here
+    sleep(10);//wait main socket thread
     pthread_join(socket_tid,NULL);
 
     return 0;
