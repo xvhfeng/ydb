@@ -45,16 +45,18 @@ spx_private void ydb_storage_heartbeat_nio_body_writer(\
 spx_private void ydb_storage_heartbeat_nio_body_reader(int fd,struct spx_job_context *jc);
 
 spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c);
-spx_private void *ydb_storage_report();
+spx_private void *ydb_storage_report(void *arg);
 spx_private err_t ydb_storage_heartbeat_send(int protocol,\
         struct ydb_tracker *tracker,string_t groupname,string_t machineid,\
         string_t syncgroup,string_t ip,int port,\
-        u64_t first_start,u64_t disksize,u64_t freesize,int status);
+        u64_t first_start,u64_t disksize,u64_t freesize,int status,
+        u32_t timeout);
 
 spx_private err_t ydb_storage_heartbeat_send(int protocol,\
         struct ydb_tracker *tracker,string_t groupname,string_t machineid,\
         string_t syncgroup,string_t ip,int port,\
-        u64_t first_start,u64_t disksize,u64_t freesize,int status){/*{{{*/
+        u64_t first_start,u64_t disksize,u64_t freesize,int status,
+        u32_t timeout){/*{{{*/
     err_t err = 0;
     struct spx_job_context *jc = tracker->hjc;
     int fd = spx_socket_new(&err);
@@ -70,11 +72,11 @@ spx_private err_t ydb_storage_heartbeat_send(int protocol,\
                     SpxDetectTimes,SpxDetectTimeout,\
                     SpxLinger,SpxLingerTimeout,\
                     SpxNodelay,\
-                    true,30))){
+                    true,timeout))){
         SpxLog2(jc->log,SpxLogError,err,"set socket operator is fail.");
         goto r1;
     }
-    if(0 != (err = spx_socket_connect(fd,tracker->host.ip,tracker->host.port))){
+    if(0 != (err = spx_socket_connect_nb(fd,tracker->host.ip,tracker->host.port,timeout))){
         SpxLogFmt2(jc->log,SpxLogError,err,\
                 "conntect to tracker:%s:%d is fail.",\
                 tracker->host.ip,tracker->host.port);
@@ -156,7 +158,8 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
                 t,c->groupname,c->machineid,c->syncgroup,\
                 c->ip,c->port,
                 g_ydb_storage_runtime->first_start_time,\
-                disksize,freesize,g_ydb_storage_runtime->status);
+                disksize,freesize,g_ydb_storage_runtime->status,
+                c->timeout);
     }
     spx_vector_iter_free(&iter);
 
@@ -197,7 +200,8 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c){/*{{{
         err = ydb_storage_heartbeat_send( YDB_REGEDIT_STORAGE,\
                 t,c->groupname,c->machineid,c->syncgroup,c->ip,c->port,
                 g_ydb_storage_runtime->first_start_time,\
-                disksize,freesize,g_ydb_storage_runtime->status);
+                disksize,freesize,g_ydb_storage_runtime->status,
+                c->timeout);
         if(0 != err){
             SpxLogFmt2(t->hjc->log,SpxLogError,err,\
                     "regedit to tracker %s:%d is fail.",\
@@ -216,8 +220,12 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c){/*{{{
     return can_run ;
 }/*}}}*/
 
-spx_private void *ydb_storage_report(){/*{{{*/
-    ev_timer_init(heartbeat_timer,ydb_storage_heartbeat_handler,(double) 10,(double) 10);
+spx_private void *ydb_storage_report(void *arg){/*{{{*/
+    struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) arg;
+    if(NULL == c){
+        return NULL;
+    }
+    ev_timer_init(heartbeat_timer,ydb_storage_heartbeat_handler,(double) c->heartbeat ,(double) c->heartbeat);
     ev_timer_start(hloop,heartbeat_timer);
     ev_run(hloop,0);
     return NULL;
@@ -226,12 +234,14 @@ spx_private void *ydb_storage_report(){/*{{{*/
 void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
         string_t groupname,string_t machineid,\
         string_t syncgroup, string_t ip,int port,\
-        u64_t first_start,u64_t disksize,u64_t freesize){/*{{{*/
+        u64_t first_start,u64_t disksize,u64_t freesize,
+        u32_t timeout){/*{{{*/
    g_ydb_storage_runtime->status = YDB_STORAGE_CLOSING;
     ev_timer_stop(hloop,heartbeat_timer);
     ydb_storage_heartbeat_send( YDB_SHUTDOWN_STORAGE,
             tracker,groupname,machineid,syncgroup,ip,port,
-            first_start,disksize,freesize,YDB_STORAGE_CLOSING);
+            first_start,disksize,freesize,YDB_STORAGE_CLOSING,
+            timeout );
     g_ydb_storage_runtime->status = YDB_STORAGE_CLOSED;
 }/*}}}*/
 
@@ -326,6 +336,7 @@ pthread_t ydb_storage_heartbeat_service_init(
 
     ydb_storage_regedit(config);
 
+    /*
     pthread_t tid = 0;
     pthread_attr_t attr;
     pthread_attr_init(&attr);
@@ -340,7 +351,7 @@ pthread_t ydb_storage_heartbeat_service_init(
             goto r1;
         }
         if (0 !=(*err =  pthread_create(&(tid), &attr, ydb_storage_report,
-                        NULL))){
+                        config))){
             pthread_attr_destroy(&attr);
             SpxLog2(log,SpxLogError,*err,\
                     "create heartbeat thread is fail.");
@@ -349,6 +360,7 @@ pthread_t ydb_storage_heartbeat_service_init(
     }while(false);
     pthread_attr_destroy(&attr);
     return tid;
+    */return 0;
 r1:
     if(NULL != heartbeat_timer){
         SpxFree(heartbeat_timer);

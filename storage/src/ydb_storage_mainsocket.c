@@ -23,6 +23,7 @@
 #include "spx_socket.h"
 #include "spx_io.h"
 #include "spx_alloc.h"
+#include "spx_socket_accept.h"
 
 #include "ydb_storage_configurtion.h"
 
@@ -89,7 +90,7 @@ spx_private void *ydb_storage_mainsocket_create(void *arg){
         goto r1;
     }
 
-    spx_socket_accept_nb(mainsocket);
+    spx_socket_accept_nb(c->log,mainsocket);
 r1:
     SpxClose(mainsocket);
     return NULL;

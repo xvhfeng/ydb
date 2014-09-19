@@ -31,6 +31,8 @@ extern "C" {
      *
      */
 
+#include <pthread.h>
+
 #include "spx_socket.h"
 #include "spx_job.h"
 
@@ -45,7 +47,8 @@ pthread_t ydb_storage_heartbeat_service_init(
 void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
         string_t groupname,string_t machineid,\
         string_t syncgroup, string_t ip,int port,\
-        u64_t first_start,u64_t disksize,u64_t freesize);
+        u64_t first_start,u64_t disksize,u64_t freesize,
+        u32_t timeout);
 
 #ifdef __cplusplus
 }

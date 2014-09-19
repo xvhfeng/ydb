@@ -26,6 +26,7 @@
 #include "spx_io.h"
 #include "spx_log.h"
 #include "spx_alloc.h"
+#include "spx_socket_accept.h"
 
 #include "ydb_tracker_configurtion.h"
 
@@ -97,7 +98,7 @@ spx_private void *ydb_tracker_mainsocket_create(void *arg){
         goto r1;
     }
 
-    spx_socket_accept_nb(mainsocket);
+    spx_socket_accept_nb(c->log,mainsocket);
 r1:
     SpxClose(mainsocket);
     return NULL;

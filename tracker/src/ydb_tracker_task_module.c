@@ -118,7 +118,7 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,int idx,struct spx_ta
     }
 
     jcontext->moore = SpxNioMooreResponse;
-    size_t i = jcontext->idx % g_spx_network_module->threadpool->curr_size;
+    size_t i = jcontext->idx % g_spx_network_module->threadpool->size;
     err = spx_module_dispatch(g_spx_network_module,i,jcontext);
     if(0 != err){
             SpxLog2(jcontext->log,SpxLogError,jcontext->err,\

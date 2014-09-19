@@ -48,6 +48,7 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     string_t new_basepath = NULL;
     string_t line = NULL;
     string_t filename = NULL;
+    FILE *fp = NULL;
     rt->c = c;
     rt->log = log;
     /*
@@ -84,7 +85,7 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
         return rt;
     }
 
-    FILE *fp = fopen(filename,"r");
+    fp = fopen(filename,"r");
     if(NULL == fp) {
         *err = errno;
         SpxLogFmt2(log,SpxLogError,*err,\
@@ -109,7 +110,7 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     }
     spx_string_free(line);
     fclose(fp);
-    ev_timer_init(&(rt->w),ydb_storage_runtime_flush,(double) c->runtime_flush_timespan,1);
+    ev_timer_init(&(rt->w),ydb_storage_runtime_flush,(double) c->runtime_flush_timespan,(double) c->runtime_flush_timespan);
     ev_timer_start (loop, &(rt->w));
     ev_run(loop,0);
     return rt;
@@ -128,6 +129,9 @@ r1:
     }
     if(NULL != line){
         spx_string_free(line);
+    }
+    if(NULL != fp){
+        fclose(fp);
     }
     return NULL;
 }/*}}}*/
@@ -368,11 +372,11 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
         goto r1;
     }
     new_basepath = filename;
-    FILE *fp = fopen(filename,"w+");
+    FILE *fp = fopen(new_basepath,"w+");
     if(NULL == fp) {
         err = errno;
         SpxLogFmt2(rt->log,SpxLogError,err,\
-                "open the mid file is fail.filename:&s.",filename);
+                "open the mid file is fail.filename:&s.",new_basepath);
         goto r1;
     }
     size_t size = spx_string_len(buf);
