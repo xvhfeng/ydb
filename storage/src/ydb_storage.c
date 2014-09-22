@@ -90,7 +90,12 @@ int main(int argc,char **argv){
         abort();
     }
     ydb_storage_regedit_signal(mainloop);
-    ev_run(mainloop,EVRUN_NOWAIT);
+    bool_t rc = ev_run(mainloop,EVRUN_NOWAIT);
+    if(rc){
+        printf("ok");
+    }else {
+        printf("error.");
+    }
 
     if(0 != ( err = spx_log_new(\
                     log,\
@@ -206,7 +211,7 @@ int main(int argc,char **argv){
 
 
 
-    pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,c->timeout,c,&err);
+    pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,mainloop,c->timeout,c,&err);
     if(0 == heartbeat_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new heartbeat thread is fail.");

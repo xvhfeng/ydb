@@ -44,15 +44,15 @@ spx_private void ydb_storage_heartbeat_nio_body_writer(\
         int fd,struct spx_job_context *jc);
 spx_private void ydb_storage_heartbeat_nio_body_reader(int fd,struct spx_job_context *jc);
 
-spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c);
+spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_configurtion *c);
 spx_private void *ydb_storage_report(void *arg);
-spx_private err_t ydb_storage_heartbeat_send(int protocol,\
+spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
         struct ydb_tracker *tracker,string_t groupname,string_t machineid,\
         string_t syncgroup,string_t ip,int port,\
         u64_t first_start,u64_t disksize,u64_t freesize,int status,
         u32_t timeout);
 
-spx_private err_t ydb_storage_heartbeat_send(int protocol,\
+spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
         struct ydb_tracker *tracker,string_t groupname,string_t machineid,\
         string_t syncgroup,string_t ip,int port,\
         u64_t first_start,u64_t disksize,u64_t freesize,int status,
@@ -83,7 +83,7 @@ spx_private err_t ydb_storage_heartbeat_send(int protocol,\
         goto r1;
     }
 
-    struct spx_msg_header *writer_header = NULL;
+        struct spx_msg_header *writer_header = NULL;
     writer_header = spx_alloc_alone(sizeof(*writer_header),&err);
     if(NULL == writer_header){
         SpxLog2(jc->log,SpxLogError,err,\
@@ -114,7 +114,7 @@ spx_private err_t ydb_storage_heartbeat_send(int protocol,\
     spx_msg_pack_i32(ctx,status);
 
     jc->fd = fd;
-    spx_nio_regedit_writer(hloop,jc->fd,jc);
+    spx_nio_regedit_writer(loop,jc->fd,jc);
     return err;
 r1:
     SpxClose(fd);
@@ -154,7 +154,7 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
 
     struct ydb_tracker *t = NULL;
     while(NULL != (t = spx_vector_iter_next(iter))){
-        ydb_storage_heartbeat_send( YDB_HEARTBEAT_STORAGE,
+        ydb_storage_heartbeat_send( hloop,YDB_HEARTBEAT_STORAGE,
                 t,c->groupname,c->machineid,c->syncgroup,\
                 c->ip,c->port,
                 g_ydb_storage_runtime->first_start_time,\
@@ -167,7 +167,7 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
 //    ev_timer_again(hloop,heartbeat_timer);
 }/*}}}*/
 
-spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c){/*{{{*/
+spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_configurtion *c){/*{{{*/
     err_t err = 0;
     u64_t disksize = 0;
     u64_t freesize = 0;
@@ -197,11 +197,12 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c){/*{{{
     bool_t can_run = false;
     struct ydb_tracker *t = NULL;
     while(NULL != (t = spx_vector_iter_next(iter))){
-        err = ydb_storage_heartbeat_send( YDB_REGEDIT_STORAGE,\
+        err = ydb_storage_heartbeat_send( loop,YDB_REGEDIT_STORAGE,\
                 t,c->groupname,c->machineid,c->syncgroup,c->ip,c->port,
                 g_ydb_storage_runtime->first_start_time,\
                 disksize,freesize,g_ydb_storage_runtime->status,
                 c->timeout);
+
         if(0 != err){
             SpxLogFmt2(t->hjc->log,SpxLogError,err,\
                     "regedit to tracker %s:%d is fail.",\
@@ -211,6 +212,8 @@ spx_private bool_t ydb_storage_regedit(struct ydb_storage_configurtion *c){/*{{{
         }
     }
     spx_vector_iter_free(&iter);
+    ev_run(loop,EVRUN_NOWAIT);//the ev_run must add,if not the loop will not loop
+
 
     if(!can_run){
         SpxLog1(c->log,SpxLogError,\
@@ -238,7 +241,7 @@ void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
         u32_t timeout){/*{{{*/
    g_ydb_storage_runtime->status = YDB_STORAGE_CLOSING;
     ev_timer_stop(hloop,heartbeat_timer);
-    ydb_storage_heartbeat_send( YDB_SHUTDOWN_STORAGE,
+    ydb_storage_heartbeat_send(hloop,YDB_SHUTDOWN_STORAGE,
             tracker,groupname,machineid,syncgroup,ip,port,
             first_start,disksize,freesize,YDB_STORAGE_CLOSING,
             timeout );
@@ -281,6 +284,7 @@ r1:
 
 pthread_t ydb_storage_heartbeat_service_init(
         SpxLogDelegate *log,
+        struct ev_loop *loop,
         u32_t timeout,
         struct ydb_storage_configurtion *config,\
         err_t *err){/*{{{*/
@@ -334,7 +338,7 @@ pthread_t ydb_storage_heartbeat_service_init(
         goto r1;
     }
 
-    ydb_storage_regedit(config);
+    ydb_storage_regedit(loop,config);
 
     /*
     pthread_t tid = 0;

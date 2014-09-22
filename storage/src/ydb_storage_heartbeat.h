@@ -32,6 +32,7 @@ extern "C" {
      */
 
 #include <pthread.h>
+#include <ev.h>
 
 #include "spx_socket.h"
 #include "spx_job.h"
@@ -40,6 +41,7 @@ extern "C" {
 
 pthread_t ydb_storage_heartbeat_service_init(
         SpxLogDelegate *log,
+        struct ev_loop *loop,
         u32_t timeout,
         struct ydb_storage_configurtion *config,\
         err_t *err);

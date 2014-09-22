@@ -99,6 +99,18 @@ spx_private err_t ydb_storage_binlog_open(struct ydb_storage_binlog *binlog){/*{
         stat(binlog->filename,&buf);
     }
 
+    string_t basepath = spx_basepath(binlog->filename,&(binlog->err));
+    if(NULL == basepath || 0 != binlog->err){
+        SpxLogFmt2(binlog->log,SpxLogError,binlog->err,
+                "get basepath from filename:%s is fail.",
+                binlog->filename);
+        spx_string_free(binlog->filename);
+    }
+    if(!spx_is_dir(basepath,&(binlog->err))){
+        spx_mkdir(binlog->log,basepath,SpxPathMode);
+    }
+    spx_string_free(basepath);
+
     binlog->fp = fopen(binlog->filename,"a+");
     if(NULL == binlog->fp){
         binlog->err = errno;
@@ -246,7 +258,7 @@ void ydb_storage_binlog_free(struct ydb_storage_binlog **binlog){/*{{{*/
 }/*}}}*/
 
 string_t ydb_storage_binlog_make_filename(SpxLogDelegate *log,string_t path,string_t machineid,
-        int year,int month,int day,err_t *err){
+        int year,int month,int day,err_t *err){/*{{{*/
     string_t filename = spx_string_newlen(NULL,SpxPathSize,err);
     if(NULL == filename){
         SpxLog2(log,SpxLogError,*err,
@@ -254,7 +266,7 @@ string_t ydb_storage_binlog_make_filename(SpxLogDelegate *log,string_t path,stri
         return NULL;
     }
     string_t new_filename = spx_string_cat_printf(err,filename,
-            "%s%s.metadata/%s%04-%02-%02.binlog",\
+            "%s%s.metadata/%s%04d-%02d-%02d.binlog",\
             path,SpxStringEndWith(path,SpxPathDlmt) ? "" : SpxPathDlmtString,\
             machineid,year,month,day);
     if(NULL == new_filename){
@@ -265,12 +277,12 @@ string_t ydb_storage_binlog_make_filename(SpxLogDelegate *log,string_t path,stri
     }
     filename = new_filename;
     return filename;
-}
+}/*}}}*/
 
 err_t ydb_storage_binlog_context_parser(SpxLogDelegate *log,string_t line,i32_t *op,bool_t *issinglefile,
         string_t *mid,u32_t *ver,u32_t *opver,u64_t *fcreatetime,u64_t *createtime,
         u64_t *lastmodifytime,i32_t *mpidx,i32_t *p1,i32_t *p2,u32_t *tid,u32_t *rand,
-        u64_t *begin,u64_t *totalsize,u64_t *realsize,string_t *suffix){
+        u64_t *begin,u64_t *totalsize,u64_t *realsize,string_t *suffix){/*{{{*/
 
     int count = 0;
     err_t err = 0;
@@ -456,4 +468,4 @@ err_t ydb_storage_binlog_context_parser(SpxLogDelegate *log,string_t line,i32_t 
 r1:
     spx_string_free_splitres(contexts,count);
     return err;
-}
+}/*}}}*/
