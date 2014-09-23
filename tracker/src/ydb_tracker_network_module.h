@@ -27,8 +27,10 @@ extern "C" {
 
 bool_t ydb_tracker_network_module_header_validator_handler(struct spx_job_context *jcontext);
 void ydb_tracker_network_module_header_validator_fail_handler(struct spx_job_context *jcontext);
-void ydb_tracker_network_module_request_body_handler(int fd,struct spx_job_context *jcontext);
-void ydb_tracker_network_module_response_body_handler(int fd,struct spx_job_context *jcontext);
+void ydb_tracker_network_module_request_body_handler(
+        struct ev_loop *loop,int fd,struct spx_job_context *jcontext);
+void ydb_tracker_network_module_response_body_handler(
+        struct ev_loop *loop,int fd,struct spx_job_context *jcontext);
 
 #ifdef __cplusplus
 }

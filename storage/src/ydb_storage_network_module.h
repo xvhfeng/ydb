@@ -29,8 +29,10 @@ extern "C" {
 bool_t ydb_storage_network_module_header_validator_handler(struct spx_job_context *jcontext);
 void ydb_storage_network_module_header_validator_fail_handler(struct spx_job_context *jcontext);
 void ydb_storage_network_module_request_body_before_handler(struct spx_job_context *jc);
-void ydb_storage_network_module_request_body_handler(int fd,struct spx_job_context *jcontext);
-void ydb_storage_network_module_response_body_handler(int fd,struct spx_job_context *jcontext);
+void ydb_storage_network_module_request_body_handler(
+        struct ev_loop *loop,int fd,struct spx_job_context *jcontext);
+void ydb_storage_network_module_response_body_handler(
+        struct ev_loop  *loop,int fd,struct spx_job_context *jcontext);
 
 #ifdef __cplusplus
 }

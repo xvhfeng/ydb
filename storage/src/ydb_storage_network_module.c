@@ -46,8 +46,9 @@ void ydb_storage_network_module_request_body_before_handler(struct spx_job_conte
     }
 }
 
-void ydb_storage_network_module_request_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_reader_body_handler(fd,jcontext);
+void ydb_storage_network_module_request_body_handler(
+        struct ev_loop *loop,int fd,struct spx_job_context *jcontext){
+    spx_nio_reader_body_handler(loop,fd,jcontext);
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "read body is fail.");
@@ -66,8 +67,9 @@ void ydb_storage_network_module_request_body_handler(int fd,struct spx_job_conte
     return;
 }
 
-void ydb_storage_network_module_response_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_writer_body_handler(fd,jcontext);//send data for explaning the body first
+void ydb_storage_network_module_response_body_handler(
+        struct ev_loop *loop,int fd,struct spx_job_context *jcontext){
+    spx_nio_writer_body_handler(loop,fd,jcontext);//send data for explaning the body first
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "send data for body explaning itself first that is fail.");

@@ -41,8 +41,9 @@ spx_private struct ev_loop *hloop;
 
 
 spx_private void ydb_storage_heartbeat_nio_body_writer(\
-        int fd,struct spx_job_context *jc);
-spx_private void ydb_storage_heartbeat_nio_body_reader(int fd,struct spx_job_context *jc);
+        struct ev_loop *loop,int fd,struct spx_job_context *jc);
+spx_private void ydb_storage_heartbeat_nio_body_reader(
+        struct ev_loop *loop,int fd,struct spx_job_context *jc);
 
 spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_configurtion *c);
 spx_private void *ydb_storage_report(void *arg);
@@ -249,13 +250,20 @@ void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
 }/*}}}*/
 
 spx_private void ydb_storage_heartbeat_nio_body_writer(\
-        int fd,struct spx_job_context *jc){/*{{{*/
-    spx_nio_writer_body_handler(fd,jc);
-    spx_nio_regedit_reader(hloop,jc->fd,jc);
+        struct ev_loop *loop,int fd,struct spx_job_context *jc){/*{{{*/
+    spx_nio_writer_body_handler(loop,fd,jc);
+    spx_nio_regedit_reader(loop,jc->fd,jc);
+    bool_t rc = ev_run(loop,EVRUN_NOWAIT);
+    if(rc){
+        printf("ok");
+    }else{
+        printf("error.");
+    }
 }/*}}}*/
 
-spx_private void ydb_storage_heartbeat_nio_body_reader(int fd,struct spx_job_context *jc){/*{{{*/
-    spx_nio_reader_body_handler(fd,jc);
+spx_private void ydb_storage_heartbeat_nio_body_reader(struct ev_loop *loop,
+        int fd,struct spx_job_context *jc){/*{{{*/
+    spx_nio_reader_body_handler(loop,fd,jc);
     if(0 != jc->err){
         SpxLog2(jc->log,SpxLogError,jc->err,\
                 "recv the regedit response is fail.");

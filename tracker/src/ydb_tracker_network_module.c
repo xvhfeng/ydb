@@ -36,8 +36,9 @@ void ydb_tracker_network_module_header_validator_fail_handler(struct spx_job_con
     return;
 }
 
-void ydb_tracker_network_module_request_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_reader_body_handler(fd,jcontext);
+void ydb_tracker_network_module_request_body_handler(
+        struct ev_loop *loop,int fd,struct spx_job_context *jcontext){
+    spx_nio_reader_body_handler(loop,fd,jcontext);
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "read body is fail.");
@@ -56,12 +57,15 @@ void ydb_tracker_network_module_request_body_handler(int fd,struct spx_job_conte
     return;
 }
 
-void ydb_tracker_network_module_response_body_handler(int fd,struct spx_job_context *jcontext){
-    spx_nio_writer_body_handler(fd,jcontext);
+void ydb_tracker_network_module_response_body_handler(
+        struct ev_loop *loop,int fd,struct spx_job_context *jcontext){
+    spx_nio_writer_body_handler(loop,fd,jcontext);
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "write body buffer is fail.");
     }
+    ev_io_stop(loop,&(jcontext->watcher));
+    spx_job_pool_push(g_spx_job_pool,jcontext);
     return;
 }
 

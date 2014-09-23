@@ -54,22 +54,23 @@ spx_private err_t  ydb_remote_storage_key_free(void **arg);
 spx_private err_t ydb_remote_storage_free(void **arg);
 spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struct spx_task_context *tcontext);
 
-spx_private err_t ydb_remote_storage_value_free(void **arg){
+spx_private err_t ydb_remote_storage_value_free(void **arg){/*{{{*/
     if(NULL != *arg){
         struct spx_map **map = (struct spx_map **) arg;
         spx_map_free(map);
     }
     return 0;
-}
-spx_private err_t  ydb_remote_storage_key_free(void **arg){
+}/*}}}*/
+
+spx_private err_t  ydb_remote_storage_key_free(void **arg){/*{{{*/
     if(NULL != *arg){
         string_t s = (string_t ) *arg;
         spx_string_free(s);
     }
     return 0;
-}
+}/*}}}*/
 
-spx_private err_t ydb_remote_storage_free(void **arg){
+spx_private err_t ydb_remote_storage_free(void **arg){/*{{{*/
     if(NULL != *arg){
         struct ydb_remote_storage **s = (struct ydb_remote_storage **) arg;
         if(NULL != (*s)->machineid){
@@ -87,7 +88,7 @@ spx_private err_t ydb_remote_storage_free(void **arg){
         SpxFree(*s);
     }
     return 0;
-}
+}/*}}}*/
 
 /*
  * msg:groupname + machienid + ip + port + first-start-timestamp + disksize
@@ -98,7 +99,7 @@ spx_private err_t ydb_remote_storage_free(void **arg){
  *
  *
  */
-spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struct spx_task_context *tcontext){
+spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext){
         return EINVAL;
     }
@@ -256,9 +257,9 @@ r1:
         spx_string_free(ip);
     }
     return jcontext->err;
-}
+}/*}}}*/
 
-err_t ydb_tracker_regedit_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_regedit_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext){
         return EINVAL;
     }
@@ -267,9 +268,9 @@ err_t ydb_tracker_regedit_from_storage(struct ev_loop *loop,struct spx_task_cont
         return EINVAL;
     }
     return  ydb_remote_storage_report(loop,YDB_REGEDIT_STORAGE,tcontext);
-}
+}/*}}}*/
 
-err_t ydb_tracker_heartbeat_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_heartbeat_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext){
         return EINVAL;
     }
@@ -278,9 +279,9 @@ err_t ydb_tracker_heartbeat_from_storage(struct ev_loop *loop,struct spx_task_co
         return EINVAL;
     }
     return  ydb_remote_storage_report(loop,YDB_HEARTBEAT_STORAGE,tcontext);
-}
+}/*}}}*/
 
-err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){
+err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext){
         return EINVAL;
     }
@@ -289,4 +290,4 @@ err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_con
         return EINVAL;
     }
     return  ydb_remote_storage_report(loop,YDB_SHUTDOWN_STORAGE,tcontext);
-}
+}/*}}}*/
