@@ -169,7 +169,7 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
         }
     }
 
-    spx_map_get(map,machineid,spx_string_len(machineid),(void **)storage,&size);
+    spx_map_get(map,machineid,spx_string_len(machineid),(void **) &storage,&size);
     if(NULL == storage){
         storage = spx_alloc_alone(sizeof(*storage),&(jcontext->err));
         if(NULL == storage){

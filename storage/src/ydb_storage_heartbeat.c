@@ -213,7 +213,7 @@ spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_c
         }
     }
     spx_vector_iter_free(&iter);
-    ev_run(loop,EVRUN_NOWAIT);//the ev_run must add,if not the loop will not loop
+//    ev_run(loop,EVRUN_NOWAIT);//the ev_run must add,if not the loop will not loop
 
 
     if(!can_run){
@@ -253,12 +253,12 @@ spx_private void ydb_storage_heartbeat_nio_body_writer(\
         struct ev_loop *loop,int fd,struct spx_job_context *jc){/*{{{*/
     spx_nio_writer_body_handler(loop,fd,jc);
     spx_nio_regedit_reader(loop,jc->fd,jc);
-    bool_t rc = ev_run(loop,EVRUN_NOWAIT);
-    if(rc){
-        printf("ok");
-    }else{
-        printf("error.");
-    }
+//    bool_t rc = ev_run(loop,EVRUN_NOWAIT);
+//    if(rc){
+//        printf("ok");
+//    }else{
+//        printf("error.");
+//    }
 }/*}}}*/
 
 spx_private void ydb_storage_heartbeat_nio_body_reader(struct ev_loop *loop,
@@ -346,33 +346,32 @@ pthread_t ydb_storage_heartbeat_service_init(
         goto r1;
     }
 
-    ydb_storage_regedit(loop,config);
+//    ydb_storage_regedit(loop,config);
 
-    /*
-       pthread_t tid = 0;
-       pthread_attr_t attr;
-       pthread_attr_init(&attr);
-       size_t ostack_size = 0;
-       pthread_attr_getstacksize(&attr, &ostack_size);
-       do{
-       if (ostack_size != config->stacksize
-       && (0 != (*err = pthread_attr_setstacksize(&attr,config->stacksize)))){
-       pthread_attr_destroy(&attr);
-       SpxLog2(log,SpxLogError,*err,\
-       "set thread stack size is fail.");
-       goto r1;
-       }
-       if (0 !=(*err =  pthread_create(&(tid), &attr, ydb_storage_report,
-       config))){
-       pthread_attr_destroy(&attr);
-       SpxLog2(log,SpxLogError,*err,\
-       "create heartbeat thread is fail.");
-       goto r1;
-       }
-       }while(false);
-       pthread_attr_destroy(&attr);
-       return tid;
-       */return 0;
+    pthread_t tid = 0;
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    size_t ostack_size = 0;
+    pthread_attr_getstacksize(&attr, &ostack_size);
+    do{
+        if (ostack_size != config->stacksize
+                && (0 != (*err = pthread_attr_setstacksize(&attr,config->stacksize)))){
+            pthread_attr_destroy(&attr);
+            SpxLog2(log,SpxLogError,*err,\
+                    "set thread stack size is fail.");
+            goto r1;
+        }
+        if (0 !=(*err =  pthread_create(&(tid), &attr, ydb_storage_report,
+                        config))){
+            pthread_attr_destroy(&attr);
+            SpxLog2(log,SpxLogError,*err,\
+                    "create heartbeat thread is fail.");
+            goto r1;
+        }
+    }while(false);
+    pthread_attr_destroy(&attr);
+    return tid;
+    return 0;
 r1:
     if(NULL != heartbeat_timer){
         SpxFree(heartbeat_timer);

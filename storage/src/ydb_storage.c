@@ -225,9 +225,10 @@ int main(int argc,char **argv){
     }
 
     //if have maneger code please input here
-    sleep(10);//wait main socket thread
+//    sleep(10);//wait main socket thread
     g_ydb_storage_runtime->status = YDB_STORAGE_RUNNING;
-    pthread_join(socket_tid,NULL);
+    ev_run(mainloop,0);
+//    pthread_join(socket_tid,NULL);
 
     return 0;
 }

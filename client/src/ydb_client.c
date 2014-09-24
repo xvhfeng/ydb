@@ -106,8 +106,8 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
     struct spx_host *t = NULL;
     size_t i = 0;
     int idx = 0;
-    for(; i< trackers->curr_size; i++){
-        idx =(size_t) g_ydb_client_trackers_idx == trackers->curr_size
+    for(; i< trackers->busy_size; i++){
+        idx =(size_t) g_ydb_client_trackers_idx == trackers->busy_size
             ? 0 : g_ydb_client_trackers_idx;
         t = (struct spx_host *)spx_list_get(trackers,idx);
         if(NULL == t){
@@ -231,8 +231,8 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
     struct spx_host *t = NULL;
     size_t i = 0;
     int idx = 0;
-    for(; i< trackers->curr_size; i++){
-        idx =(size_t) g_ydb_client_trackers_idx == trackers->curr_size
+    for(; i< trackers->busy_size; i++) {
+        idx =(size_t) g_ydb_client_trackers_idx == trackers->busy_size
             ? 0 : g_ydb_client_trackers_idx;
         t = (struct spx_host *)spx_list_get(trackers,idx);
         if(NULL == t){
@@ -456,9 +456,6 @@ string_t ydb_client_upload(char *groupname,char *hosts,
         *err = EINVAL;
         return NULL;
     }
-    string_t test_fileid = spx_string_new("g001/m001/s001/00/00/01/23434523242/82323232/234234/2342342/13344/9343",err);
-    return test_fileid;
-
     struct spx_list *trackers = NULL;
     struct spx_host *s = NULL;
     string_t fileid = NULL;
@@ -599,9 +596,6 @@ byte_t *ydb_client_find(char *hosts,char *fileid,err_t *err){/*{{{*/
         *err = EINVAL;
         return NULL;
     }
-
-    byte_t *test_buff = spx_alloc_alone(1024,err);
-    return test_buff;
 
     struct spx_list *trackers = NULL;
     struct spx_host *s = NULL;

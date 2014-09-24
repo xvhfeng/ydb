@@ -55,7 +55,9 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
         jc->err = err;
         jc->moore = SpxNioMooreResponse;
         size_t idx = spx_network_module_wakeup_idx(jc);
-        err = spx_module_dispatch(g_spx_network_module,idx,jc);
+        struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+        jc->tc = threadcontext;
+        err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
         return err;
     }
     dc->tc = tc;

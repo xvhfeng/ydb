@@ -107,7 +107,9 @@ r1:
     jc->err = err;
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    err = spx_module_dispatch(g_spx_network_module,idx,jc);
+    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    jc->tc = threadcontext;
+    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
                 "dispatch network module is fail,and push jcontext to pool force.");
@@ -231,7 +233,9 @@ r1:
     jc->err = err;
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    err = spx_module_dispatch(g_spx_network_module,idx,jc);
+    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    jc->tc = threadcontext;
+    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
                 "dispatch network module is fail,and push jcontext to pool force.");

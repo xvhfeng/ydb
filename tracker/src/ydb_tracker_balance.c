@@ -220,7 +220,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
     time_t now = spx_now();
     struct ydb_remote_storage *storage = NULL;
     struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
-    jcontext->err = spx_map_get(map,machineid,spx_string_len(machineid),(void **) storage,NULL);
+    jcontext->err = spx_map_get(map,machineid,spx_string_len(machineid),(void **) &storage,NULL);
     if(NULL != storage){
         if(YDB_STORAGE_RUNNING == storage->status
                 && (check_freedisk && 0 >= storage->freesize)//for modify

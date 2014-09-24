@@ -216,12 +216,10 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
 
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    if(0 !=(err = spx_module_dispatch(g_spx_network_module,idx,jc))){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "wakeup network is fail,then push jc to job pool.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
+    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    jc->tc = threadcontext;
+    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
+    return;
 r1:
 
     jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
@@ -239,12 +237,9 @@ r1:
 
     jc->moore = SpxNioMooreResponse;
     size_t i = spx_network_module_wakeup_idx(jc);
-    if(0 !=(err = spx_module_dispatch(g_spx_network_module,i,jc))){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "wakeup network is fail,then push jc to job pool.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
+    struct spx_thread_context *threadcontext_err = spx_get_thread(g_spx_network_module,i);
+    jc->tc = threadcontext_err;
+    err = spx_module_dispatch(threadcontext_err,spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 
@@ -353,12 +348,10 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
 
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    if(0 !=(err = spx_module_dispatch(g_spx_network_module,idx,jc))){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "wakeup network is fail,then push jc to job pool.");
-        spx_job_pool_push(g_spx_job_pool,jc);
+    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    jc->tc = threadcontext;
+    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
         return;
-    }
 r1:
     spx_string_free(cf->singlefile.filename);
     SpxClose(cf->singlefile.fd);
@@ -381,12 +374,9 @@ r1:
 
     jc->moore = SpxNioMooreResponse;
     size_t i = spx_network_module_wakeup_idx(jc);
-    if(0 !=(err = spx_module_dispatch(g_spx_network_module,i,jc))){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "wakeup network is fail,then push jc to job pool.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
+    struct spx_thread_context *threadcontext_err = spx_get_thread(g_spx_network_module,i);
+    jc->tc = threadcontext_err;
+    err = spx_module_dispatch(threadcontext_err,spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 
