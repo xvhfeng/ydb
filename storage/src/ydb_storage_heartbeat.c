@@ -37,7 +37,7 @@
 #include "ydb_storage_runtime.h"
 
 spx_private ev_timer *heartbeat_timer = NULL;
-spx_private struct ev_loop *hloop;
+spx_private struct ev_loop *hloop = NULL;
 
 
 spx_private void ydb_storage_heartbeat_nio_body_writer(\
@@ -84,7 +84,7 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
         goto r1;
     }
 
-        struct spx_msg_header *writer_header = NULL;
+    struct spx_msg_header *writer_header = NULL;
     writer_header = spx_alloc_alone(sizeof(*writer_header),&err);
     if(NULL == writer_header){
         SpxLog2(jc->log,SpxLogError,err,\
@@ -96,7 +96,7 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
     writer_header->protocol = protocol;
     writer_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN \
                              + YDB_SYNCGROUP_LEN + SpxIpv4Size + sizeof(i32_t) \
-            + sizeof(u64_t) + sizeof(u64_t) + sizeof(i64_t) + sizeof(int);
+                             + sizeof(u64_t) + sizeof(u64_t) + sizeof(i64_t) + sizeof(int);
     struct spx_msg *ctx = spx_msg_new(writer_header->bodylen,&err);
     if(NULL == ctx){
         SpxLog2(jc->log,SpxLogError,err,\
@@ -164,8 +164,8 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     }
     spx_vector_iter_free(&iter);
 
-//    ev_timer_set (heartbeat_timer, (double) 10, 0.);
-//    ev_timer_again(hloop,heartbeat_timer);
+    //    ev_timer_set (heartbeat_timer, (double) 10, 0.);
+    //    ev_timer_again(hloop,heartbeat_timer);
 }/*}}}*/
 
 spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_configurtion *c){/*{{{*/
@@ -240,7 +240,7 @@ void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
         string_t syncgroup, string_t ip,int port,\
         u64_t first_start,u64_t disksize,u64_t freesize,
         u32_t timeout){/*{{{*/
-   g_ydb_storage_runtime->status = YDB_STORAGE_CLOSING;
+    g_ydb_storage_runtime->status = YDB_STORAGE_CLOSING;
     ev_timer_stop(hloop,heartbeat_timer);
     ydb_storage_heartbeat_send(hloop,YDB_SHUTDOWN_STORAGE,
             tracker,groupname,machineid,syncgroup,ip,port,
@@ -349,30 +349,30 @@ pthread_t ydb_storage_heartbeat_service_init(
     ydb_storage_regedit(loop,config);
 
     /*
-    pthread_t tid = 0;
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    size_t ostack_size = 0;
-    pthread_attr_getstacksize(&attr, &ostack_size);
-    do{
-        if (ostack_size != config->stacksize
-                && (0 != (*err = pthread_attr_setstacksize(&attr,config->stacksize)))){
-            pthread_attr_destroy(&attr);
-            SpxLog2(log,SpxLogError,*err,\
-                    "set thread stack size is fail.");
-            goto r1;
-        }
-        if (0 !=(*err =  pthread_create(&(tid), &attr, ydb_storage_report,
-                        config))){
-            pthread_attr_destroy(&attr);
-            SpxLog2(log,SpxLogError,*err,\
-                    "create heartbeat thread is fail.");
-            goto r1;
-        }
-    }while(false);
-    pthread_attr_destroy(&attr);
-    return tid;
-    */return 0;
+       pthread_t tid = 0;
+       pthread_attr_t attr;
+       pthread_attr_init(&attr);
+       size_t ostack_size = 0;
+       pthread_attr_getstacksize(&attr, &ostack_size);
+       do{
+       if (ostack_size != config->stacksize
+       && (0 != (*err = pthread_attr_setstacksize(&attr,config->stacksize)))){
+       pthread_attr_destroy(&attr);
+       SpxLog2(log,SpxLogError,*err,\
+       "set thread stack size is fail.");
+       goto r1;
+       }
+       if (0 !=(*err =  pthread_create(&(tid), &attr, ydb_storage_report,
+       config))){
+       pthread_attr_destroy(&attr);
+       SpxLog2(log,SpxLogError,*err,\
+       "create heartbeat thread is fail.");
+       goto r1;
+       }
+       }while(false);
+       pthread_attr_destroy(&attr);
+       return tid;
+       */return 0;
 r1:
     if(NULL != heartbeat_timer){
         SpxFree(heartbeat_timer);

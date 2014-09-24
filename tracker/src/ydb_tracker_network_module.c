@@ -53,7 +53,9 @@ void ydb_tracker_network_module_request_body_handler(
         return;
     }
     tcontext->jcontext = jcontext;
-    spx_module_dispatch(g_spx_task_module,idx,tcontext);
+    struct spx_thread_context *tc = spx_get_thread(g_spx_task_module,idx);
+    jcontext->tc = tc;
+    spx_module_dispatch(tc,spx_task_module_wakeup_handler,tcontext);
     return;
 }
 

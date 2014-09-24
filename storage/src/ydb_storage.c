@@ -176,7 +176,7 @@ int main(int argc,char **argv){
     g_spx_notifier_module = spx_module_new(log,\
             c->notifier_module_thread_size,\
             c->stacksize,\
-            spx_notifier_module_wakeup_handler,\
+//            spx_notifier_module_wakeup_handler,
             spx_notifier_module_receive_handler,\
             &err);
     if(NULL == g_spx_notifier_module){
@@ -188,7 +188,7 @@ int main(int argc,char **argv){
     g_spx_network_module = spx_module_new(log,\
             c->network_module_thread_size,\
             c->stacksize,\
-            spx_network_module_wakeup_handler,\
+//            spx_network_module_wakeup_handler,
             spx_network_module_receive_handler,\
             &err);
     if(NULL == g_spx_network_module){
@@ -200,7 +200,7 @@ int main(int argc,char **argv){
     g_spx_task_module = spx_module_new(log,\
             c->task_module_thread_size,\
             c->stacksize,\
-            spx_task_module_wakeup_handler,\
+//            spx_task_module_wakeup_handler,
             spx_task_module_receive_handler,\
             &err);
     if(NULL == g_spx_task_module){
@@ -226,6 +226,7 @@ int main(int argc,char **argv){
 
     //if have maneger code please input here
     sleep(10);//wait main socket thread
+    g_ydb_storage_runtime->status = YDB_STORAGE_RUNNING;
     pthread_join(socket_tid,NULL);
 
     return 0;
