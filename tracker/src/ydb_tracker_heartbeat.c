@@ -191,16 +191,16 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     storage->freesize = spx_msg_unpack_u64(ctx);
     storage->status = spx_msg_unpack_u32(ctx);
     storage->last_heartbeat = spx_now();
-
-    if(NULL != storage->groupname){
-        spx_string_free(storage->groupname);
+    if(NULL == storage->groupname){
+        storage->groupname = groupname;
+    } else {
+        spx_string_free(groupname);
     }
-    storage->groupname = groupname;
-
-    if(NULL != storage->machineid){
-        spx_string_free(storage->machineid);
+    if(NULL == storage->machineid){
+        storage->machineid = machineid;
+    } else {
+        spx_string_free(machineid);
     }
-    storage->machineid = machineid;
 
     if(NULL != storage->syncgroup){
         spx_string_free(storage->syncgroup);
@@ -210,8 +210,9 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     if(NULL == storage->ip){
         storage->ip = ip;
     }else {
-        spx_string_free(storage->ip);
+        string_t oip = storage->ip;
         storage->ip = ip;
+        spx_string_free(oip);
     }
     struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
     if(NULL == response_header){

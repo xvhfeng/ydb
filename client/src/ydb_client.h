@@ -58,7 +58,7 @@ string_t ydb_client_upload(char *groupname,char *hosts,
         byte_t *buff,size_t len,char *suffix,err_t *err);
 
 bool_t ydb_client_delete(char *groupname,char *hosts,char *fileid);
-byte_t *ydb_client_find(char *hosts,char *fileid,err_t *err);
+byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,err_t *err);
 string_t ydb_client_update(char *groupname,char *hosts,
         byte_t *buff,size_t len,char *suffix);
 

@@ -71,7 +71,7 @@ spx_private string_t ydb_client_uplaod_do(struct spx_host *s,
         byte_t *buff,size_t len,char *suffix,err_t *err);
 
 spx_private byte_t *ydb_client_find_do(struct spx_host *s,
-        string_t fileid,err_t *err);
+        string_t fileid,size_t *len,err_t *err);
 
 spx_private struct spx_host *ydb_client_query_storage_for_upload(
         char *groupname,struct spx_list *trackers,err_t *err){/*{{{*/
@@ -83,7 +83,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
     struct spx_host *s = NULL;
 
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
-    if(NULL == qctx || 0 != err){
+    if(NULL == qctx || 0 != *err){
         return NULL;
     }
 
@@ -97,7 +97,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
     qheader->bodylen = YDB_GROUPNAME_LEN;
 
     struct spx_msg *qbody = spx_msg_new(YDB_GROUPNAME_LEN,err);
-    if(NULL == qbody || 0 != err){
+    if(NULL == qbody || 0 != *err){
         goto r1;
     }
     qctx->body = qbody;
@@ -116,7 +116,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
 
         int fd = 0;
         fd = spx_socket_new(err);
-        if(0 >= fd || 0 != err){
+        if(0 >= fd || 0 != *err){
             continue;
         }
         spx_set_nb(fd);
@@ -125,7 +125,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
             SpxClose(fd);
             continue;
         }
-        *err = spx_socket_connect(fd,t->ip,t->port);
+        *err = spx_socket_connect_nb(fd,t->ip,t->port,30);
         if(0 != *err){
             SpxClose(fd);
             continue;
@@ -206,7 +206,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
     struct spx_host *s = NULL;
 
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
-    if(NULL == qctx || 0 != err){
+    if(NULL == qctx || 0 != *err){
         return NULL;
     }
 
@@ -220,7 +220,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
     qheader->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN + YDB_SYNCGROUP_LEN;
 
     struct spx_msg *qbody = spx_msg_new(qheader->bodylen,err);
-    if(NULL == qbody || 0 != err){
+    if(NULL == qbody || 0 != *err){
         goto r1;
     }
     qctx->body = qbody;
@@ -241,7 +241,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
 
         int fd = 0;
         fd = spx_socket_new(err);
-        if(0 >= fd || 0 != err){
+        if(0 >= fd || 0 != *err){
             continue;
         }
         spx_set_nb(fd);
@@ -250,7 +250,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
             SpxClose(fd);
             continue;
         }
-        *err = spx_socket_connect(fd,t->ip,t->port);
+        *err = spx_socket_connect_nb(fd,t->ip,t->port,30);
         if(0 != *err){
             SpxClose(fd);
             continue;
@@ -320,7 +320,7 @@ spx_private struct spx_list *ydb_client_parser_trackers(char *hosts,err_t *err){
         return NULL;
     }
     int count = 0;
-    string_t *ctx = spx_string_split(shosts,";",sizeof(";"),&count,err);
+    string_t *ctx = spx_string_split(shosts,";",strlen(";"),&count,err);
     if(0 != *err || NULL == ctx){
         spx_string_free(shosts);
         return NULL;
@@ -335,8 +335,8 @@ spx_private struct spx_list *ydb_client_parser_trackers(char *hosts,err_t *err){
     int i = 0;
     int len = 0;
     for( ; i< count; i++){
-        string_t *host = spx_string_split(*(ctx + i),":",sizeof(":"),&len,err);
-        if(0 != err || 2 != len){
+        string_t *host = spx_string_split(*(ctx + i),":",strlen(":"),&len,err);
+        if(0 != *err || 2 != len){
             continue;
         }
         int j = 0;
@@ -353,6 +353,7 @@ spx_private struct spx_list *ydb_client_parser_trackers(char *hosts,err_t *err){
                                SpxFree(h);
                                break;
                            }
+                           break;
                        }
                 case 1:{
                            h->port = atoi(*(host + j));
@@ -362,8 +363,8 @@ spx_private struct spx_list *ydb_client_parser_trackers(char *hosts,err_t *err){
                                    spx_string_free(h->ip);
                                }
                                SpxFree(h);
-                               break;
                            }
+                           break;
                        }
             }
         }
@@ -492,7 +493,7 @@ r1:
 spx_private string_t ydb_client_uplaod_do(struct spx_host *s,
         byte_t *buff,size_t len,char *suffix,err_t *err){/*{{{*/
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
-    if(NULL == qctx || 0 != err){
+    if(NULL == qctx || 0 != *err){
         return NULL;
     }
 
@@ -502,7 +503,7 @@ spx_private string_t ydb_client_uplaod_do(struct spx_host *s,
     struct spx_msg *pbody = NULL;
 
     struct spx_msg_header *qheader = spx_alloc_alone(sizeof(*qheader),err);
-    if(NULL == qheader || 0 != err){
+    if(NULL == qheader || 0 != *err){
         goto r1;
     }
     qctx->header = qheader;
@@ -515,7 +516,7 @@ spx_private string_t ydb_client_uplaod_do(struct spx_host *s,
         qheader->offset = SpxBoolTransportSize;
     }
     struct spx_msg *qbody = spx_msg_new(qheader->bodylen,err);
-    if(NULL == qbody || 0 != err){
+    if(NULL == qbody || 0 != *err){
         goto r1;
     }
     qctx->body = qbody;
@@ -532,14 +533,14 @@ spx_private string_t ydb_client_uplaod_do(struct spx_host *s,
     spx_msg_pack_ubytes(qbody,(ubyte_t *)buff,len);
 
     fd = spx_socket_new(err);
-    if(0 >= fd || 0 != err){
+    if(0 >= fd || 0 != *err){
     }
     spx_set_nb(fd);
     *err =  spx_socket_set(fd,true,30,3,30,false,0,true,true,30);
     if(0 != *err){
         goto r1;
     }
-    *err = spx_socket_connect(fd,s->ip,s->port);
+    *err = spx_socket_connect_nb(fd,s->ip,s->port,30);
     if(0 != *err){
         goto r1;
     }
@@ -587,7 +588,7 @@ r1:
 }/*}}}*/
 
 
-byte_t *ydb_client_find(char *hosts,char *fileid,err_t *err){/*{{{*/
+byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,err_t *err){/*{{{*/
     if(NULL == hosts || 0 == strlen(hosts)){
         *err = EINVAL;
         return NULL;
@@ -622,7 +623,7 @@ byte_t *ydb_client_find(char *hosts,char *fileid,err_t *err){/*{{{*/
         goto r1;
     }
 
-    buff = ydb_client_find_do(s,fileid,err);
+    buff = ydb_client_find_do(s,fileid,len,err);
 r1:
     if(NULL != trackers){
         spx_list_free(&trackers);
@@ -647,9 +648,9 @@ r1:
 
 
 spx_private byte_t *ydb_client_find_do(struct spx_host *s,
-        string_t fileid,err_t *err){/*{{{*/
+        string_t fileid,size_t *len,err_t *err){/*{{{*/
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
-    if(NULL == qctx || 0 != err){
+    if(NULL == qctx || 0 != *err){
         return NULL;
     }
 
@@ -659,13 +660,13 @@ spx_private byte_t *ydb_client_find_do(struct spx_host *s,
     byte_t *buff = NULL;
 
     struct spx_msg_header *qheader = spx_alloc_alone(sizeof(*qheader),err);
-    if(NULL == qheader || 0 != err){
+    if(NULL == qheader || 0 != *err){
         goto r1;
     }
     qctx->header = qheader;
 
     struct spx_msg *qbody = spx_msg_new(spx_string_len(fileid),err);
-    if(NULL == qbody || 0 != err){
+    if(NULL == qbody || 0 != *err){
         goto r1;
     }
     qctx->body = qbody;
@@ -677,14 +678,14 @@ spx_private byte_t *ydb_client_find_do(struct spx_host *s,
     spx_msg_pack_string(qbody,fileid);
 
     fd = spx_socket_new(err);
-    if(0 >= fd || 0 != err){
+    if(0 >= fd || 0 != *err){
     }
     spx_set_nb(fd);
     *err =  spx_socket_set(fd,true,30,3,30,false,0,true,true,30);
     if(0 != *err){
         goto r1;
     }
-    *err = spx_socket_connect(fd,s->ip,s->port);
+    *err = spx_socket_connect_nb(fd,s->ip,s->port,30);
     if(0 != *err){
         goto r1;
     }
@@ -708,6 +709,7 @@ spx_private byte_t *ydb_client_find_do(struct spx_host *s,
         goto r1;
     }
     buff = spx_msg_unpack_bytes(pbody,pheader->bodylen,err);
+    *len = pheader->bodylen;
 r1:
     if(NULL != qctx){
         if(NULL != qctx->header){

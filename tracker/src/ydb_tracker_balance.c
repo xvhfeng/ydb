@@ -137,6 +137,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(stri
     struct ydb_remote_storage *dest = NULL;
     struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
     u64_t freedisk = 0;
+    time_t now = spx_now();
     while(true){
         struct spx_map_node *n = spx_map_iter_next(iter,&(jcontext->err));
         if(NULL == n){
@@ -148,7 +149,6 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(stri
             continue;
         }
 
-        time_t now = spx_now();
         if(YDB_STORAGE_RUNNING != storage->status
                 || 0 >= storage->freesize
                 || c->heartbeat + storage->last_heartbeat <(u64_t) now){

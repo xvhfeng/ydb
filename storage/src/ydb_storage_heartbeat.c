@@ -115,7 +115,8 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
     spx_msg_pack_i32(ctx,status);
 
     jc->fd = fd;
-    spx_nio_regedit_writer(loop,jc->fd,jc);
+    jc->lifecycle = SpxNioLifeCycleHeader;
+    spx_nio_writer_faster(loop,fd,jc);
     return err;
 r1:
     SpxClose(fd);
@@ -251,14 +252,8 @@ void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
 
 spx_private void ydb_storage_heartbeat_nio_body_writer(\
         struct ev_loop *loop,int fd,struct spx_job_context *jc){/*{{{*/
-    spx_nio_writer_body_handler(loop,fd,jc);
+    spx_nio_writer_body_faster_handler(loop,fd,jc);
     spx_nio_regedit_reader(loop,jc->fd,jc);
-//    bool_t rc = ev_run(loop,EVRUN_NOWAIT);
-//    if(rc){
-//        printf("ok");
-//    }else{
-//        printf("error.");
-//    }
 }/*}}}*/
 
 spx_private void ydb_storage_heartbeat_nio_body_reader(struct ev_loop *loop,
