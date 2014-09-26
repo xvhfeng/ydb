@@ -34,7 +34,7 @@ struct ydb_storage_storefile{
         int proxyfd;
         int fd;
         char *mptr;
-        off_t offset;
+        u64_t offset;
         u64_t fcreatetime;
         u32_t rand;
         string_t filename;
@@ -46,7 +46,7 @@ struct ydb_storage_storefile{
         u8_t p2;
         int fd;
         char *mptr;
-        off_t offset;
+        u64_t offset;
         u64_t fcreatetime;
         u32_t rand;
         string_t filename;

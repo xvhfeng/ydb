@@ -69,7 +69,9 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
     }
 
     dc->buf = ydb_storage_dio_make_filename(dc->log,c->mountpoints,\
-            dc->mp_idx,dc->machineid,dc->tidx,dc->file_createtime,\
+            dc->mp_idx,
+            dc->p1,dc->p2,
+            dc->machineid,dc->tidx,dc->file_createtime,\
             dc->rand,dc->suffix,&err);
     if(NULL == dc->buf){
         SpxLog2(dc->log,SpxLogError,err,\

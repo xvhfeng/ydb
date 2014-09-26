@@ -69,7 +69,8 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
     }
 
     dc->buf = ydb_storage_dio_make_filename(dc->log,c->mountpoints,\
-            dc->mp_idx,dc->machineid,dc->tidx,dc->file_createtime,\
+            dc->mp_idx,dc->p1,dc->p2,
+            dc->machineid,dc->tidx,dc->file_createtime,\
             dc->rand,dc->suffix,&err);
     if(NULL == dc->buf){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -90,7 +91,8 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
     } else {
         spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_find_form_signalfile,dc);
     }
-        ev_async_send(loop,&(dc->async));
+    ev_async_start(loop,&(dc->async));
+    ev_async_send(loop,&(dc->async));
     return err;
 r1:
     spx_task_pool_push(g_spx_task_pool,tc);

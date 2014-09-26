@@ -331,8 +331,8 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
         goto r1;
     }
     jcontext->writer_body_ctx = response_body_ctx;
-    spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
+    spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
 r1:
     spx_string_free(groupname);
     return jcontext->err;

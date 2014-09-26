@@ -83,8 +83,9 @@ r1:
 
 
 string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
-        struct spx_list *mps,\
-        u8_t mpidx,string_t machineid,u32_t tidx,\
+        struct spx_list *mps,u8_t mpidx,
+        u8_t p1,u8_t p2,
+        string_t machineid,u32_t tidx,\
         u64_t createtime, u32_t rand,string_t suffix,err_t *err){/*{{{*/
     string_t filename = spx_string_newlen(NULL,SpxPathSize,err);
     if(NULL == filename){
@@ -94,14 +95,18 @@ string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
     }
     struct ydb_storage_mountpoint *mp = spx_list_get(mps,mpidx);
     if(SpxStringEndWith(mp->path,SpxPathDlmt)){
-        spx_string_cat_printf(err,filename, "%s%s_%d_%lld_%d%s%s",\
-                machineid,tidx,createtime,rand,\
-                NULL == suffix ? "" : ".",\
+        spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
+                mp->path,SpxPathDlmtString,
+                p1,SpxPathDlmtString,p2,SpxPathDlmtString,
+                machineid,tidx,createtime,rand,
+                NULL == suffix ? "" : ".",
                 NULL == suffix ? "" : suffix);
     }else{
-        spx_string_cat_printf(err,filename,"%s/%s_%d_%lld_%d%s%s",\
-                machineid,tidx,createtime,rand,\
-                NULL == suffix ? "" : ".",\
+        spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
+                mp->path,SpxPathDlmtString,SpxPathDlmtString,
+                p1,SpxPathDlmtString,p2,SpxPathDlmtString,
+                machineid,tidx,createtime,rand,
+                NULL == suffix ? "" : ".",
                 NULL == suffix ? "" : suffix);
     }
     return filename;
@@ -118,8 +123,8 @@ string_t fid = spx_string_newlen(NULL,SpxFileNameSize,err);
         return NULL;
     }
     spx_string_cat_printf(err,fid,\
-            "%s:%s:%d:%d:%d:%d:%d:%ulld:%ud:%ulld:%ulld:%ulld:%ud:%ud:%ulld:%s%s%s",
-            c->groupname,c->machineid,dc->issignalfile,dc->mp_idx,dc->p1,dc->p2,\
+            "%s:%s:%s:%d:%d:%d:%d:%d:%lld:%d:%lld:%lld:%lld:%d:%d:%lld:%s%s%s",
+            c->groupname,c->machineid,c->syncgroup, dc->issignalfile,dc->mp_idx,dc->p1,dc->p2,\
             cf->tidx,dc->file_createtime,dc->rand,dc->begin,dc->realsize,dc->totalsize,\
             dc->ver,dc->opver,dc->lastmodifytime,NULL == dc->hashcode ? "" : dc->hashcode,\
             dc->has_suffix ? "." : "",dc->has_suffix ? dc->suffix : "");
@@ -167,81 +172,88 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
                     }
                     break;
                 }
-            case 2://issignalfile
+            case 2://syncgroupname
+                {
+                    //unuseful
+                    break;
+                }
+            case 3://issignalfile
                 {
                     dc->issignalfile = (bool_t) atoi(*(fids + count));
                     break;
                 }
-            case 3://mpidx
+            case 4://mpidx
                 {
                     dc->mp_idx = (u8_t) atoi(*(fids + count));
                     break;
                 }
-            case 4://p1
+            case 5://p1
                 {
                     dc->p1 = (u8_t) atoi(*(fids + count));
                     break;
                 }
-            case 5://p2
+            case 6://p2
                 {
                     dc->p2 = (u8_t) atoi(*(fids + count));
                     break;
                 }
-            case 6://tidx
+            case 7://tidx
                 {
                     dc->tidx = (u32_t) atol(*(fids + count));
                     break;
                 }
-            case 7://file_createtime
+            case 8://file_createtime
                 {
                     dc->file_createtime = (u64_t) strtoul(*(fids + count),NULL,10);
                     break;
                 }
-            case 8://rand
+            case 9://rand
                 {
                     dc->rand = (u32_t) atol(*(fids + count));
                     break;
                 }
-            case 9://begin
+            case 10://begin
                 {
                     dc->begin = (u64_t) strtoul(*(fids + count),NULL,10);
                     break;
                 }
-            case 10://realsize
+            case 11://realsize
                 {
                     dc->realsize = (u64_t) strtoul(*(fids + count),NULL,10);
                     break;
                 }
-            case 11://totalsize
+            case 12://totalsize
                 {
                     dc->totalsize = (u64_t) strtoul(*(fids + count),NULL,10);
                     break;
                 }
-            case 12://ver
+            case 13://ver
                 {
                     dc->ver = (u32_t) atol(*(fids + count));
                     break;
                 }
-            case 13://opver
+            case 14://opver
                 {
                     dc->opver = (u32_t) atol(*fids + count);
                     break;
                 }
-            case 14://lastmodifytime
+            case 15://lastmodifytime
                 {
                     dc->lastmodifytime = (u64_t) strtoul(*(fids + count),NULL,10);
                     break;
                 }
-            case 15://hashcode
+            case 16://hashcode
                 {
-                    dc->hashcode = spx_string_dup(*(fids + count),&(dc->err));
-                    if(NULL == dc->hashcode){
-                        SpxLog2(dc->log,SpxLogError,dc->err,\
+                    if(!SpxStringIsEmpty(*(fids + count))){
+                            dc->hashcode = spx_string_dup(*(fids + count),&(dc->err));
+                            if(NULL == dc->hashcode){
+                            SpxLog2(dc->log,SpxLogError,dc->err,\
                                 "dup hashcode is fail.");
+                            }
                     }
                     break;
                 }
-            case 16://suffix
+            case 17://suffix
                 {
                     dc->suffix = spx_string_dup(((*(fids + count)) + 1),&(dc->err));//remove suffix sper "."
                     if(NULL != dc->suffix){
