@@ -30,21 +30,27 @@
 
 struct ydb_storage_dio_pool *g_ydb_storage_dio_pool = NULL;
 
+struct ydb_storage_dio_context_transport{
+    SpxLogDelegate *log;
+    struct ydb_storage_configurtion *c;
+};
+
 spx_private  void *ydb_storage_dio_context_new(size_t idx,void *arg,err_t *err);
 spx_private err_t ydb_storage_dio_context_free(void **arg);
 
 
 spx_private  void *ydb_storage_dio_context_new(size_t idx,void *arg,err_t *err){
-    SpxLogDelegate *log = (SpxLogDelegate*) arg;
+    struct ydb_storage_dio_context_transport *dct = (struct ydb_storage_dio_context_transport *) arg;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) \
                                          spx_alloc_alone(sizeof(*dc),err);
     if(NULL == dc){
-        SpxLog2(log,SpxLogError,*err,\
+        SpxLog2(dct->log,SpxLogError,*err,\
                 "new storage dio context.");
         return NULL;
     }
-    dc->log = log;
+    dc->log = dct->log;
     dc->idx = idx;
+    dc->c = dct->c;
     return dc;
 }
 
@@ -57,7 +63,8 @@ spx_private err_t ydb_storage_dio_context_free(void **arg){
 }
 
 struct ydb_storage_dio_pool *ydb_storage_dio_pool_new(SpxLogDelegate *log,\
-        size_t size,\
+        struct ydb_storage_configurtion *c,
+        size_t size,
         err_t *err){
     struct ydb_storage_dio_pool *p = (struct ydb_storage_dio_pool *) \
                                      spx_alloc_alone(sizeof(*p),err);
@@ -66,10 +73,14 @@ struct ydb_storage_dio_pool *ydb_storage_dio_pool_new(SpxLogDelegate *log,\
                 "new dio context pool is fail.");
         return NULL;
     }
+    struct ydb_storage_dio_context_transport dct;
+    SpxZero(dct);
+    dct.log = log;
+    dct.c = c;
     p->log = log;
     p->pool = spx_fixed_vector_new(log,size,\
             ydb_storage_dio_context_new,\
-            log,
+            &dct,
             ydb_storage_dio_context_free,\
             err);
     if(NULL == p->pool){

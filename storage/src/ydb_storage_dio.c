@@ -144,7 +144,7 @@ string_t ydb_storage_dio_make_fileid(struct ydb_storage_configurtion *c,\
             c->groupname,c->machineid,c->syncgroup, dc->issignalfile,dc->mp_idx,dc->p1,dc->p2,\
             cf->tidx,dc->file_createtime,dc->rand,dc->begin,dc->realsize,dc->totalsize,\
             dc->ver,dc->opver,dc->lastmodifytime,NULL == dc->hashcode ? "" : dc->hashcode,\
-            dc->has_suffix ? "." : "",dc->has_suffix ? dc->suffix : "");
+            dc->has_suffix ? ":." : "",dc->has_suffix ? dc->suffix : "");
 
     *len = spx_string_len(fid);
     return fid;
@@ -173,7 +173,7 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
         switch (i){
             case 0://groupname
                 {
-                    dc->groupname = spx_string_dup(*(fids + count),&(dc->err));
+                    dc->groupname = spx_string_dup(*(fids + i),&(dc->err));
                     if(NULL == dc->groupname){
                         SpxLog2(dc->log,SpxLogError,dc->err,\
                                 "dup groupname is fail.");
@@ -182,7 +182,7 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
                 }
             case 1://machineid
                 {
-                    dc->machineid = spx_string_dup(*(fids + count),&(dc->err));
+                    dc->machineid = spx_string_dup(*(fids + i),&(dc->err));
                     if(NULL == dc->machineid){
                         SpxLog2(dc->log,SpxLogError,dc->err,\
                                 "dup machineid is fail.");
@@ -196,73 +196,73 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
                 }
             case 3://issignalfile
                 {
-                    dc->issignalfile = (bool_t) atoi(*(fids + count));
+                    dc->issignalfile = (bool_t) atoi(*(fids + i));
                     break;
                 }
             case 4://mpidx
                 {
-                    dc->mp_idx = (u8_t) atoi(*(fids + count));
+                    dc->mp_idx = (u8_t) atoi(*(fids + i));
                     break;
                 }
             case 5://p1
                 {
-                    dc->p1 = (u8_t) atoi(*(fids + count));
+                    dc->p1 = (u8_t) atoi(*(fids + i));
                     break;
                 }
             case 6://p2
                 {
-                    dc->p2 = (u8_t) atoi(*(fids + count));
+                    dc->p2 = (u8_t) atoi(*(fids + i));
                     break;
                 }
             case 7://tidx
                 {
-                    dc->tidx = (u32_t) atol(*(fids + count));
+                    dc->tidx = (u32_t) atol(*(fids + i));
                     break;
                 }
             case 8://file_createtime
                 {
-                    dc->file_createtime = (u64_t) strtoul(*(fids + count),NULL,10);
+                    dc->file_createtime = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 9://rand
                 {
-                    dc->rand = (u32_t) atol(*(fids + count));
+                    dc->rand = (u32_t) atol(*(fids + i));
                     break;
                 }
             case 10://begin
                 {
-                    dc->begin = (u64_t) strtoul(*(fids + count),NULL,10);
+                    dc->begin = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 11://realsize
                 {
-                    dc->realsize = (u64_t) strtoul(*(fids + count),NULL,10);
+                    dc->realsize = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 12://totalsize
                 {
-                    dc->totalsize = (u64_t) strtoul(*(fids + count),NULL,10);
+                    dc->totalsize = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 13://ver
                 {
-                    dc->ver = (u32_t) atol(*(fids + count));
+                    dc->ver = (u32_t) atol(*(fids + i));
                     break;
                 }
             case 14://opver
                 {
-                    dc->opver = (u32_t) atol(*fids + count);
+                    dc->opver = (u32_t) atol(*fids + i);
                     break;
                 }
             case 15://lastmodifytime
                 {
-                    dc->lastmodifytime = (u64_t) strtoul(*(fids + count),NULL,10);
+                    dc->lastmodifytime = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 16://hashcode
                 {
-                    if(!SpxStringIsEmpty(*(fids + count))){
-                            dc->hashcode = spx_string_dup(*(fids + count),&(dc->err));
+                    if(!SpxStringIsEmpty(*(fids + i))){
+                            dc->hashcode = spx_string_dup(*(fids + i),&(dc->err));
                             if(NULL == dc->hashcode){
                             SpxLog2(dc->log,SpxLogError,dc->err,\
                                 "dup hashcode is fail.");
@@ -272,8 +272,9 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
                 }
             case 17://suffix
                 {
-                    dc->suffix = spx_string_dup(((*(fids + count)) + 1),&(dc->err));//remove suffix sper "."
-                    if(NULL != dc->suffix){
+                    dc->suffix = spx_string_new(((*(fids + i)) + 1),&(dc->err));//remove suffix sper "."
+//                    dc->suffix = spx_string_dup(((*(fids + i)) + 1),&(dc->err));//remove suffix sper "."
+                    if(NULL == dc->suffix){
                         SpxLog2(dc->log,SpxLogError,dc->err,\
                                 "dup suffix is fail.");
                     }

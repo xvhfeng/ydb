@@ -78,6 +78,7 @@ err_t ydb_storage_dio_upload(struct ev_loop *loop,\
     err_t err = 0;
     struct ydb_storage_configurtion *c = dc->jc->config;
     struct spx_msg_header *rqh = dc->jc->reader_header;
+    struct spx_job_context *jc = dc->jc;
 
     //deal suffix
     dc->has_suffix = spx_msg_unpack_bool(dc->jc->reader_body_ctx);
@@ -86,7 +87,7 @@ err_t ydb_storage_dio_upload(struct ev_loop *loop,\
         if(NULL == dc->suffix){
             SpxLog2(dc->log,SpxLogError,err,\
                     "unpack suffix is fail.");
-            return err;
+            goto r1;
         }
     }
 
@@ -113,6 +114,29 @@ err_t ydb_storage_dio_upload(struct ev_loop *loop,\
     ev_async_start(loop,&(dc->async));
     ev_async_send(loop,&(dc->async));
     return err;
+r1:
+    spx_task_pool_push(g_spx_task_pool,dc->tc);
+    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+
+    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    if(NULL == jc->writer_header){
+        SpxLog2(jc->log,SpxLogError,err,\
+                "dispatch network module is fail,and push jcontext to pool force.");
+        spx_job_pool_push(g_spx_job_pool,jc);
+        return err;
+    }
+    jc->writer_header->protocol = YDB_STORAGE_UPLOAD;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+    jc->writer_header->err = err;
+
+    jc->moore = SpxNioMooreResponse;
+    size_t i = spx_network_module_wakeup_idx(jc);
+    struct spx_thread_context *threadcontext_err = spx_get_thread(g_spx_network_module,i);
+    jc->tc = threadcontext_err;
+    err = spx_module_dispatch(threadcontext_err,spx_network_module_wakeup_handler,jc);
+    return err;
+
 }/*}}}*/
 
 spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
@@ -225,18 +249,20 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
     return;
 r1:
 
+    spx_task_pool_push(g_spx_task_pool,dc->tc);
+    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+
     jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail.");
+        SpxLog2(jc->log,SpxLogError,err,\
+                "dispatch network module is fail,and push jcontext to pool force.");
+        spx_job_pool_push(g_spx_job_pool,jc);
+        return;
     }
     jc->writer_header->protocol = YDB_STORAGE_UPLOAD;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
-
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
-    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
     jc->moore = SpxNioMooreResponse;
     size_t i = spx_network_module_wakeup_idx(jc);
@@ -364,26 +390,27 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
-        return;
+    return;
 r1:
     spx_string_free(cf->singlefile.filename);
     SpxClose(cf->singlefile.fd);
     if(NULL != cf->singlefile.mptr) {
         munmap(cf->singlefile.mptr,dc->realsize);
     }
+    spx_task_pool_push(g_spx_task_pool,dc->tc);
+    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
     jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail.");
+        SpxLog2(jc->log,SpxLogError,err,\
+                "dispatch network module is fail,and push jcontext to pool force.");
+        spx_job_pool_push(g_spx_job_pool,jc);
+        return;
     }
     jc->writer_header->protocol = YDB_STORAGE_UPLOAD;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
-
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
-    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
     jc->moore = SpxNioMooreResponse;
     size_t i = spx_network_module_wakeup_idx(jc);

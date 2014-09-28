@@ -86,6 +86,7 @@ extern "C" {
     extern struct ydb_storage_dio_pool *g_ydb_storage_dio_pool;
 
     struct ydb_storage_dio_pool *ydb_storage_dio_pool_new(SpxLogDelegate *log,\
+        struct ydb_storage_configurtion *c,
             size_t size,\
             err_t *err);
 

@@ -131,7 +131,7 @@ int main(int argc,char **argv){
     }
 
     g_ydb_storage_dio_pool =
-        ydb_storage_dio_pool_new(log,c->context_size,&err);
+        ydb_storage_dio_pool_new(log,c,c->context_size,&err);
     if(NULL == g_ydb_storage_dio_pool || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storage dio pool is fail.");

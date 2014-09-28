@@ -87,9 +87,9 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
     }
 
     if(dc->issignalfile){
-        spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_find_form_chunkfile,dc);
-    } else {
         spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_find_form_signalfile,dc);
+    } else {
+        spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_find_form_chunkfile,dc);
     }
     ev_async_start(loop,&(dc->async));
     ev_async_send(loop,&(dc->async));
@@ -97,6 +97,18 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
 r1:
     spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    if(NULL == jc->writer_header){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "new response header is fail. no notify client and push jc force.");
+        spx_job_pool_push(g_spx_job_pool,jc);
+        return err;
+    }
+    jc->writer_header->protocol = YDB_STORAGE_FIND;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+    jc->writer_header->err = err;
+
     jc->err = err;
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
@@ -164,6 +176,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
         munmap(mptr,len);
         goto r1;
     }
+    spx_msg_seek(ioctx,0,SpxMsgSeekSet);
     bool_t io_isdelete = false;
     u32_t io_opver = 0;
     u32_t io_ver = 0;
@@ -195,7 +208,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
         munmap(mptr,len);
         goto r1;
     }
-    if(dc->opver != io_opver || dc->ver != io_ver || dc->createtime != io_createtime \
+    if(dc->opver != io_opver || dc->ver != io_ver || dc->file_createtime != io_createtime \
             || dc->lastmodifytime != io_lastmodifytime || dc->totalsize != io_totalsize \
             || dc->realsize != io_realsize){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -245,7 +258,23 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
 
     munmap(mptr,len);
     spx_msg_free(&ioctx);
+    goto r2;
 r1:
+
+    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    if(NULL == jc->writer_header){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "new response header is fail. no notify client and push jc force.");
+        spx_task_pool_push(g_spx_task_pool,tc);
+        ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+        spx_job_pool_push(g_spx_job_pool,jc);
+        return;
+    }
+    jc->writer_header->protocol = YDB_STORAGE_FIND;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+    jc->writer_header->err = err;
+r2:
     spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
     jc->err = err;
@@ -255,9 +284,10 @@ r1:
     jc->tc = threadcontext;
     err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
     if(0 != err){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,and push jcontext to pool force.");
+        SpxLog2(dc->log,SpxLogError,err,\
+                "notify network module is fail.");
         spx_job_pool_push(g_spx_job_pool,jc);
+        return;
     }
     return;
 }/*}}}*/
@@ -342,7 +372,22 @@ spx_private void ydb_storage_dio_do_find_form_signalfile(struct ev_loop *loop,ev
         munmap(mptr,dc->realsize);
         SpxClose(fd);
     }
+    goto r2;
 r1:
+    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    if(NULL == jc->writer_header){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "new response header is fail. no notify client and push jc force.");
+        spx_task_pool_push(g_spx_task_pool,tc);
+        ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+        spx_job_pool_push(g_spx_job_pool,jc);
+        return;
+    }
+    jc->writer_header->protocol = YDB_STORAGE_FIND;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+    jc->writer_header->err = err;
+r2:
     spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
     jc->err = err;
@@ -353,7 +398,7 @@ r1:
     err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,and push jcontext to pool force.");
+                "notify network module is fail.");
         spx_job_pool_push(g_spx_job_pool,jc);
     }
     return;
