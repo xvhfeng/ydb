@@ -488,6 +488,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
                     "loglevel use default:%s",SpxLogDesc[c->loglevel]);
+        } else {
             string_t s = *(kv + 1);
             if(0 == spx_string_casecmp(s,"debug")){
                 c->loglevel = SpxLogDebug;

@@ -39,6 +39,8 @@ extern "C" {
         u8_t p1;
         u8_t p2;
         u32_t storecount;
+        u32_t chunkfile_count;
+        u32_t singlefile_count;
         u64_t first_start_time;
         u64_t total_disksize;
         u64_t total_freesize;

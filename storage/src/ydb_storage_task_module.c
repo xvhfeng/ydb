@@ -63,6 +63,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
     dc->tc = tc;
     dc->jc = jc;
     dc->storefile = sf;
+    SpxLogFmt1(tc->log,SpxLogDebug,"jc idx:%d sf idx:%d.tc idx:%d",jc->idx,sf->tidx,tc->idx);
 
     switch (jc->reader_header->protocol){
         case (YDB_STORAGE_UPLOAD):

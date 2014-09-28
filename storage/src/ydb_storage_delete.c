@@ -68,10 +68,11 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
         goto r1;
     }
 
-    dc->buf = ydb_storage_dio_make_filename(dc->log,c->mountpoints,\
+    dc->buf = ydb_storage_dio_make_filename(dc->log,dc->issignalfile,
+            c->mountpoints,
             dc->mp_idx,
             dc->p1,dc->p2,
-            dc->machineid,dc->tidx,dc->file_createtime,\
+            dc->machineid,dc->tidx,dc->file_createtime,
             dc->rand,dc->suffix,&err);
     if(NULL == dc->buf){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -121,6 +122,7 @@ r1:
 }
 
 spx_private void ydb_storage_dio_do_delete_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+    ev_async_stop(loop,w);
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) w->data;
     struct spx_task_context *tc = dc->tc;

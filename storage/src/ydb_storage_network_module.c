@@ -55,7 +55,7 @@ void ydb_storage_network_module_request_body_handler(
         return;
     }
 
-    size_t idx = 0;
+//    size_t idx = 0;
     struct spx_task_context *tcontext = spx_task_pool_pop(g_spx_task_pool,&(jcontext->err));
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
@@ -63,6 +63,7 @@ void ydb_storage_network_module_request_body_handler(
         return;
     }
     tcontext->jcontext = jcontext;
+    int idx= spx_task_module_wakeup_idx(tcontext);
     struct spx_thread_context *tc = spx_get_thread(g_spx_task_module,idx);
     jcontext->tc = tc;
     spx_module_dispatch(tc,spx_task_module_wakeup_handler,tcontext);

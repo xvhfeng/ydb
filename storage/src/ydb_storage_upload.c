@@ -40,6 +40,7 @@
 #include "spx_module.h"
 #include "spx_network_module.h"
 #include "spx_task.h"
+#include "spx_atomic.h"
 
 #include "ydb_protocol.h"
 
@@ -129,11 +130,6 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
         goto r1;
     }
 
-//    dc->createtime = spx_now();
-//    dc->issignalfile = false;
-//    dc->lastmodifytime = dc->createtime;
-//    dc->isdelete = false;
-//    dc->ver = YDB_VERSION;
     dc->metadata = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
 
     if(NULL == dc->metadata){
@@ -259,13 +255,16 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
     err_t err = 0;
 
     cf->singlefile.fcreatetime = dc->createtime;
-    cf->singlefile.rand = spx_random(cf->tidx);
+
+    int count = SpxAtomicLazyIncr(&(g_ydb_storage_runtime->singlefile_count));
+    SpxAtomicCas(&(g_ydb_storage_runtime->singlefile_count),10000,0);
+    cf->singlefile.rand = count;
 
     ydb_storage_dio_get_path(c,g_ydb_storage_runtime,&(cf->singlefile.mpidx),\
             &(cf->singlefile.p1),&(cf->singlefile.p2));
 
     cf->singlefile.filename = ydb_storage_dio_make_filename(\
-            dc->log,c->mountpoints,g_ydb_storage_runtime->mpidx,\
+            dc->log,dc->issignalfile,c->mountpoints,g_ydb_storage_runtime->mpidx,\
             cf->singlefile.p1,cf->singlefile.p2,
             c->machineid,cf->tidx,cf->singlefile.fcreatetime,cf->singlefile.rand,\
             dc->suffix,&err);
@@ -328,8 +327,6 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
         memcpy(cf->singlefile.mptr,
                 jc->reader_body_ctx->buf + jc->reader_header->offset,
                 jc->reader_header->bodylen - jc->reader_header->offset);
-//        off += jc->reader_header->bodylen - jc->reader_header->offset;
-//        spx_mmap_form_msg(cf->chunkfile.mptr,0,jc->reader_body_ctx);
     }
 
     spx_string_free(cf->singlefile.filename);
@@ -356,6 +353,8 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
                 "make reponse for uploading is fail.");
         goto r1;
     }
+
+    SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
 
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
@@ -443,18 +442,21 @@ spx_private err_t ydb_storage_upload_check_and_open_chunkfile(struct ydb_storage
     while(true) {
         if(0 == cf->chunkfile.fd){
             cf->chunkfile.fcreatetime = dc->createtime;
-            cf->chunkfile.rand = spx_random(cf->tidx);
-
+            int count = SpxAtomicIncr(&(g_ydb_storage_runtime->chunkfile_count));
+            SpxAtomicCas(&(g_ydb_storage_runtime->chunkfile_count),10000,0);
+            cf->chunkfile.rand = count;
             ydb_storage_dio_get_path(c,g_ydb_storage_runtime,\
                     &(cf->chunkfile.mpidx),\
                     &(cf->chunkfile.p1),&(cf->chunkfile.p2));
 
             cf->chunkfile.filename = ydb_storage_dio_make_filename(\
-                    dc->log,c->mountpoints,g_ydb_storage_runtime->mpidx,\
+                    dc->log,dc->issignalfile,c->mountpoints,g_ydb_storage_runtime->mpidx,\
                     cf->chunkfile.p1,cf->chunkfile.p2,
                     c->machineid,cf->tidx,cf->chunkfile.fcreatetime,cf->chunkfile.rand,\
                     dc->suffix,&err);
-            SpxLogFmt1(c->log,SpxLogInfo,"reopen :%s.",cf->chunkfile.filename);
+
+            SpxLogFmt1(c->log,SpxLogDebug,"reopen :%s.",cf->chunkfile.filename);
+            SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
 
             if(SpxStringIsNullOrEmpty(cf->chunkfile.filename)){
                 SpxLog2(c->log,SpxLogError,err,
@@ -495,9 +497,9 @@ spx_private err_t ydb_storage_upload_check_and_open_chunkfile(struct ydb_storage
         }
 
         if(dc->totalsize > c->chunksize - cf->chunkfile.offset){
-            SpxLogFmt1(c->log,SpxLogInfo, "total:%lld,chunksize:%lld,offset:%lld.",dc->totalsize,
+            SpxLogFmt1(c->log,SpxLogDebug, "total:%lld,chunksize:%lld,offset:%lld.",dc->totalsize,
                     c->chunksize,cf->chunkfile.offset);
-            SpxLogFmt1(c->log,SpxLogInfo,"close the file %s",cf->chunkfile.filename);
+            SpxLogFmt1(c->log,SpxLogDebug,"close the file %s",cf->chunkfile.filename);
             munmap(cf->chunkfile.mptr,c->chunksize);
             cf->chunkfile.mptr = NULL;
             SpxClose(cf->chunkfile.fd);
@@ -507,7 +509,7 @@ spx_private err_t ydb_storage_upload_check_and_open_chunkfile(struct ydb_storage
         }
         break;
     }
-    SpxLog1(c->log,SpxLogInfo,"return");
+    SpxLog1(c->log,SpxLogDebug,"return");
     return err;
 }/*}}}*/
 

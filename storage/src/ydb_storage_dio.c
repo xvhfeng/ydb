@@ -83,6 +83,7 @@ r1:
 
 
 string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
+        bool_t issinglefile,
         struct spx_list *mps,u8_t mpidx,
         u8_t p1,u8_t p2,
         string_t machineid,u32_t tidx,\
@@ -93,21 +94,37 @@ string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
                 "new filename is fail.");
         return NULL;
     }
+
     struct ydb_storage_mountpoint *mp = spx_list_get(mps,mpidx);
-    if(SpxStringEndWith(mp->path,SpxPathDlmt)){
-        spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
-                mp->path,SpxPathDlmtString,
-                p1,SpxPathDlmtString,p2,SpxPathDlmtString,
-                machineid,tidx,createtime,rand,
-                NULL == suffix ? "" : ".",
-                NULL == suffix ? "" : suffix);
-    }else{
-        spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
-                mp->path,SpxPathDlmtString,SpxPathDlmtString,
-                p1,SpxPathDlmtString,p2,SpxPathDlmtString,
-                machineid,tidx,createtime,rand,
-                NULL == suffix ? "" : ".",
-                NULL == suffix ? "" : suffix);
+    if(issinglefile){
+        if(SpxStringEndWith(mp->path,SpxPathDlmt)){
+            spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
+                    mp->path,SpxPathDlmtString,
+                    p1,SpxPathDlmtString,p2,SpxPathDlmtString,
+                    machineid,tidx,createtime,rand,
+                    NULL == suffix ? "" : ".",
+                    NULL == suffix ? "" : suffix);
+        }else{
+            spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
+                    mp->path,SpxPathDlmtString,SpxPathDlmtString,
+                    p1,SpxPathDlmtString,p2,SpxPathDlmtString,
+                    machineid,tidx,createtime,rand,
+                    NULL == suffix ? "" : ".",
+                    NULL == suffix ? "" : suffix);
+        }
+    } else {
+        if(SpxStringEndWith(mp->path,SpxPathDlmt)){
+            spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d",
+                    mp->path,SpxPathDlmtString,
+                    p1,SpxPathDlmtString,p2,SpxPathDlmtString,
+                    machineid,tidx,createtime,rand);
+        }else{
+            spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d",
+                    mp->path,SpxPathDlmtString,SpxPathDlmtString,
+                    p1,SpxPathDlmtString,p2,SpxPathDlmtString,
+                    machineid,tidx,createtime,rand);
+        }
+
     }
     return filename;
 }/*}}}*/
@@ -116,7 +133,7 @@ string_t ydb_storage_dio_make_fileid(struct ydb_storage_configurtion *c,\
         struct ydb_storage_dio_context *dc,struct ydb_storage_storefile *cf,\
         size_t *len,err_t *err){/*{{{*/
 
-string_t fid = spx_string_newlen(NULL,SpxFileNameSize,err);
+    string_t fid = spx_string_newlen(NULL,SpxFileNameSize,err);
     if(NULL == fid){
         SpxLog2(dc->log,SpxLogError,*err,\
                 "new file is fail.");
@@ -129,7 +146,7 @@ string_t fid = spx_string_newlen(NULL,SpxFileNameSize,err);
             dc->ver,dc->opver,dc->lastmodifytime,NULL == dc->hashcode ? "" : dc->hashcode,\
             dc->has_suffix ? "." : "",dc->has_suffix ? dc->suffix : "");
 
-   *len = spx_string_len(fid);
+    *len = spx_string_len(fid);
     return fid;
 }/*}}}*/
 

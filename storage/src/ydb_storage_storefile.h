@@ -31,14 +31,14 @@ struct ydb_storage_storefile{
         u8_t mpidx;
         u8_t p1;
         u8_t p2;
-        int proxyfd;
+//        int proxyfd;
         int fd;
         char *mptr;
         u64_t offset;
         u64_t fcreatetime;
         u32_t rand;
         string_t filename;
-        struct spx_queue *dio_queue;
+//        struct spx_queue *dio_queue;
     }chunkfile;
     struct {
         u8_t mpidx;

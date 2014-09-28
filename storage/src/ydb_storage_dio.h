@@ -34,6 +34,7 @@ extern "C" {
 err_t ydb_storage_dio_mountpoint_init(struct ydb_storage_configurtion *c);
 
 string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
+        bool_t issinglefile,
         struct spx_list *mps,u8_t mpidx,
         u8_t p1,u8_t p2,
         string_t machineid,u32_t tidx,\
