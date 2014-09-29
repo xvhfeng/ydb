@@ -278,6 +278,7 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
                         SpxLog2(dc->log,SpxLogError,dc->err,\
                                 "dup suffix is fail.");
                     }
+                    dc->has_suffix = true;
                     break;
                 }
             default:{

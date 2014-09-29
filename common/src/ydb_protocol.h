@@ -61,7 +61,7 @@ extern "C" {
 #define YDB_CHUNKFILE_MEMADATA_SIZE \
     sizeof(char) + sizeof(u32_t) + sizeof(u64_t) + sizeof(u64_t) \
     + sizeof(u32_t) + sizeof(u64_t) + sizeof(u64_t) \
-    + YDB_HASHCODE_SIZE
+     + YDB_FILENAME_SUFFIX_SIZE + YDB_HASHCODE_SIZE
 
 #define YDB_CHUNKFILE_OFFSET_ISDELETE 0
 #define YDB_CHUNKFILE_SIZE_ISDELETE sizeof(char)

@@ -55,12 +55,12 @@ extern "C" {
 #define YDB_CLIENT_VERSION 1
 
 string_t ydb_client_upload(char *groupname,char *hosts,
-        byte_t *buff,size_t len,char *suffix,err_t *err);
+        byte_t *buff,size_t len,char *suffix,u32_t timeout,err_t *err);
 
-bool_t ydb_client_delete(char *groupname,char *hosts,char *fileid);
-byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,err_t *err);
-string_t ydb_client_update(char *groupname,char *hosts,
-        byte_t *buff,size_t len,char *suffix);
+bool_t ydb_client_delete(char *groupname,char *hosts,char *fileid,u32_t timeout,err_t *err);
+byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,u32_t timeout,err_t *err);
+string_t ydb_client_modify(char *old_fileid,char *hosts,
+        byte_t *buff,size_t len,char *suffix,u32_t timeout,err_t *err);
 
 void ydb_client_upload_free(string_t fileid);
 void ydb_client_find_free(byte_t **buff);

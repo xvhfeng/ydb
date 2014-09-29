@@ -186,7 +186,9 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
     size_t writebytes = 0;
     size_t len = 0;
 
-    off += spx_mmap_form_msg(cf->chunkfile.mptr,off,dc->metadata);
+//    off += spx_mmap_form_msg(cf->chunkfile.mptr,off,dc->metadata);
+    memcpy(cf->chunkfile.mptr + off,dc->metadata->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
+    off += YDB_CHUNKFILE_MEMADATA_SIZE;
     if(jc->is_lazy_recv){
         do{
             recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
@@ -523,7 +525,7 @@ spx_private err_t ydb_storage_upload_check_and_open_chunkfile(struct ydb_storage
             }
         }
 
-        if(dc->totalsize > c->chunksize - cf->chunkfile.offset){
+        if(dc->totalsize + cf->chunkfile.offset  > c->chunksize){
             SpxLogFmt1(c->log,SpxLogDebug, "total:%lld,chunksize:%lld,offset:%lld.",dc->totalsize,
                     c->chunksize,cf->chunkfile.offset);
             SpxLogFmt1(c->log,SpxLogDebug,"close the file %s",cf->chunkfile.filename);

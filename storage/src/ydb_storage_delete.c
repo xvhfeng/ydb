@@ -95,9 +95,9 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
                     dc->buf);
         }
 
-        YdbStorageBinlog(YDB_BINLOG_DELETE,dc->issignalfile,dc->ver,dc->opver,cf->machineid,\
-                dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
-                cf->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
+//        YdbStorageBinlog(YDB_BINLOG_DELETE,dc->issignalfile,dc->ver,dc->opver,cf->machineid,\
+//                dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
+//                cf->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
         goto r1;
     } else {
         spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_delete_form_chunkfile,dc);

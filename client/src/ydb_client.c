@@ -58,23 +58,23 @@ spx_private err_t ydb_client_parser_fileid(string_t fileid,string_t *groupname,
         string_t *machineid,string_t *syncgroup);
 
 spx_private struct spx_host *ydb_client_query_storage_for_upload(
-        char *groupname,struct spx_list *trackers,err_t *err);
+        char *groupname,struct spx_list *trackers,u32_t timeout,err_t *err);
 
 spx_private struct spx_host *ydb_client_query_storage_for_operator(
         int protocol,
         string_t groupname,string_t machineid,string_t syncgroup,
-        struct spx_list *trackers,err_t *err);
+        struct spx_list *trackers,u32_t timeout,err_t *err);
 
 spx_private err_t ydb_client_free_tracker(void **arg);
 
 spx_private string_t ydb_client_upload_do(struct spx_host *s,
-        byte_t *buff,size_t len,char *suffix,err_t *err);
+        byte_t *buff,size_t len,char *suffix,u32_t timeout,err_t *err);
 
 spx_private byte_t *ydb_client_find_do(struct spx_host *s,
-        string_t fileid,size_t *len,err_t *err);
+        string_t fileid,size_t *len,u32_t timeout,err_t *err);
 
 spx_private struct spx_host *ydb_client_query_storage_for_upload(
-        char *groupname,struct spx_list *trackers,err_t *err){/*{{{*/
+        char *groupname,struct spx_list *trackers,u32_t timeout,err_t *err){/*{{{*/
     if(NULL == groupname || NULL == trackers){
         *err = EINVAL;
         return NULL;
@@ -136,6 +136,11 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
             continue;
         }
 
+        if(!spx_socket_ready_read(fd,timeout)){
+            SpxClose(fd);
+            continue;
+        }
+
         struct spx_msg_header *pheader = spx_read_header(NULL,fd,err);
         if(NULL == pheader){
             SpxClose(fd);
@@ -152,7 +157,7 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
         SpxClose(fd);
         if(NULL == pbody){
             SpxFree(pheader);
-           continue;
+            continue;
         }
         if(0 != *err || 0 == spx_msg_len(pbody)){
             SpxFree(pheader);
@@ -173,8 +178,8 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
             SpxFree(s);
             continue;
         }
-        SpxFree(pheader);
         SpxFree(pbody);
+        SpxFree(pheader);
         break;
     }
 r1:
@@ -194,7 +199,7 @@ r1:
 spx_private struct spx_host *ydb_client_query_storage_for_operator(
         int protocol,
         string_t groupname,string_t machineid,string_t syncgroup,
-        struct spx_list *trackers,err_t *err){/*{{{*/
+        struct spx_list *trackers,u32_t timeout,err_t *err){/*{{{*/
 
     if(SpxStringIsNullOrEmpty(groupname)
             || SpxStringIsNullOrEmpty(machineid)
@@ -225,9 +230,9 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
         goto r1;
     }
     qctx->body = qbody;
-    spx_msg_pack_ubytes(qbody,(ubyte_t *)groupname,SpxMin(YDB_GROUPNAME_LEN,spx_string_len(groupname)));
-    spx_msg_pack_ubytes(qbody,(ubyte_t *)machineid,SpxMin(YDB_MACHINEID_LEN,spx_string_len(machineid)));
-    spx_msg_pack_ubytes(qbody,(ubyte_t *)syncgroup,SpxMin(YDB_SYNCGROUP_LEN,spx_string_len(syncgroup)));
+    spx_msg_pack_fixed_string(qbody,groupname,YDB_GROUPNAME_LEN);
+    spx_msg_pack_fixed_string(qbody,machineid,YDB_MACHINEID_LEN);
+    spx_msg_pack_fixed_string(qbody,syncgroup,YDB_SYNCGROUP_LEN);
 
     struct spx_host *t = NULL;
     size_t i = 0;
@@ -258,6 +263,11 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
         }
         *err = spx_write_context(NULL,fd,qctx);
         if(0 != *err){
+            SpxClose(fd);
+            continue;
+        }
+
+        if(!spx_socket_ready_read(fd,timeout)){
             SpxClose(fd);
             continue;
         }
@@ -445,7 +455,7 @@ spx_private err_t ydb_client_free_tracker(void **arg){/*{{{*/
 
 
 string_t ydb_client_upload(char *groupname,char *hosts,
-        byte_t *buff,size_t len,char *suffix,err_t *err){/*{{{*/
+        byte_t *buff,size_t len,char *suffix,u32_t timeout,err_t *err){/*{{{*/
     if(NULL == groupname || 0 == strlen(groupname)){
         *err = EINVAL;
         return NULL;
@@ -462,23 +472,24 @@ string_t ydb_client_upload(char *groupname,char *hosts,
     struct spx_host *s = NULL;
     string_t fileid = NULL;
 
-    /*
     trackers = ydb_client_parser_trackers(hosts,err);
     if(NULL == trackers){
         goto r1;
     }
 
     s = ydb_client_query_storage_for_upload(
-            groupname,trackers,err);
+            groupname,trackers,timeout,err);
     if(NULL == s){
         goto r1;
     }
-    */
+
+    /*
     s = spx_alloc_alone(sizeof(*s),err);
     s->ip = spx_string_new("10.97.19.31",err);
     s->port = 8175;
+    */
 
-    fileid = ydb_client_upload_do(s,buff,len,suffix,err);
+    fileid = ydb_client_upload_do(s,buff,len,suffix,timeout,err);
     if(NULL == fileid){
         goto r1;
     }
@@ -497,7 +508,7 @@ r1:
 }/*}}}*/
 
 spx_private string_t ydb_client_upload_do(struct spx_host *s,
-        byte_t *buff,size_t len,char *suffix,err_t *err){/*{{{*/
+        byte_t *buff,size_t len,char *suffix,u32_t timeout,err_t *err){/*{{{*/
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
     if(NULL == qctx || 0 != *err){
         return NULL;
@@ -555,6 +566,12 @@ spx_private string_t ydb_client_upload_do(struct spx_host *s,
         goto r1;
     }
 
+    if(!spx_socket_ready_read(fd,timeout)){
+        *err = EBUSY;
+        SpxClose(fd);
+        goto r1;
+    }
+
     pheader = spx_read_header(NULL,fd,err);
     if(NULL == pheader){
         goto r1;
@@ -594,7 +611,7 @@ r1:
 }/*}}}*/
 
 
-byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,err_t *err){/*{{{*/
+byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,u32_t timeout,err_t *err){/*{{{*/
     if(NULL == hosts || 0 == strlen(hosts)){
         *err = EINVAL;
         return NULL;
@@ -621,23 +638,24 @@ byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,err_t *err){/*{{{*/
         goto r1;
     }
 
+//    s = spx_alloc_alone(sizeof(*s),err);
+//    s->ip = spx_string_new("10.97.19.31",err);
+//    s->port = 8175;
+    s = ydb_client_query_storage_for_operator(
+            YDB_TRACKER_QUERY_SELECT_STORAGE,
+            groupname,machineid,syncgroup,
+            trackers,timeout,err);
+    if(NULL == s){
+        goto r1;
+    }
+
     /*
     s = spx_alloc_alone(sizeof(*s),err);
     s->ip = spx_string_new("10.97.19.31",err);
     s->port = 8175;
-    s = ydb_client_query_storage_for_operator(
-            YDB_TRACKER_QUERY_SELECT_STORAGE,
-            groupname,machineid,syncgroup,
-            trackers,err);
-    if(NULL == s){
-        goto r1;
-    }
     */
-    s = spx_alloc_alone(sizeof(*s),err);
-    s->ip = spx_string_new("10.97.19.31",err);
-    s->port = 8175;
 
-    buff = ydb_client_find_do(s,fileid,len,err);
+    buff = ydb_client_find_do(s,fileid,len,timeout,err);
 r1:
     if(NULL != trackers){
         spx_list_free(&trackers);
@@ -662,7 +680,7 @@ r1:
 
 
 spx_private byte_t *ydb_client_find_do(struct spx_host *s,
-        string_t fileid,size_t *len,err_t *err){/*{{{*/
+        string_t fileid,size_t *len,u32_t timeout,err_t *err){/*{{{*/
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
     if(NULL == qctx || 0 != *err){
         return NULL;
@@ -705,6 +723,11 @@ spx_private byte_t *ydb_client_find_do(struct spx_host *s,
     }
     *err = spx_write_context(NULL,fd,qctx);
     if(0 != *err){
+        goto r1;
+    }
+
+    if(!spx_socket_ready_read(fd,timeout)){
+        *err = EBUSY;
         goto r1;
     }
 

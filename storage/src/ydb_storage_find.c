@@ -133,7 +133,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
 
     u32_t unit = (int) dc->begin / c->pagesize;
     u64_t begin = unit * c->pagesize;
-    u64_t offset = dc->begin - unit % c->pagesize;
+    u64_t offset = dc->begin - begin;
     u64_t len = offset + dc->totalsize;
 
     int fd = open(dc->buf,\
@@ -208,7 +208,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
         munmap(mptr,len);
         goto r1;
     }
-    if(dc->opver != io_opver || dc->ver != io_ver || dc->file_createtime != io_createtime \
+    if(dc->opver != io_opver || dc->ver != io_ver //|| dc->file_createtime != io_createtime
             || dc->lastmodifytime != io_lastmodifytime || dc->totalsize != io_totalsize \
             || dc->realsize != io_realsize){
         SpxLog2(dc->log,SpxLogError,err,\
