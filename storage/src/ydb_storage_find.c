@@ -62,15 +62,36 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
 
     struct spx_msg *ctx = jc->reader_body_ctx;
     size_t len = jc->reader_header->bodylen;
-    if(0 != ( err = ydb_storage_dio_parser_fileid(ctx,len,dc))){
+
+    string_t fid = NULL;
+    fid = spx_msg_unpack_string(ctx,len,&(err));
+    if(NULL == fid){
+        SpxLog2(c->log,SpxLogError,err,\
+                "alloc file id for parser is fail.");
+        goto r1;
+    }
+
+    if(0 != ( err = ydb_storage_dio_parser_fileid(jc->log,fid,
+                    &(dc->groupname),&(dc->machineid),&(dc->syncgroup),
+                    &(dc->issinglefile),&(dc->mp_idx),&(dc->p1),
+                    &(dc->p2),&(dc->tidx),&(dc->file_createtime),
+                    &(dc->rand),&(dc->begin),&(dc->realsize),
+                    &(dc->totalsize),&(dc->ver),&(dc->opver),
+                    &(dc->lastmodifytime),&(dc->hashcode),
+                    &(dc->has_suffix),&(dc->suffix)))){
+
         SpxLog2(dc->log,SpxLogError,err,\
                 "parser fid is fail.");
         goto r1;
     }
 
-    dc->buf = ydb_storage_dio_make_filename(dc->log,dc->issignalfile,c->mountpoints,\
+    spx_string_free(fid);
+    fid = NULL;
+
+    dc->buf = ydb_storage_dio_make_filename(dc->log,
+            dc->issinglefile,c->mountpoints,
             dc->mp_idx,dc->p1,dc->p2,
-            dc->machineid,dc->tidx,dc->file_createtime,\
+            dc->machineid,dc->tidx,dc->file_createtime,
             dc->rand,dc->suffix,&err);
     if(NULL == dc->buf){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -86,21 +107,28 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
         goto r1;
     }
 
-    if(dc->issignalfile){
-        spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_find_form_signalfile,dc);
+    if(dc->issinglefile){
+        spx_dio_regedit_async(&(dc->async),
+                ydb_storage_dio_do_find_form_signalfile,dc);
     } else {
-        spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_find_form_chunkfile,dc);
+        spx_dio_regedit_async(&(dc->async),
+                ydb_storage_dio_do_find_form_chunkfile,dc);
     }
     ev_async_start(loop,&(dc->async));
     ev_async_send(loop,&(dc->async));
     return err;
 r1:
+    if(NULL != fid){
+        spx_string_free(fid);
+    }
     spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    jc->writer_header = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
         SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail. no notify client and push jc force.");
+                "new response header is fail."
+                "no notify client and push jc force.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return err;
     }
@@ -112,12 +140,15 @@ r1:
     jc->err = err;
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    struct spx_thread_context *threadcontext =
+        spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext,
+            spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,and push jcontext to pool force.");
+                "dispatch network module is fail,"
+                "and push jcontext to pool force.");
         spx_job_pool_push(g_spx_job_pool,jc);
     }
     return 0;
@@ -126,7 +157,8 @@ r1:
 spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
-    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) w->data;
+    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
+        w->data;
     struct spx_task_context *tc = dc->tc;
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
@@ -136,7 +168,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
     u64_t offset = dc->begin - begin;
     u64_t len = offset + dc->totalsize;
 
-    int fd = open(dc->buf,\
+    int fd = open(dc->buf,
             O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
     if(0 == fd){
         err = errno;
@@ -167,8 +199,9 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
         goto r1;
     }
 
-    if(0 != (err = spx_msg_pack_ubytes(ioctx,\
-                    ((ubyte_t *) (mptr+ offset)),YDB_CHUNKFILE_MEMADATA_SIZE))){
+    if(0 != (err = spx_msg_pack_ubytes(ioctx,
+                    ((ubyte_t *) (mptr+ offset)),
+                    YDB_CHUNKFILE_MEMADATA_SIZE))){
         SpxLog2(dc->log,SpxLogError,err,\
                 "pack io ctx is fail.");
         spx_msg_free(&ioctx);
@@ -187,8 +220,10 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
     string_t io_suffix = NULL;
     string_t io_hashcode = NULL;
 
-    err = ydb_storage_dio_parser_metadata(dc->log,ioctx,&io_isdelete,&io_opver,\
-            &io_ver,&io_createtime,&io_lastmodifytime,&io_totalsize,&io_realsize,\
+    err = ydb_storage_dio_parser_metadata(dc->log,ioctx,
+            &io_isdelete,&io_opver,
+            &io_ver,&io_createtime,
+            &io_lastmodifytime,&io_totalsize,&io_realsize,
             &io_suffix,&io_hashcode);
     if(0 != err){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -201,15 +236,17 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
 
     if(io_isdelete){
         SpxLogFmt2(dc->log,SpxLogError,err,\
-                "the file in the chunkfile:%s begin is %lld totalsize:%lld is deleted.",
+                "the file in the chunkfile:%s "
+                "begin is %lld totalsize:%lld is deleted.",
                 dc->buf,dc->begin,dc->totalsize);
         spx_msg_free(&ioctx);
         SpxClose(fd);
         munmap(mptr,len);
         goto r1;
     }
-    if(dc->opver != io_opver || dc->ver != io_ver //|| dc->file_createtime != io_createtime
-            || dc->lastmodifytime != io_lastmodifytime || dc->totalsize != io_totalsize \
+    if(dc->opver != io_opver || dc->ver != io_ver
+            || dc->lastmodifytime != io_lastmodifytime
+            || dc->totalsize != io_totalsize
             || dc->realsize != io_realsize){
         SpxLog2(dc->log,SpxLogError,err,\
                 "the file is not same as want to delete-file.");
@@ -219,10 +256,10 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
         goto r1;
     }
 
-    struct spx_msg_header *wh = (struct spx_msg_header *) \
-                                spx_alloc_alone(sizeof(*wh),&err);
+    struct spx_msg_header *wh = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*wh),&err);
     if(NULL == wh){
-        SpxLog2(dc->log,SpxLogError,err,\
+        SpxLog2(dc->log,SpxLogError,err,
                 "alloc write header for find buffer in chunkfile is fail.");
         spx_msg_free(&ioctx);
         SpxClose(fd);
@@ -252,7 +289,9 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
             goto r1;
         }
         jc->writer_body_ctx = ctx;
-        spx_msg_pack_ubytes(ctx,(ubyte_t *)mptr + begin + YDB_CHUNKFILE_MEMADATA_SIZE,dc->realsize);
+        spx_msg_pack_ubytes(ctx,
+                (ubyte_t *)mptr + begin + YDB_CHUNKFILE_MEMADATA_SIZE,
+                dc->realsize);
         SpxClose(fd);
     }
 
@@ -261,10 +300,12 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
     goto r2;
 r1:
 
-    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    jc->writer_header = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
         SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail. no notify client and push jc force.");
+                "new response header is fail."
+                "no notify client and push jc force.");
         spx_task_pool_push(g_spx_task_pool,tc);
         ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
         spx_job_pool_push(g_spx_job_pool,jc);
@@ -280,9 +321,11 @@ r2:
     jc->err = err;
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    struct spx_thread_context *threadcontext =
+        spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext,
+            spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(dc->log,SpxLogError,err,\
                 "notify network module is fail.");
@@ -295,7 +338,8 @@ r2:
 spx_private void ydb_storage_dio_do_find_form_signalfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
-    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) w->data;
+    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
+        w->data;
     struct spx_task_context *tc = dc->tc;
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
@@ -374,10 +418,12 @@ spx_private void ydb_storage_dio_do_find_form_signalfile(struct ev_loop *loop,ev
     }
     goto r2;
 r1:
-    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    jc->writer_header = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
         SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail. no notify client and push jc force.");
+                "new response header is fail."
+                "no notify client and push jc force.");
         spx_task_pool_push(g_spx_task_pool,tc);
         ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
         spx_job_pool_push(g_spx_job_pool,jc);
@@ -395,7 +441,8 @@ r2:
     size_t idx = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext,
+            spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
                 "notify network module is fail.");

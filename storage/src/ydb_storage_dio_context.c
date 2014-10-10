@@ -124,7 +124,7 @@ err_t ydb_storage_dio_pool_push(\
     dc->p2 = 0;
     dc->tidx = 0;
     dc->rand = 0;
-    dc->issignalfile = false;
+    dc->issinglefile = false;
     dc->begin = 0;
     dc->has_suffix = false;
     if(NULL != dc->suffix){
@@ -135,6 +135,9 @@ err_t ydb_storage_dio_pool_push(\
     }
     if(NULL != dc->machineid){
         spx_string_free(dc->machineid);
+    }
+    if(NULL != dc->syncgroup){
+        spx_string_free(dc->syncgroup);
     }
 
     dc->jc = NULL;

@@ -51,26 +51,15 @@
 #include "ydb_storage_runtime.h"
 #include "ydb_storage_dio.h"
 
-spx_private err_t ydb_storage_dio_get_path(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,\
-        u8_t *mpdix,u8_t *pq,u8_t *p2);
-spx_private u8_t ydb_storage_get_mountpoint_with_loop(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,bool_t isfirst,err_t *err);
-spx_private u8_t ydb_storage_get_mountpoint_with_turn(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,err_t *err);
-spx_private u8_t ydb_storage_get_mountpoint_with_maxsize(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,err_t *err);
-spx_private u8_t ydb_storage_get_mountpoint_with_master(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,err_t *err);
 
-spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev_async *w,int revents);
-spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,ev_async *w,int revents);
+spx_private void ydb_storage_dio_do_upload_for_chunkfile(
+        struct ev_loop *loop,ev_async *w,int revents);
+spx_private void ydb_storage_dio_do_upload_for_singlefile(
+        struct ev_loop *loop,ev_async *w,int revents);
 
-spx_private err_t ydb_storage_upload_check_and_open_chunkfile(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_dio_context *dc,\
-        struct ydb_storage_storefile *cf);
 
-spx_private err_t ydb_storage_upload_after(struct ydb_storage_dio_context *dc);
+spx_private err_t ydb_storage_upload_after(
+        struct ydb_storage_dio_context *dc);
 
 
 err_t ydb_storage_dio_upload(struct ev_loop *loop,\
@@ -83,7 +72,8 @@ err_t ydb_storage_dio_upload(struct ev_loop *loop,\
     //deal suffix
     dc->has_suffix = spx_msg_unpack_bool(dc->jc->reader_body_ctx);
     if(dc->has_suffix){
-        dc->suffix = spx_msg_unpack_string(dc->jc->reader_body_ctx,YDB_FILENAME_SUFFIX_SIZE,&err);
+        dc->suffix = spx_msg_unpack_string(dc->jc->reader_body_ctx,
+                YDB_FILENAME_SUFFIX_SIZE,&err);
         if(NULL == dc->suffix){
             SpxLog2(dc->log,SpxLogError,err,\
                     "unpack suffix is fail.");
@@ -105,11 +95,13 @@ err_t ydb_storage_dio_upload(struct ev_loop *loop,\
     }
 
     if(c->chunkfile && (dc->realsize <= c->singlemin)){
-        dc->issignalfile = false;
-        spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_upload_for_chunkfile,dc);
+        dc->issinglefile = false;
+        spx_dio_regedit_async(&(dc->async),
+                ydb_storage_dio_do_upload_for_chunkfile,dc);
     } else {//singlefile
-        dc->issignalfile = true;
-        spx_dio_regedit_async(&(dc->async),ydb_storage_dio_do_upload_for_singlefile,dc);
+        dc->issinglefile = true;
+        spx_dio_regedit_async(&(dc->async),
+                ydb_storage_dio_do_upload_for_singlefile,dc);
     }
     ev_async_start(loop,&(dc->async));
     ev_async_send(loop,&(dc->async));
@@ -118,10 +110,12 @@ r1:
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
-    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    jc->writer_header = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
         SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,and push jcontext to pool force.");
+                "dispatch network module is fail,"
+                "and push jcontext to pool force.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return err;
     }
@@ -132,21 +126,32 @@ r1:
 
     jc->moore = SpxNioMooreResponse;
     size_t i = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext_err = spx_get_thread(g_spx_network_module,i);
+    struct spx_thread_context *threadcontext_err =
+        spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    err = spx_module_dispatch(threadcontext_err,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext_err,
+            spx_network_module_wakeup_handler,jc);
     return err;
 
 }/*}}}*/
 
-spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+spx_private void ydb_storage_dio_do_upload_for_chunkfile(
+        struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     err_t  err = 0;
     ev_async_stop(loop,w);
-    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) w->data;
+    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
+        w->data;
     struct spx_job_context *jc = dc->jc;
-    struct ydb_storage_configurtion *c = jc->config;
-    struct ydb_storage_storefile *cf = dc->storefile;
+//    struct ydb_storage_configurtion *c = jc->config;
+//    struct ydb_storage_storefile *cf = dc->storefile;
 
+    if(0 != (err = ydb_storage_dio_upload_to_chunkfile(dc))){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "write context to chunkfile is fail.");
+        goto r1;
+
+    }
+    /*
     err = ydb_storage_upload_check_and_open_chunkfile(c,dc,cf);
     if(0 != err){
         SpxLog2(c->log,SpxLogError,err,\
@@ -170,7 +175,8 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
     spx_msg_pack_u64(dc->metadata,dc->totalsize);
     spx_msg_pack_u64(dc->metadata,dc->realsize);
     if(dc->has_suffix){
-        spx_msg_pack_fixed_string(dc->metadata,dc->suffix,YDB_FILENAME_SUFFIX_SIZE);
+        spx_msg_pack_fixed_string(dc->metadata,
+                dc->suffix,YDB_FILENAME_SUFFIX_SIZE);
     } else {
         spx_msg_align(dc->metadata,YDB_FILENAME_SUFFIX_SIZE);
     }
@@ -178,7 +184,8 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
     if(NULL == dc->hashcode){
         spx_msg_align(dc->metadata,YDB_HASHCODE_SIZE);
     } else {
-        spx_msg_pack_fixed_string(dc->metadata,dc->hashcode,YDB_HASHCODE_SIZE);
+        spx_msg_pack_fixed_string(dc->metadata,
+                dc->hashcode,YDB_HASHCODE_SIZE);
     }
 
     size_t off = cf->chunkfile.offset;
@@ -187,10 +194,11 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
     size_t len = 0;
 
 //    off += spx_mmap_form_msg(cf->chunkfile.mptr,off,dc->metadata);
-    memcpy(cf->chunkfile.mptr + off,dc->metadata->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
+    memcpy(cf->chunkfile.mptr + off,
+            dc->metadata->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
     off += YDB_CHUNKFILE_MEMADATA_SIZE;
     if(jc->is_lazy_recv){
-        do{
+        while(true){
             recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
                         ? YdbBufferSizeForLazyRecv \
                         : dc->realsize - writebytes;
@@ -207,10 +215,10 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
             memcpy(cf->chunkfile.mptr + off,dc->buf,len);
             off += len;
             writebytes += len;
-            if(writebytes < dc->realsize) {
-                continue;
+            if(writebytes >= dc->realsize) {
+                break;
             }
-        }while(false);
+        }
     } else {
         memcpy(cf->chunkfile.mptr + off,
                 jc->reader_body_ctx->buf + jc->reader_header->offset,
@@ -226,6 +234,7 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
     dc->p2 = cf->chunkfile.p2;
     dc->mp_idx = cf->chunkfile.mpidx;
     dc->file_createtime = cf->chunkfile.fcreatetime;
+    */
 
     /*
     YdbStorageBinlog(YDB_BINLOG_ADD,dc->issignalfile,dc->ver,dc->opver,cf->machineid,\
@@ -247,17 +256,20 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(struct ev_loop *loop,ev
     size_t idx = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext,
+            spx_network_module_wakeup_handler,jc);
     return;
 r1:
 
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
-    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    jc->writer_header = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
         SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,and push jcontext to pool force.");
+                "dispatch network module is fail,"
+                "and push jcontext to pool force.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
@@ -268,20 +280,31 @@ r1:
 
     jc->moore = SpxNioMooreResponse;
     size_t i = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext_err = spx_get_thread(g_spx_network_module,i);
+    struct spx_thread_context *threadcontext_err =
+        spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    err = spx_module_dispatch(threadcontext_err,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext_err,
+            spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 
-spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+spx_private void ydb_storage_dio_do_upload_for_singlefile(
+        struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     ev_async_stop(loop,w);
-    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *) w->data;
+    struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
+        w->data;
     struct spx_job_context *jc = dc->jc;
-    struct ydb_storage_configurtion *c = jc->config;
-    struct ydb_storage_storefile *cf = dc->storefile;
+//    struct ydb_storage_configurtion *c = jc->config;
+//    struct ydb_storage_storefile *cf = dc->storefile;
     err_t err = 0;
 
+    if(0 != (err = ydb_storage_dio_upload_to_singlefile(dc))){
+        SpxLog2(dc->log,SpxLogError,err,
+                "write context to single file is fail.");
+        goto r1;
+    }
+
+    /*
     cf->singlefile.fcreatetime = dc->createtime;
 
     int count = SpxAtomicLazyIncr(&(g_ydb_storage_runtime->singlefile_count));
@@ -292,9 +315,11 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
             &(cf->singlefile.p1),&(cf->singlefile.p2));
 
     cf->singlefile.filename = ydb_storage_dio_make_filename(\
-            dc->log,dc->issignalfile,c->mountpoints,g_ydb_storage_runtime->mpidx,\
+            dc->log,dc->issinglefile,
+            c->mountpoints,g_ydb_storage_runtime->mpidx,\
             cf->singlefile.p1,cf->singlefile.p2,
-            c->machineid,cf->tidx,cf->singlefile.fcreatetime,cf->singlefile.rand,\
+            c->machineid,cf->tidx,
+            cf->singlefile.fcreatetime,cf->singlefile.rand,\
             dc->suffix,&err);
     if(SpxStringIsNullOrEmpty(cf->singlefile.filename)){
         SpxLog2(c->log,SpxLogError,err,
@@ -331,7 +356,7 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
     size_t writebytes = 0;
     size_t len = 0;
     if(jc->is_lazy_recv){
-        do{
+        while(true){
             recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
                         ? YdbBufferSizeForLazyRecv \
                         : dc->realsize - writebytes;
@@ -347,10 +372,10 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
 
             memcpy(cf->singlefile.mptr + writebytes,dc->buf,len);
             writebytes += len;
-            if(writebytes < dc->realsize) {
-                continue;
+            if(writebytes >= dc->realsize) {
+                break;
             }
-        }while(false);
+        }
     } else {
         memcpy(cf->singlefile.mptr,
                 jc->reader_body_ctx->buf + jc->reader_header->offset,
@@ -370,7 +395,9 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
     dc->p2 = cf->singlefile.p2;
     dc->mp_idx = cf->singlefile.mpidx;
     dc->file_createtime = cf->singlefile.fcreatetime;
+    dc->totalsize = dc->realsize;
 
+    */
     /*
     YdbStorageBinlog(YDB_BINLOG_ADD,dc->issignalfile,dc->ver,dc->opver,cf->machineid,\
             dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
@@ -389,23 +416,27 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(struct ev_loop *loop,e
 
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    struct spx_thread_context *threadcontext =
+        spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext,
+            spx_network_module_wakeup_handler,jc);
     return;
 r1:
-    spx_string_free(cf->singlefile.filename);
-    SpxClose(cf->singlefile.fd);
-    if(NULL != cf->singlefile.mptr) {
-        munmap(cf->singlefile.mptr,dc->realsize);
-    }
+//    spx_string_free(cf->singlefile.filename);
+//    SpxClose(cf->singlefile.fd);
+//    if(NULL != cf->singlefile.mptr) {
+//        munmap(cf->singlefile.mptr,dc->realsize);
+//    }
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
-    jc->writer_header = (struct spx_msg_header *) spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    jc->writer_header = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
         SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,and push jcontext to pool force.");
+                "dispatch network module is fail,"
+                "and push jcontext to pool force.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
@@ -416,21 +447,33 @@ r1:
 
     jc->moore = SpxNioMooreResponse;
     size_t i = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext_err = spx_get_thread(g_spx_network_module,i);
+    struct spx_thread_context *threadcontext_err =
+        spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    err = spx_module_dispatch(threadcontext_err,spx_network_module_wakeup_handler,jc);
+    err = spx_module_dispatch(threadcontext_err,
+            spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 
 
-spx_private err_t ydb_storage_upload_after(struct ydb_storage_dio_context *dc){/*{{{*/
+spx_private err_t ydb_storage_upload_after(
+        struct ydb_storage_dio_context *dc){/*{{{*/
     err_t err = 0;
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
     struct ydb_storage_storefile *cf = dc->storefile;
 
     size_t len = 0;
-    string_t fid =  ydb_storage_dio_make_fileid(c,dc,cf,&len,&err);
+
+    string_t fid =  ydb_storage_dio_make_fileid(c->log,
+                c->groupname,c->machineid,c->syncgroup,
+                dc->issinglefile,dc->mp_idx,dc->p1,dc->p2,
+                cf->tidx,dc->file_createtime,dc->rand,
+                dc->begin,dc->realsize,dc->totalsize,
+                dc->ver,dc->opver,dc->lastmodifytime,
+                dc->hashcode,dc->has_suffix,dc->suffix,
+                &len,&err);
+
     if(NULL == fid){
         SpxLog2(dc->log,SpxLogError,err,\
                 "new file is fail.");
@@ -447,7 +490,8 @@ spx_private err_t ydb_storage_upload_after(struct ydb_storage_dio_context *dc){/
     jc->writer_body_ctx = ctx;
     spx_msg_pack_fixed_string(ctx,fid,len);
 
-    struct spx_msg_header *h = (struct spx_msg_header *) spx_alloc_alone(sizeof(*h),&err);
+    struct spx_msg_header *h = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*h),&err);
     if(NULL == h){
         SpxLog2(dc->log,SpxLogError,err,\
                 "new response header is fail.");
@@ -464,245 +508,198 @@ r1:
     return err;
 }/*}}}*/
 
-spx_private err_t ydb_storage_upload_check_and_open_chunkfile(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_dio_context *dc,\
-        struct ydb_storage_storefile *cf){/*{{{*/
+err_t ydb_storage_dio_upload_to_chunkfile(
+        struct ydb_storage_dio_context *dc){/*{{{*/
+
     err_t err = 0;
-    while(true) {
-        if(0 == cf->chunkfile.fd){
-            cf->chunkfile.fcreatetime = dc->createtime;
-            int count = SpxAtomicIncr(&(g_ydb_storage_runtime->chunkfile_count));
-            SpxAtomicCas(&(g_ydb_storage_runtime->chunkfile_count),10000,0);
-            cf->chunkfile.rand = count;
-            ydb_storage_dio_get_path(c,g_ydb_storage_runtime,\
-                    &(cf->chunkfile.mpidx),\
-                    &(cf->chunkfile.p1),&(cf->chunkfile.p2));
-
-            cf->chunkfile.filename = ydb_storage_dio_make_filename(\
-                    dc->log,dc->issignalfile,c->mountpoints,g_ydb_storage_runtime->mpidx,\
-                    cf->chunkfile.p1,cf->chunkfile.p2,
-                    c->machineid,cf->tidx,cf->chunkfile.fcreatetime,cf->chunkfile.rand,\
-                    dc->suffix,&err);
-
-            SpxLogFmt1(c->log,SpxLogDebug,"reopen :%s.",cf->chunkfile.filename);
-            SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
-
-            if(SpxStringIsNullOrEmpty(cf->chunkfile.filename)){
-                SpxLog2(c->log,SpxLogError,err,
-                        "alloc chunkfile name is fail.");
-                break;
-            }
-
-            cf->chunkfile.fd = open(cf->chunkfile.filename,\
-                    O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
-            if(0 >= cf->chunkfile.fd){
-                err = errno;
-                SpxLogFmt2(c->log,SpxLogError,err,\
-                        "open chunkfile is fail.",
-                        cf->chunkfile.filename);
-                spx_string_free(cf->chunkfile.filename);
-                break;
-            }
-            if(0 != (err = ftruncate(cf->chunkfile.fd,c->chunksize))){
-                SpxLogFmt2(c->log,SpxLogError,err,\
-                        "truncate chunkfile:%s to size:%lld is fail.",
-                        cf->chunkfile.filename,c->chunksize);
-                spx_string_free(cf->chunkfile.filename);
-                SpxClose(cf->chunkfile.fd);
-                break;
-            }
-            cf->chunkfile.mptr = mmap(NULL,\
-                    c->chunksize,PROT_READ | PROT_WRITE ,\
-                    MAP_SHARED,cf->chunkfile.fd,0);
-            if(MAP_FAILED == cf->chunkfile.mptr){
-                err = errno;
-                SpxLogFmt2(c->log,SpxLogError,err,\
-                        "mmap the chunkfile file:%s to memory is fail.",
-                        cf->chunkfile.filename);
-                spx_string_free(cf->chunkfile.filename);
-                SpxClose(cf->chunkfile.fd);
-                break;
-            }
-        }
-
-        if(dc->totalsize + cf->chunkfile.offset  > c->chunksize){
-            SpxLogFmt1(c->log,SpxLogDebug, "total:%lld,chunksize:%lld,offset:%lld.",dc->totalsize,
-                    c->chunksize,cf->chunkfile.offset);
-            SpxLogFmt1(c->log,SpxLogDebug,"close the file %s",cf->chunkfile.filename);
-            munmap(cf->chunkfile.mptr,c->chunksize);
-            cf->chunkfile.mptr = NULL;
-            SpxClose(cf->chunkfile.fd);
-            spx_string_free(cf->chunkfile.filename);
-            cf->chunkfile.offset = 0;
-            continue;//reopen a new file
-        }
-        break;
+    struct spx_job_context *jc = dc->jc;
+    struct ydb_storage_configurtion *c = jc->config;
+    struct ydb_storage_storefile *sf = dc->storefile;
+    err = ydb_storage_upload_check_and_open_chunkfile(c,dc,sf);
+    if(0 != err){
+        SpxLog2(c->log,SpxLogError,err,\
+                "check and open chunkfile is fail.");
+        return err;
     }
-    SpxLog1(c->log,SpxLogDebug,"return");
+
+    dc->metadata = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
+
+    if(NULL == dc->metadata){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "alloc metadata for chunkfile is fail.");
+        return err;
+    }
+
+    spx_msg_pack_false(dc->metadata);//isdelete
+    spx_msg_pack_u32(dc->metadata,dc->opver);
+    spx_msg_pack_u32(dc->metadata,dc->ver);
+    spx_msg_pack_u64(dc->metadata,dc->createtime);
+    spx_msg_pack_u64(dc->metadata,dc->lastmodifytime);
+    spx_msg_pack_u64(dc->metadata,dc->totalsize);
+    spx_msg_pack_u64(dc->metadata,dc->realsize);
+    if(dc->has_suffix){
+        spx_msg_pack_fixed_string(dc->metadata,
+                dc->suffix,YDB_FILENAME_SUFFIX_SIZE);
+    } else {
+        spx_msg_align(dc->metadata,YDB_FILENAME_SUFFIX_SIZE);
+    }
+
+    if(NULL == dc->hashcode){
+        spx_msg_align(dc->metadata,YDB_HASHCODE_SIZE);
+    } else {
+        spx_msg_pack_fixed_string(dc->metadata,
+                dc->hashcode,YDB_HASHCODE_SIZE);
+    }
+
+    size_t off = sf->chunkfile.offset;
+    size_t recvbytes = 0;
+    size_t writebytes = 0;
+    size_t len = 0;
+
+    memcpy(sf->chunkfile.mptr + off,
+            dc->metadata->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
+    off += YDB_CHUNKFILE_MEMADATA_SIZE;
+    if(jc->is_lazy_recv){
+        while(true){
+            recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
+                        ? YdbBufferSizeForLazyRecv \
+                        : dc->realsize - writebytes;
+            err = spx_read_nb(jc->fd,(byte_t *) dc->buf,recvbytes,&len);
+            if(0 != err || recvbytes != len){
+                SpxLogFmt2(dc->log,SpxLogError,err,\
+                        "lazy read buffer and cp to mmap is fail."
+                        "recvbytes:%lld,real recvbytes:%lld."
+                        "writedbytes:%lld,total size:%lld.",
+                        recvbytes,len,writebytes,dc->realsize);
+                return err;
+            }
+
+            memcpy(sf->chunkfile.mptr + off,dc->buf,len);
+            off += len;
+            writebytes += len;
+            if(writebytes >= dc->realsize) {
+                break;
+            }
+        }
+    } else {
+        memcpy(sf->chunkfile.mptr + off,
+                jc->reader_body_ctx->buf + jc->reader_header->offset,
+                jc->reader_header->bodylen - jc->reader_header->offset);
+        off += jc->reader_header->bodylen - jc->reader_header->offset;
+    }
+
+    dc->begin = sf->chunkfile.offset;
+    sf->chunkfile.offset += dc->totalsize;
+    dc->rand = sf->chunkfile.rand;
+    dc->tidx = sf->tidx;
+    dc->p1 = sf->chunkfile.p1;
+    dc->p2 = sf->chunkfile.p2;
+    dc->mp_idx = sf->chunkfile.mpidx;
+    dc->file_createtime = sf->chunkfile.fcreatetime;
+
     return err;
 }/*}}}*/
 
-spx_private err_t ydb_storage_dio_get_path(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,\
-        u8_t *mpidx,u8_t *p1,u8_t *p2){/*{{{*/
+err_t ydb_storage_dio_upload_to_singlefile(
+        struct ydb_storage_dio_context *dc){/*{{{*/
     err_t err = 0;
-    if(rt->storecount <= c->storecount){//input the current store
-        return 0;
+    struct spx_job_context *jc = dc->jc;
+    struct ydb_storage_configurtion *c = jc->config;
+    struct ydb_storage_storefile *sf = dc->storefile;
+
+    sf->singlefile.fcreatetime = dc->lastmodifytime;
+
+    int count = SpxAtomicLazyIncr(&(g_ydb_storage_runtime->singlefile_count));
+    SpxAtomicCas(&(g_ydb_storage_runtime->singlefile_count),10000,0);
+    sf->singlefile.rand = count;
+
+    ydb_storage_dio_get_path(c,g_ydb_storage_runtime,&(sf->singlefile.mpidx),\
+            &(sf->singlefile.p1),&(sf->singlefile.p2));
+
+    sf->singlefile.filename = ydb_storage_dio_make_filename(\
+            dc->log,dc->issinglefile,
+            c->mountpoints,g_ydb_storage_runtime->mpidx,\
+            sf->singlefile.p1,sf->singlefile.p2,
+            c->machineid,sf->tidx,
+            sf->singlefile.fcreatetime,sf->singlefile.rand,\
+            dc->suffix,&err);
+    if(SpxStringIsNullOrEmpty(sf->singlefile.filename)){
+        SpxLog2(c->log,SpxLogError,err,
+                "alloc singlefile name is fail.");
+        goto r1;
     }
 
-    //ready,go
-    u32_t total = 0;
-    u8_t tp1 = rt->p1;
-    u8_t tp2 = rt->p2;
-    u8_t flag = 0;
-
-    //now begin magic
-    //if you no understand this ways,please donot modify it
-    //bit alg
-    total = tp1 << 8 | tp2;
-    total++;
-    flag = total >> 16 & 0xFF;
-    tp1 = total >> 8 & 0xFF;
-    tp2 = total & 0xFF;
-
-    if(c->storerooms == tp2){
-        tp1++;
-        tp2 = 0;
+    sf->singlefile.fd = open(sf->singlefile.filename,\
+            O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
+    if(0 == sf->singlefile.fd){
+        err = errno;
+        SpxLogFmt2(c->log,SpxLogError,err,\
+                "open singlefile is fail.",
+                sf->singlefile.filename);
+        goto r1;
     }
-    if(c->storerooms == tp1){
-        flag = 1;
-        tp1 = 0;
+    if(0 != (err = ftruncate(sf->singlefile.fd,dc->realsize))){
+        SpxLogFmt2(c->log,SpxLogError,err,\
+                "truncate singlefile:%s to size:%lld is fail.",
+                sf->singlefile.filename,dc->realsize);
+        goto r1;
+    }
+    sf->singlefile.mptr = mmap(NULL,\
+            c->chunksize,PROT_READ | PROT_WRITE ,\
+            MAP_SHARED,sf->singlefile.fd,0);
+    if(MAP_FAILED == sf->singlefile.mptr){
+        SpxLogFmt2(c->log,SpxLogError,err,\
+                "mmap the single file:%s to memory is fail.",
+                sf->singlefile.filename);
+        goto r1;
     }
 
-    *p1 = tp1;
-    *p2 = tp2;
+    size_t recvbytes = 0;
+    size_t writebytes = 0;
+    size_t len = 0;
+    if(jc->is_lazy_recv){
+        while(true){
+            recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
+                        ? YdbBufferSizeForLazyRecv \
+                        : dc->realsize - writebytes;
+            err = spx_read_nb(jc->fd,(byte_t *) dc->buf,recvbytes,&len);
+            if(0 != err || recvbytes != len){
+                SpxLogFmt2(dc->log,SpxLogError,err,\
+                        "lazy read buffer and cp to mmap is fail."
+                        "recvbytes:%lld,real recvbytes:%lld."
+                        "writedbytes:%lld,total size:%lld.",
+                        recvbytes,len,writebytes,dc->realsize);
+                goto r1;
+            }
 
-    if(1 == flag){/*{{{*/
-        switch(c->balance){
-            case YDB_STORAGE_MOUNTPOINT_TURN:
-                {
-                    *mpidx = ydb_storage_get_mountpoint_with_turn(c,rt,&err);
-                    if(0 != err){
-                        return err;
-                    }
-                    break;
-                }
-            case YDB_STORAGE_MOUNTPOINT_MAXSIZE:
-                {
-                    *mpidx = ydb_storage_get_mountpoint_with_maxsize(c,rt,&err);
-                    if(0 != err){
-                        return err;
-                    }
-                    break;
-                }
-            case YDB_STORAGE_MOUNTPOINT_MASTER:
-                {
-                    *mpidx = ydb_storage_get_mountpoint_with_master(c,rt,&err);
-                    if(0 != err){
-                        return err;
-                    }
-                    break;
-                }
-            case YDB_STORAGE_MOUNTPOINT_LOOP:
-            default:
-                {
-                    *mpidx = ydb_storage_get_mountpoint_with_loop(c,rt,true,&err);
-                    if(0 != err){
-                        return err;
-                    }
-                    break;
-                }
+            memcpy(sf->singlefile.mptr + writebytes,dc->buf,len);
+            writebytes += len;
+            if(writebytes >= dc->realsize) {
+                break;
+            }
         }
-    }/*}}}*/
+    } else {
+        memcpy(sf->singlefile.mptr,
+                jc->reader_body_ctx->buf + jc->reader_header->offset,
+                jc->reader_header->bodylen - jc->reader_header->offset);
+    }
+
+
+    dc->begin = 0;
+    dc->rand = sf->singlefile.rand;
+    dc->tidx = sf->tidx;
+    dc->p1 = sf->singlefile.p1;
+    dc->p2 = sf->singlefile.p2;
+    dc->mp_idx = sf->singlefile.mpidx;
+    dc->file_createtime = sf->singlefile.fcreatetime;
+    dc->totalsize = dc->realsize;
+
+r1:
+    SpxStringFree(sf->singlefile.filename);
+    SpxClose(sf->singlefile.fd);
+    if(NULL != sf->singlefile.mptr) {
+        munmap(sf->singlefile.mptr,dc->realsize);
+    }
+
     return err;
 }/*}}}*/
-
-spx_private u8_t ydb_storage_get_mountpoint_with_loop(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,bool_t isfirst,err_t *err){/*{{{*/
-    u8_t mpidx = isfirst ? rt->mpidx : rt->mpidx + 1;
-    struct ydb_storage_mountpoint *mp = NULL;
-    int i = 0;
-    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
-        mp = spx_list_get(c->mountpoints,mpidx);
-        if(NULL == mp || SpxStringIsNullOrEmpty(mp->path)){
-            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
-            continue;
-        }
-        u64_t size = spx_mountpoint_freesize(mp->path,err);
-        if(size <= c->freedisk){
-            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
-            continue;
-        }else{
-            return mpidx;
-        }
-    }
-    *err = ENOENT;
-    SpxLog1(c->log,SpxLogError,\
-            "no the mountpoint can use.");
-    return 0;
-}/*}}}*/
-
-spx_private u8_t ydb_storage_get_mountpoint_with_turn(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,err_t *err){/*{{{*/
-    u8_t mpidx = rt->mpidx ;
-    struct ydb_storage_mountpoint *mp = NULL;
-    int i = 0;
-    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
-        mp = spx_list_get(c->mountpoints,mpidx);
-        if(NULL == mp || SpxStringIsNullOrEmpty(mp->path)){
-            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
-            continue;
-        }
-        u64_t size = spx_mountpoint_freesize(mp->path,err);
-        if(size <= c->freedisk){
-            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
-            continue;
-        }else{
-            return mpidx;
-        }
-    }
-    *err = ENOENT;
-    SpxLog1(c->log,SpxLogError,\
-            "no the mountpoint can use.");
-    return 0;
-}/*}}}*/
-
-spx_private u8_t ydb_storage_get_mountpoint_with_maxsize(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,err_t *err){/*{{{*/
-    u8_t mpidx = 0;
-    u64_t max = 0;
-    bool_t exist = false;
-    struct ydb_storage_mountpoint *mp = NULL;
-    int i = 0;
-    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
-        mp = spx_list_get(c->mountpoints,i);
-        if(NULL == mp || SpxStringIsNullOrEmpty(mp->path)){
-            continue;
-        }
-        u64_t size = spx_mountpoint_freesize(mp->path,err);
-        if(size - c->freedisk > max){
-            exist = true;
-            max = size - c->freedisk;
-            mpidx = i;
-        }
-    }
-    if(!exist){
-        *err = ENOENT;
-        SpxLog1(c->log,SpxLogError,\
-                "no the mountpoint can use.");
-    }
-    return mpidx;
-}/*}}}*/
-
-spx_private u8_t ydb_storage_get_mountpoint_with_master(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_runtime *rt,err_t *err){/*{{{*/
-    struct ydb_storage_mountpoint *mp = NULL;
-    mp = spx_list_get(c->mountpoints,c->master);
-    if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)
-            && c->freedisk < spx_mountpoint_freesize(mp->path,err)){
-        return c->master;
-    }
-    return ydb_storage_get_mountpoint_with_loop(c,rt,false,err);
-}/*}}}*/
-
-

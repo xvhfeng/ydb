@@ -24,10 +24,23 @@ extern "C" {
 #include <ev.h>
 
 #include "spx_types.h"
+
 #include "ydb_storage_dio_context.h"
+#include "ydb_storage_configurtion.h"
 
 err_t ydb_storage_dio_delete(struct ev_loop *loop,\
         struct ydb_storage_dio_context *dc);
+
+err_t ydb_storage_dio_delete_context_from_chunkfile(
+        struct ydb_storage_configurtion *c,
+        string_t fname,
+        u64_t cbegin,
+        u64_t ctotalsize,
+        u32_t copver,
+        u32_t cver,
+        u64_t clastmodifytime,
+        u64_t crealsize,
+        u64_t lastmodifytime);
 
 #ifdef __cplusplus
 }

@@ -15,6 +15,11 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include "spx_types.h"
 #include "spx_defs.h"
@@ -22,12 +27,15 @@
 #include "spx_list.h"
 #include "spx_path.h"
 #include "spx_message.h"
+#include "spx_atomic.h"
 
 #include "ydb_protocol.h"
 
 #include "ydb_storage_configurtion.h"
 #include "ydb_storage_dio_context.h"
 #include "ydb_storage_storefile.h"
+#include "ydb_storage_runtime.h"
+#include "ydb_storage_dio.h"
 
 err_t ydb_storage_dio_mountpoint_init(struct ydb_storage_configurtion *c){/*{{{*/
     err_t err = 0;
@@ -129,43 +137,47 @@ string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
     return filename;
 }/*}}}*/
 
-string_t ydb_storage_dio_make_fileid(struct ydb_storage_configurtion *c,\
-        struct ydb_storage_dio_context *dc,struct ydb_storage_storefile *cf,\
+string_t ydb_storage_dio_make_fileid(SpxLogDelegate *log,\
+        string_t groupname,string_t machineid,string_t syncgroup,
+        bool_t issinglefile,u8_t mpidx,u8_t p1,u8_t p2,
+        u32_t tidx,u64_t fcreatetime,u32_t rand,u64_t begin,u64_t realsize,
+        u64_t totalsize,u32_t ver,u32_t opver,u64_t lastmodifytime,
+        string_t hashcode,bool_t has_suffix,string_t suffix,
         size_t *len,err_t *err){/*{{{*/
 
     string_t fid = spx_string_newlen(NULL,SpxFileNameSize,err);
     if(NULL == fid){
-        SpxLog2(dc->log,SpxLogError,*err,\
+        SpxLog2(log,SpxLogError,*err,\
                 "new file is fail.");
         return NULL;
     }
     spx_string_cat_printf(err,fid,\
             "%s:%s:%s:%d:%d:%d:%d:%d:%lld:%d:%lld:%lld:%lld:%d:%d:%lld:%s%s%s",
-            c->groupname,c->machineid,c->syncgroup, dc->issignalfile,dc->mp_idx,dc->p1,dc->p2,\
-            cf->tidx,dc->file_createtime,dc->rand,dc->begin,dc->realsize,dc->totalsize,\
-            dc->ver,dc->opver,dc->lastmodifytime,NULL == dc->hashcode ? "" : dc->hashcode,\
-            dc->has_suffix ? ":." : "",dc->has_suffix ? dc->suffix : "");
+            groupname,machineid,syncgroup,issinglefile,mpidx,p1,p2,
+            tidx,fcreatetime,rand,begin,realsize,totalsize,
+            ver,opver,lastmodifytime,NULL == hashcode ? "" : hashcode,
+            has_suffix ? ":." : "" , has_suffix ? suffix : "");
 
     *len = spx_string_len(fid);
     return fid;
 }/*}}}*/
 
-err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
-        size_t fid_len,struct ydb_storage_dio_context *dc){/*{{{*/
-    string_t fid = spx_msg_unpack_string(ctx,0 == fid_len ? ctx->s : fid_len,&(dc->err));
-    if(NULL == fid){
-        SpxLog2(dc->log,SpxLogError,dc->err,\
-                "alloc file id for parser is fail.");
-        return dc->err;
-    }
+err_t ydb_storage_dio_parser_fileid(SpxLogDelegate *log,
+        string_t fid,
+        string_t *groupname,string_t *machineid,string_t *syncgroup,
+        bool_t *issinglefile,u8_t *mpidx,u8_t *p1,u8_t *p2,
+        u32_t *tidx,u64_t *fcreatetime,u32_t *rand,u64_t *begin,u64_t *realsize,
+        u64_t *totalsize,u32_t *ver,u32_t *opver,u64_t *lastmodifytime,
+        string_t *hashcode,bool_t *has_suffix,string_t *suffix){/*{{{*/
+    err_t err = 0;
     int count = 0;
     string_t *fids = spx_string_splitlen(fid,\
             spx_string_len(fid),":",strlen(":"),\
-            &count,&(dc->err));
+            &count,&(err));
     if(NULL == fids || 0 == count){
-        SpxLogFmt2(dc->log,SpxLogError,dc->err,\
+        SpxLogFmt2(log,SpxLogError,err,\
                 "split fileid:%s is fail.",fid);
-        return dc->err;
+        return err;
     }
 
     int i = 0;
@@ -173,112 +185,122 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
         switch (i){
             case 0://groupname
                 {
-                    dc->groupname = spx_string_dup(*(fids + i),&(dc->err));
-                    if(NULL == dc->groupname){
-                        SpxLog2(dc->log,SpxLogError,dc->err,\
+                    *groupname = spx_string_dup(*(fids + i),&(err));
+                    if(NULL == *groupname){
+                        SpxLog2(log,SpxLogError,err,\
                                 "dup groupname is fail.");
+                        goto r1;
                     }
                     break;
                 }
             case 1://machineid
                 {
-                    dc->machineid = spx_string_dup(*(fids + i),&(dc->err));
-                    if(NULL == dc->machineid){
-                        SpxLog2(dc->log,SpxLogError,dc->err,\
+                    *machineid = spx_string_dup(*(fids + i),&(err));
+                    if(NULL == *machineid){
+                        SpxLog2(log,SpxLogError,err,\
                                 "dup machineid is fail.");
+                        goto r1;
                     }
                     break;
                 }
             case 2://syncgroupname
                 {
+                    *syncgroup = spx_string_dup(*(fids + i),&(err));
+                    if(NULL == *syncgroup){
+                        SpxLog2(log,SpxLogError,err,\
+                                "dup syncgroup is fail.");
+                        goto r1;
+                    }
                     //unuseful
                     break;
                 }
             case 3://issignalfile
                 {
-                    dc->issignalfile = (bool_t) atoi(*(fids + i));
+                    *issinglefile = (bool_t) atoi(*(fids + i));
                     break;
                 }
             case 4://mpidx
                 {
-                    dc->mp_idx = (u8_t) atoi(*(fids + i));
+                    *mpidx = (u8_t) atoi(*(fids + i));
                     break;
                 }
             case 5://p1
                 {
-                    dc->p1 = (u8_t) atoi(*(fids + i));
+                    *p1 = (u8_t) atoi(*(fids + i));
                     break;
                 }
             case 6://p2
                 {
-                    dc->p2 = (u8_t) atoi(*(fids + i));
+                    *p2 = (u8_t) atoi(*(fids + i));
                     break;
                 }
             case 7://tidx
                 {
-                    dc->tidx = (u32_t) atol(*(fids + i));
+                    *tidx = (u32_t) atol(*(fids + i));
                     break;
                 }
             case 8://file_createtime
                 {
-                    dc->file_createtime = (u64_t) strtoul(*(fids + i),NULL,10);
+                    *fcreatetime = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 9://rand
                 {
-                    dc->rand = (u32_t) atol(*(fids + i));
+                    *rand = (u32_t) atol(*(fids + i));
                     break;
                 }
             case 10://begin
                 {
-                    dc->begin = (u64_t) strtoul(*(fids + i),NULL,10);
+                    *begin = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 11://realsize
                 {
-                    dc->realsize = (u64_t) strtoul(*(fids + i),NULL,10);
+                    *realsize = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 12://totalsize
                 {
-                    dc->totalsize = (u64_t) strtoul(*(fids + i),NULL,10);
+                    *totalsize = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 13://ver
                 {
-                    dc->ver = (u32_t) atol(*(fids + i));
+                    *ver = (u32_t) atol(*(fids + i));
                     break;
                 }
             case 14://opver
                 {
-                    dc->opver = (u32_t) atol(*fids + i);
+                    *opver = (u32_t) atol(*fids + i);
                     break;
                 }
             case 15://lastmodifytime
                 {
-                    dc->lastmodifytime = (u64_t) strtoul(*(fids + i),NULL,10);
+                    *lastmodifytime = (u64_t) strtoul(*(fids + i),NULL,10);
                     break;
                 }
             case 16://hashcode
                 {
                     if(!SpxStringIsEmpty(*(fids + i))){
-                            dc->hashcode = spx_string_dup(*(fids + i),&(dc->err));
-                            if(NULL == dc->hashcode){
-                            SpxLog2(dc->log,SpxLogError,dc->err,\
-                                "dup hashcode is fail.");
-                            }
+                        *hashcode = spx_string_dup(*(fids + i),&(err));
+                        if(NULL == *hashcode){
+                            SpxLog2(log,SpxLogError,err,\
+                                    "dup hashcode is fail.");
+                            goto r1;
+                        }
                     }
                     break;
                 }
             case 17://suffix
                 {
-                    dc->suffix = spx_string_new(((*(fids + i)) + 1),&(dc->err));//remove suffix sper "."
-//                    dc->suffix = spx_string_dup(((*(fids + i)) + 1),&(dc->err));//remove suffix sper "."
-                    if(NULL == dc->suffix){
-                        SpxLog2(dc->log,SpxLogError,dc->err,\
+                    *suffix = spx_string_new(((*(fids + i)) + 1),&(err));//remove suffix sper "."
+                    //                    *suffix = spx_string_dup(((*(fids + i)) + 1),&(*err));//remove suffix sper "."
+                    if(NULL == *suffix){
+                        SpxLog2(log,SpxLogError,err,\
                                 "dup suffix is fail.");
+                        goto r1;
                     }
-                    dc->has_suffix = true;
+                    *has_suffix = true;
                     break;
                 }
             default:{
@@ -288,6 +310,23 @@ err_t ydb_storage_dio_parser_fileid(struct spx_msg* ctx,\
     }
 
     return 0;
+r1:
+    if(NULL != *groupname){
+        SpxStringFree(*groupname);
+    }
+    if(NULL != *machineid){
+        SpxStringFree(*machineid);
+    }
+    if(NULL != *syncgroup){
+        SpxStringFree(*syncgroup);
+    }
+    if(NULL != *hashcode){
+        SpxStringFree(*hashcode);
+    }
+    if(NULL != *suffix){
+        SpxStringFree(*suffix);
+    }
+    return err;
 }/*}}}*/
 
 struct spx_msg *ydb_storage_dio_make_metadata(SpxLogDelegate *log,
@@ -329,7 +368,7 @@ struct spx_msg *ydb_storage_dio_make_metadata(SpxLogDelegate *log,
 
 err_t ydb_storage_dio_parser_metadata(SpxLogDelegate *log,struct spx_msg *md,\
         bool_t *isdelete,u32_t *opver,u32_t *ver,u64_t *createtime,u64_t *lastmodify,\
-        u64_t *totalsize,u64_t *realsize,string_t *suffix,string_t *hashcode){
+        u64_t *totalsize,u64_t *realsize,string_t *suffix,string_t *hashcode){/*{{{*/
     err_t err = 0;
     *isdelete = spx_msg_unpack_bool(md);
     *opver = spx_msg_unpack_u32(md);
@@ -351,5 +390,265 @@ err_t ydb_storage_dio_parser_metadata(SpxLogDelegate *log,struct spx_msg *md,\
         return err;
     }
     return err;
-}
+}/*}}}*/
+
+
+err_t ydb_storage_dio_get_path(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_runtime *rt,
+        u8_t *mpidx,u8_t *p1,u8_t *p2){/*{{{*/
+    err_t err = 0;
+    if(rt->storecount <= c->storecount){//input the current store
+        return 0;
+    }
+
+    //ready,go
+    u32_t total = 0;
+    u8_t tp1 = rt->p1;
+    u8_t tp2 = rt->p2;
+    u8_t flag = 0;
+
+    //now begin magic
+    //if you no understand this ways,please donot modify it
+    //bit alg
+    total = tp1 << 8 | tp2;
+    total++;
+    flag = total >> 16 & 0xFF;
+    tp1 = total >> 8 & 0xFF;
+    tp2 = total & 0xFF;
+
+    if(c->storerooms == tp2){
+        tp1++;
+        tp2 = 0;
+    }
+    if(c->storerooms == tp1){
+        flag = 1;
+        tp1 = 0;
+    }
+
+    *p1 = tp1;
+    *p2 = tp2;
+
+    if(1 == flag){/*{{{*/
+        switch(c->balance){
+            case YDB_STORAGE_MOUNTPOINT_TURN:
+                {
+                    *mpidx = ydb_storage_get_mountpoint_with_turn(c,rt,&err);
+                    if(0 != err){
+                        return err;
+                    }
+                    break;
+                }
+            case YDB_STORAGE_MOUNTPOINT_MAXSIZE:
+                {
+                    *mpidx = ydb_storage_get_mountpoint_with_maxsize(
+                            c,rt,&err);
+                    if(0 != err){
+                        return err;
+                    }
+                    break;
+                }
+            case YDB_STORAGE_MOUNTPOINT_MASTER:
+                {
+                    *mpidx = ydb_storage_get_mountpoint_with_master(
+                            c,rt,&err);
+                    if(0 != err){
+                        return err;
+                    }
+                    break;
+                }
+            case YDB_STORAGE_MOUNTPOINT_LOOP:
+            default:
+                {
+                    *mpidx = ydb_storage_get_mountpoint_with_loop(
+                            c,rt,true,&err);
+                    if(0 != err){
+                        return err;
+                    }
+                    break;
+                }
+        }
+    }/*}}}*/
+    return err;
+}/*}}}*/
+
+u8_t ydb_storage_get_mountpoint_with_loop(
+        struct ydb_storage_configurtion *c,\
+        struct ydb_storage_runtime *rt,bool_t isfirst,err_t *err){/*{{{*/
+    u8_t mpidx = isfirst ? rt->mpidx : rt->mpidx + 1;
+    struct ydb_storage_mountpoint *mp = NULL;
+    int i = 0;
+    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
+        mp = spx_list_get(c->mountpoints,mpidx);
+        if(NULL == mp || SpxStringIsNullOrEmpty(mp->path)){
+            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
+            continue;
+        }
+        u64_t size = spx_mountpoint_freesize(mp->path,err);
+        if(size <= c->freedisk){
+            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
+            continue;
+        }else{
+            return mpidx;
+        }
+    }
+    *err = ENOENT;
+    SpxLog1(c->log,SpxLogError,\
+            "no the mountpoint can use.");
+    return 0;
+}/*}}}*/
+
+u8_t ydb_storage_get_mountpoint_with_turn(
+        struct ydb_storage_configurtion *c,\
+        struct ydb_storage_runtime *rt,err_t *err){/*{{{*/
+    u8_t mpidx = rt->mpidx ;
+    struct ydb_storage_mountpoint *mp = NULL;
+    int i = 0;
+    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
+        mp = spx_list_get(c->mountpoints,mpidx);
+        if(NULL == mp || SpxStringIsNullOrEmpty(mp->path)){
+            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
+            continue;
+        }
+        u64_t size = spx_mountpoint_freesize(mp->path,err);
+        if(size <= c->freedisk){
+            mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
+            continue;
+        }else{
+            return mpidx;
+        }
+    }
+    *err = ENOENT;
+    SpxLog1(c->log,SpxLogError,\
+            "no the mountpoint can use.");
+    return 0;
+}/*}}}*/
+
+u8_t ydb_storage_get_mountpoint_with_maxsize(
+        struct ydb_storage_configurtion *c,\
+        struct ydb_storage_runtime *rt,err_t *err){/*{{{*/
+    u8_t mpidx = 0;
+    u64_t max = 0;
+    bool_t exist = false;
+    struct ydb_storage_mountpoint *mp = NULL;
+    int i = 0;
+    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
+        mp = spx_list_get(c->mountpoints,i);
+        if(NULL == mp || SpxStringIsNullOrEmpty(mp->path)){
+            continue;
+        }
+        u64_t size = spx_mountpoint_freesize(mp->path,err);
+        if(size - c->freedisk > max){
+            exist = true;
+            max = size - c->freedisk;
+            mpidx = i;
+        }
+    }
+    if(!exist){
+        *err = ENOENT;
+        SpxLog1(c->log,SpxLogError,\
+                "no the mountpoint can use.");
+    }
+    return mpidx;
+}/*}}}*/
+
+u8_t ydb_storage_get_mountpoint_with_master(
+        struct ydb_storage_configurtion *c,\
+        struct ydb_storage_runtime *rt,err_t *err){/*{{{*/
+    struct ydb_storage_mountpoint *mp = NULL;
+    mp = spx_list_get(c->mountpoints,c->master);
+    if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)
+            && c->freedisk < spx_mountpoint_freesize(mp->path,err)){
+        return c->master;
+    }
+    return ydb_storage_get_mountpoint_with_loop(c,rt,false,err);
+}/*}}}*/
+
+
+err_t ydb_storage_upload_check_and_open_chunkfile(
+        struct ydb_storage_configurtion *c,\
+        struct ydb_storage_dio_context *dc,\
+        struct ydb_storage_storefile *cf){/*{{{*/
+    err_t err = 0;
+    while(true) {
+        if(0 == cf->chunkfile.fd){
+            cf->chunkfile.fcreatetime = dc->createtime;
+            int count = SpxAtomicIncr(&(
+                        g_ydb_storage_runtime->chunkfile_count));
+            SpxAtomicCas(&(g_ydb_storage_runtime->chunkfile_count),10000,0);
+            cf->chunkfile.rand = count;
+            ydb_storage_dio_get_path(c,g_ydb_storage_runtime,\
+                    &(cf->chunkfile.mpidx),\
+                    &(cf->chunkfile.p1),&(cf->chunkfile.p2));
+
+            cf->chunkfile.filename = ydb_storage_dio_make_filename(\
+                    dc->log,dc->issinglefile,c->mountpoints,
+                    g_ydb_storage_runtime->mpidx,
+                    cf->chunkfile.p1,cf->chunkfile.p2,
+                    c->machineid,cf->tidx,cf->chunkfile.fcreatetime,
+                    cf->chunkfile.rand,\
+                    dc->suffix,&err);
+
+            SpxLogFmt1(c->log,SpxLogDebug,"reopen :%s."
+                    ,cf->chunkfile.filename);
+            SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
+
+            if(SpxStringIsNullOrEmpty(cf->chunkfile.filename)){
+                SpxLog2(c->log,SpxLogError,err,
+                        "alloc chunkfile name is fail.");
+                break;
+            }
+
+            cf->chunkfile.fd = open(cf->chunkfile.filename,\
+                    O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
+            if(0 >= cf->chunkfile.fd){
+                err = errno;
+                SpxLogFmt2(c->log,SpxLogError,err,\
+                        "open chunkfile is fail.",
+                        cf->chunkfile.filename);
+                spx_string_free(cf->chunkfile.filename);
+                break;
+            }
+            if(0 != (err = ftruncate(cf->chunkfile.fd,c->chunksize))){
+                SpxLogFmt2(c->log,SpxLogError,err,\
+                        "truncate chunkfile:%s to size:%lld is fail.",
+                        cf->chunkfile.filename,c->chunksize);
+                spx_string_free(cf->chunkfile.filename);
+                SpxClose(cf->chunkfile.fd);
+                break;
+            }
+            cf->chunkfile.mptr = mmap(NULL,\
+                    c->chunksize,PROT_READ | PROT_WRITE ,\
+                    MAP_SHARED,cf->chunkfile.fd,0);
+            if(MAP_FAILED == cf->chunkfile.mptr){
+                err = errno;
+                SpxLogFmt2(c->log,SpxLogError,err,\
+                        "mmap the chunkfile file:%s to memory is fail.",
+                        cf->chunkfile.filename);
+                spx_string_free(cf->chunkfile.filename);
+                SpxClose(cf->chunkfile.fd);
+                break;
+            }
+        }
+
+        if(dc->totalsize + cf->chunkfile.offset  > c->chunksize){
+            SpxLogFmt1(c->log,SpxLogDebug,
+                    "total:%lld,chunksize:%lld,offset:%lld.",dc->totalsize,
+                    c->chunksize,cf->chunkfile.offset);
+            SpxLogFmt1(c->log,SpxLogDebug,"close the file %s",
+                    cf->chunkfile.filename);
+            munmap(cf->chunkfile.mptr,c->chunksize);
+            cf->chunkfile.mptr = NULL;
+            SpxClose(cf->chunkfile.fd);
+            spx_string_free(cf->chunkfile.filename);
+            cf->chunkfile.offset = 0;
+            continue;//reopen a new file
+        }
+        break;
+    }
+    SpxLog1(c->log,SpxLogDebug,"return");
+    return err;
+}/*}}}*/
+
+
 

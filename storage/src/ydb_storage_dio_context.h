@@ -56,13 +56,14 @@ extern "C" {
 
         string_t groupname;// from configurtion
         string_t machineid;//same as above
+        string_t syncgroup;
         u64_t file_createtime;//if it is single file then the operator equ creattime
         u8_t mp_idx;
         u8_t p1;//path of level 1
         u8_t p2;//path of level 2
         u32_t tidx;
         u32_t rand;
-        bool_t issignalfile;
+        bool_t issinglefile;
         u64_t begin;
         bool_t has_suffix;
         string_t suffix;

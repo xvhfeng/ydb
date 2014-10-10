@@ -43,14 +43,15 @@ extern "C" {
     };
 
 
-
-    err_t ydb_storage_dio_mountpoint_init(struct ydb_storage_configurtion *c);
-
     err_t ydb_storage_dio_upload(struct ev_loop *loop,\
             struct ydb_storage_dio_context *dc);
 
 
+    err_t ydb_storage_dio_upload_to_chunkfile(
+            struct ydb_storage_dio_context *dc);
 
+    err_t ydb_storage_dio_upload_to_singlefile(
+            struct ydb_storage_dio_context *dc);
 #ifdef __cplusplus
 }
 #endif
