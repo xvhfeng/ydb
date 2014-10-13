@@ -57,13 +57,14 @@ int main(int argc,char **argv){
 
     string_t ifileid = NULL;
     byte_t *ibuf_rc = NULL;
+    byte_t *ibuf_rc1 = NULL;
     size_t ilen = 0;
 
     char *suffix = "png";
     char *groupname = "g001";
     char *host = "10.97.19.31:4150";
     char *filename = "1.png";
-    u32_t timeout = 30;
+    u32_t timeout = 300;
 
     struct stat buf;
     SpxZero(buf);
@@ -94,6 +95,10 @@ int main(int argc,char **argv){
     for (i = 0; i < 1000; ++i) {
         ifileid = ydb_client_upload(groupname,host,buff,filesize,suffix,timeout,&err);
         ibuf_rc = ydb_client_find(host,ifileid,&ilen,timeout,&err);
+        err = ydb_client_delete(host,ifileid,timeout);
+
+        ibuf_rc1 = ydb_client_find(host,ifileid,&ilen,timeout,&err);
+
         printf("%s \n",ifileid);
         snprintf(iname,256,"./img1/%d",i);
         int ifd = open(iname,O_RDWR|O_CREAT);
@@ -129,6 +134,9 @@ int main(int argc,char **argv){
         }
         if(NULL != ibuf_rc){
             SpxFree(ibuf_rc);
+        }
+        if(NULL != ibuf_rc1){
+            SpxFree(ibuf_rc1);
         }
     }
 

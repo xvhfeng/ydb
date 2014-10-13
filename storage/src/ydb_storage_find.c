@@ -239,6 +239,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
                 "the file in the chunkfile:%s "
                 "begin is %lld totalsize:%lld is deleted.",
                 dc->buf,dc->begin,dc->totalsize);
+        err = ENOENT;
         spx_msg_free(&ioctx);
         SpxClose(fd);
         munmap(mptr,len);
@@ -250,6 +251,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
             || dc->realsize != io_realsize){
         SpxLog2(dc->log,SpxLogError,err,\
                 "the file is not same as want to delete-file.");
+        err = ENOENT;
         spx_msg_free(&ioctx);
         SpxClose(fd);
         munmap(mptr,len);

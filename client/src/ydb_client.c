@@ -73,6 +73,14 @@ spx_private string_t ydb_client_upload_do(struct spx_host *s,
 spx_private byte_t *ydb_client_find_do(struct spx_host *s,
         string_t fileid,size_t *len,u32_t timeout,err_t *err);
 
+spx_private err_t ydb_client_delete_do(struct spx_host *s,
+        string_t fileid,u32_t timeout);
+
+spx_private string_t ydb_client_modify_do(struct spx_host *s,
+        char *fid,byte_t *buff,size_t len,
+        char *suffix,u32_t timeout,err_t *err);
+
+
 spx_private struct spx_host *ydb_client_query_storage_for_upload(
         char *groupname,struct spx_list *trackers,u32_t timeout,err_t *err){/*{{{*/
     if(NULL == groupname || NULL == trackers){
@@ -81,6 +89,11 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
     }
 
     struct spx_host *s = NULL;
+
+    s = spx_alloc_alone(sizeof(*s),err);
+    s->port = 8175;
+    s->ip = spx_string_new("10.97.19.31",err);
+    return s;
 
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
     if(NULL == qctx || 0 != *err){
@@ -210,6 +223,10 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
     }
 
     struct spx_host *s = NULL;
+    s = spx_alloc_alone(sizeof(*s),err);
+    s->port = 8175;
+    s->ip = spx_string_new("10.97.19.31",err);
+    return s;
 
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
     if(NULL == qctx || 0 != *err){
@@ -453,7 +470,6 @@ spx_private err_t ydb_client_free_tracker(void **arg){/*{{{*/
     return 0;
 }/*}}}*/
 
-
 string_t ydb_client_upload(char *groupname,char *hosts,
         byte_t *buff,size_t len,char *suffix,u32_t timeout,err_t *err){/*{{{*/
     if(NULL == groupname || 0 == strlen(groupname)){
@@ -610,7 +626,6 @@ r1:
    return fileid;
 }/*}}}*/
 
-
 byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,u32_t timeout,err_t *err){/*{{{*/
     if(NULL == hosts || 0 == strlen(hosts)){
         *err = EINVAL;
@@ -677,7 +692,6 @@ r1:
     }
     return buff;
 }/*}}}*/
-
 
 spx_private byte_t *ydb_client_find_do(struct spx_host *s,
         string_t fileid,size_t *len,u32_t timeout,err_t *err){/*{{{*/
@@ -770,26 +784,346 @@ r1:
    return buff;
 }/*}}}*/
 
+err_t ydb_client_delete(char *hosts,char *fileid,u32_t timeout){/*{{{*/
+    err_t err = 0;
+    if(NULL == hosts || 0 == strlen(hosts)){
+        err = EINVAL;
+        return err;
+    }
+    if(NULL == fileid || 0 == strlen(fileid)){
+        err = EINVAL;
+        return err;
+    }
 
-/*
-bool_t ydb_client_delete(char *groupname,char *hosts,char *fileid){
-return true;
-}
+    struct spx_list *trackers = NULL;
+    struct spx_host *s = NULL;
+    string_t groupname = NULL;
+    string_t machineid = NULL;
+    string_t syncgroup = NULL;
 
-string_t ydb_client_update(char *groupname,char *hosts,
-        byte_t *buff,size_t len,char *suffix){
-    return NULL;
-}
-*/
-void ydb_client_upload_free(string_t fileid){/*{{{*/
+    trackers = ydb_client_parser_trackers(hosts,&err);
+    if(NULL == trackers){
+        goto r1;
+    }
+
+    err =  ydb_client_parser_fileid(fileid,&groupname,&machineid,&syncgroup);
+    if(0 != err){
+        goto r1;
+    }
+
+//    s = spx_alloc_alone(sizeof(*s),err);
+//    s->ip = spx_string_new("10.97.19.31",err);
+//    s->port = 8175;
+    s = ydb_client_query_storage_for_operator(
+            YDB_TRACKER_QUERY_DELETE_STORAGE,
+            groupname,machineid,syncgroup,
+            trackers,timeout,&err);
+    if(NULL == s){
+        goto r1;
+    }
+
+    /*
+    s = spx_alloc_alone(sizeof(*s),err);
+    s->ip = spx_string_new("10.97.19.31",err);
+    s->port = 8175;
+    */
+
+    err = ydb_client_delete_do(s,fileid,timeout);
+r1:
+    if(NULL != trackers){
+        spx_list_free(&trackers);
+    }
+    if(NULL != s){
+        if(NULL != s->ip){
+            spx_string_free(s->ip);
+        }
+        SpxFree(s);
+    }
+    if(NULL != groupname){
+        spx_string_free(groupname);
+    }
+    if(NULL != machineid){
+        spx_string_free(machineid);
+    }
+    if(NULL != syncgroup){
+        spx_string_free(syncgroup);
+    }
+    return err;
+}/*}}}*/
+
+spx_private err_t ydb_client_delete_do(struct spx_host *s,
+        string_t fileid,u32_t timeout){/*{{{*/
+    err_t err = 0;
+    struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),&err);
+    if(NULL == qctx || 0 != err){
+        return err;
+    }
+
+    int fd = 0;
+    struct spx_msg_header *pheader = NULL;
+    struct spx_msg *pbody = NULL;
+
+    struct spx_msg_header *qheader = spx_alloc_alone(sizeof(*qheader),&err);
+    if(NULL == qheader || 0 != err){
+        goto r1;
+    }
+    qctx->header = qheader;
+
+    struct spx_msg *qbody = spx_msg_new(spx_string_len(fileid),&err);
+    if(NULL == qbody || 0 != err){
+        goto r1;
+    }
+    qctx->body = qbody;
+
+    qheader->protocol = YDB_STORAGE_DELETE;
+    qheader->version = YDB_CLIENT_VERSION;
+    qheader->bodylen = spx_string_len(fileid);
+    qheader->offset = 0;
+    spx_msg_pack_string(qbody,fileid);
+
+    fd = spx_socket_new(&err);
+    if(0 >= fd || 0 != err){
+    }
+    spx_set_nb(fd);
+    err =  spx_socket_set(fd,true,30,3,30,false,0,true,true,30);
+    if(0 != err){
+        goto r1;
+    }
+    err = spx_socket_connect_nb(fd,s->ip,s->port,30);
+    if(0 != err){
+        goto r1;
+    }
+    err = spx_write_context(NULL,fd,qctx);
+    if(0 != err){
+        goto r1;
+    }
+
+    if(!spx_socket_ready_read(fd,timeout)){
+        err = EBUSY;
+        goto r1;
+    }
+
+    pheader = spx_read_header(NULL,fd,&err);
+    if(NULL == pheader){
+        goto r1;
+    }
+    if( YDB_STORAGE_DELETE != pheader->protocol){
+        err = EPERM;
+        goto r1;
+    }
+    err =  pheader->err;
+r1:
+    if(NULL != qctx){
+        if(NULL != qctx->header){
+            SpxFree(qctx->header);
+        }
+        if(NULL != qctx->body){
+            SpxFree(qctx->body);
+        }
+        SpxFree(qctx);
+    }
+    if(0 < fd){
+        SpxClose(fd);
+    }
+    if(NULL != pheader){
+        SpxFree(pheader);
+    }
+    if(NULL != pbody){
+        SpxFree(pbody);
+    }
+
+   return err;
+}/*}}}*/
+
+string_t ydb_client_modify(char *hosts,char *ofid,
+        byte_t *buff,size_t len,
+        char *suffix,u32_t timeout,err_t *err){/*{{{*/
+     if(NULL == hosts || 0 == strlen(hosts)){
+        *err = EINVAL;
+        return NULL;
+    }
+    if(NULL == ofid || 0 == strlen(ofid)){
+        *err = EINVAL;
+        return NULL;
+    }
+
+    string_t sofid = spx_string_new(ofid,err);
+    struct spx_list *trackers = NULL;
+    struct spx_host *s = NULL;
+    string_t groupname = NULL;
+    string_t machineid = NULL;
+    string_t syncgroup = NULL;
+    string_t fid = NULL;
+
+    trackers = ydb_client_parser_trackers(hosts,err);
+    if(NULL == trackers){
+        goto r1;
+    }
+
+    *err =  ydb_client_parser_fileid(sofid,&groupname,&machineid,&syncgroup);
+    if(0 != *err){
+        goto r1;
+    }
+
+//    s = spx_alloc_alone(sizeof(*s),err);
+//    s->ip = spx_string_new("10.97.19.31",err);
+//    s->port = 8175;
+    s = ydb_client_query_storage_for_operator(
+            YDB_TRACKER_QUERY_SELECT_STORAGE,
+            groupname,machineid,syncgroup,
+            trackers,timeout,err);
+    if(NULL == s){
+        goto r1;
+    }
+
+    /*
+    s = spx_alloc_alone(sizeof(*s),err);
+    s->ip = spx_string_new("10.97.19.31",err);
+    s->port = 8175;
+    */
+
+    fid = ydb_client_modify_do(s,ofid,buff,len,suffix,timeout,err);
+r1:
+    if(NULL != trackers){
+        spx_list_free(&trackers);
+    }
+    if(NULL != s){
+        if(NULL != s->ip){
+            spx_string_free(s->ip);
+        }
+        SpxFree(s);
+    }
+    if(NULL != groupname){
+        spx_string_free(groupname);
+    }
+    if(NULL != machineid){
+        spx_string_free(machineid);
+    }
+    if(NULL != syncgroup){
+        spx_string_free(syncgroup);
+    }
+    if(NULL != sofid){
+        spx_string_free(sofid);
+    }
+    return fid;
+}/*}}}*/
+
+spx_private string_t ydb_client_modify_do(struct spx_host *s,
+        string_t ofid,byte_t *buff,size_t len,
+        char *suffix,u32_t timeout,err_t *err){/*{{{*/
+    struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
+    if(NULL == qctx || 0 != *err){
+        return NULL;
+    }
+
+    string_t fid = NULL;
+    int fd = 0;
+    struct spx_msg_header *pheader = NULL;
+    struct spx_msg *pbody = NULL;
+
+    struct spx_msg_header *qheader = spx_alloc_alone(sizeof(*qheader),err);
+    if(NULL == qheader || 0 != *err){
+        goto r1;
+    }
+    qctx->header = qheader;
+
+    if(NULL == suffix || 0 == strlen(suffix)){
+        qheader->offset =sizeof(u32_t) + spx_string_len(ofid)
+            + SpxBoolTransportSize;
+    } else {
+        qheader->offset =sizeof(u32_t) + spx_string_len(ofid)
+            + SpxBoolTransportSize + YDB_FILENAME_SUFFIX_SIZE;
+    }
+    qheader->bodylen = qheader->offset + len;
+    struct spx_msg *qbody = spx_msg_new(qheader->bodylen,err);
+    if(NULL == qbody || 0 != *err){
+        goto r1;
+    }
+    qctx->body = qbody;
+
+    qheader->protocol = YDB_STORAGE_MODIFY;
+    spx_msg_pack_u32(qbody,spx_string_len(ofid));
+    spx_msg_pack_string(qbody,ofid);
+    qheader->version = YDB_CLIENT_VERSION;
+    if(NULL == suffix || 0 == strlen(suffix)){
+        spx_msg_pack_false(qbody);
+    } else {
+        spx_msg_pack_true(qbody);
+        spx_msg_pack_fixed_chars(qbody,suffix,YDB_FILENAME_SUFFIX_SIZE);
+    }
+
+    spx_msg_pack_ubytes(qbody,(ubyte_t *)buff,len);
+
+    fd = spx_socket_new(err);
+    if(0 >= fd || 0 != *err){
+    }
+    spx_set_nb(fd);
+    *err =  spx_socket_set(fd,true,30,3,30,false,0,true,true,30);
+    if(0 != *err){
+        goto r1;
+    }
+    *err = spx_socket_connect_nb(fd,s->ip,s->port,30);
+    if(0 != *err){
+        goto r1;
+    }
+    *err = spx_write_context(NULL,fd,qctx);
+    if(0 != *err){
+        goto r1;
+    }
+
+    if(!spx_socket_ready_read(fd,timeout)){
+        *err = EBUSY;
+        SpxClose(fd);
+        goto r1;
+    }
+
+    pheader = spx_read_header(NULL,fd,err);
+    if(NULL == pheader){
+        goto r1;
+    }
+    if(0 != pheader->err || 0 == pheader->bodylen){
+        goto r1;
+    }
+    pbody = spx_read_body_nb(NULL,fd,pheader->bodylen,err);
+    if(NULL == pbody){
+        goto r1;
+    }
+    if(0 == spx_msg_len(pbody)){
+        goto r1;
+    }
+    fid = spx_msg_unpack_string(pbody,pheader->bodylen,err);
+r1:
+    if(NULL != qctx){
+        if(NULL != qctx->header){
+            SpxFree(qctx->header);
+        }
+        if(NULL != qctx->body){
+            SpxFree(qctx->body);
+        }
+        SpxFree(qctx);
+    }
+    if(0 < fd){
+        SpxClose(fd);
+    }
+    if(NULL != pheader){
+        SpxFree(pheader);
+    }
+    if(NULL != pbody){
+        SpxFree(pbody);
+    }
+    return fid;
+}/*}}}*/
+
+void ydb_client_fileid_free(string_t fileid){/*{{{*/
     if(NULL == fileid) return;
     spx_string_free(fileid);
 }/*}}}*/
 
-void ydb_client_find_free(byte_t **buff){/*{{{*/
+void ydb_client_buffer_free(byte_t **buff){/*{{{*/
     if(NULL != buff) return;
     if(NULL != *buff){
         SpxFree(*buff);
     }
 }/*}}}*/
+
 

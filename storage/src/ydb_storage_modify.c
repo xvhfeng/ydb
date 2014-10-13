@@ -105,7 +105,6 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
     TypeConvert(struct ydb_storage_dio_context *,dc,w->data);
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
-    //    struct ydb_storage_storefile *sf = dc->storefile;
 
     string_t ofid = NULL;
     string_t o_fname = NULL;
