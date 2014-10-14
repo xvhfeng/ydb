@@ -378,7 +378,7 @@ err_t ydb_storage_dio_upload_to_chunkfile(
                         : dc->realsize - writebytes;
             err = spx_read_nb(jc->fd,(byte_t *) dc->buf,recvbytes,&len);
             if(0 != err || recvbytes != len){
-                SpxLogFmt2(dc->log,SpxLogError,err,\
+                SpxLogFmt2(dc->log,SpxLogError,err,
                         "lazy read buffer and cp to mmap is fail."
                         "recvbytes:%lld,real recvbytes:%lld."
                         "writedbytes:%lld,total size:%lld.",

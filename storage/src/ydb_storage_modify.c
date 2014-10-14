@@ -400,6 +400,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
             }
         }
     }/*}}}*/
+    goto r2;
 r1:
 
     if(NULL != o_groupname){
@@ -553,6 +554,7 @@ spx_private void ydb_storage_do_modify_to_singlefile(
                 "modify context convert upload is fail.");
         goto r1;
     }
+
     if(0 != (err = ydb_storage_modify_after(dc))){
         SpxLog2(dc->log,SpxLogError,err,
                 "make response for modify is fail.");
@@ -785,7 +787,7 @@ spx_private err_t ydb_storage_modify_after(
     string_t fid =  ydb_storage_dio_make_fileid(c->log,
             c->groupname,c->machineid,c->syncgroup,
             dc->issinglefile,dc->mp_idx,dc->p1,dc->p2,
-            cf->tidx,dc->file_createtime,dc->rand,
+            dc->tidx,dc->file_createtime,dc->rand,
             dc->begin,dc->realsize,dc->totalsize,
             dc->ver,dc->opver,dc->lastmodifytime,
             dc->hashcode,dc->has_suffix,dc->suffix,

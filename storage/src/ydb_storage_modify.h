@@ -1,4 +1,3 @@
-
 /*
  * =====================================================================================
  *
@@ -13,7 +12,25 @@
  *
  * =====================================================================================
  */
+#ifndef _YDB_STORAGE_MODIFY_H_
+#define _YDB_STORAGE_MODIFY_H_
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <ev.h>
 
+#include "spx_types.h"
+#include "ydb_storage_dio_context.h"
+
+
+err_t ydb_storage_dio_modify(struct ev_loop *loop,\
+        struct ydb_storage_dio_context *dc);
+
+#ifdef __cplusplus
+}
+#endif
+#endif

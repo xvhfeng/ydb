@@ -28,6 +28,7 @@
 #include "spx_path.h"
 #include "spx_message.h"
 #include "spx_atomic.h"
+#include "spx_time.h"
 
 #include "ydb_protocol.h"
 
@@ -271,7 +272,7 @@ err_t ydb_storage_dio_parser_fileid(SpxLogDelegate *log,
                 }
             case 14://opver
                 {
-                    *opver = (u32_t) atol(*fids + i);
+                    *opver = (u32_t) atol(*(fids + i));
                     break;
                 }
             case 15://lastmodifytime
@@ -572,7 +573,7 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
     err_t err = 0;
     while(true) {
         if(0 == cf->chunkfile.fd){
-            cf->chunkfile.fcreatetime = dc->createtime;
+            cf->chunkfile.fcreatetime = spx_now();
             int count = SpxAtomicIncr(&(
                         g_ydb_storage_runtime->chunkfile_count));
             SpxAtomicCas(&(g_ydb_storage_runtime->chunkfile_count),10000,0);

@@ -60,15 +60,18 @@ int main(int argc,char **argv){
     byte_t *ibuf_rc1 = NULL;
     size_t ilen = 0;
 
-    char *suffix = "png";
+    char *suffix = "jpg";
     char *groupname = "g001";
     char *host = "10.97.19.31:4150";
-    char *filename = "1.png";
+//    char *filename = "3.jpg";
+//    char *rfilename = "2.jpg";
+    char *filename = "4.jpg";
+    char *rfilename = "5.jpg";
     u32_t timeout = 300;
 
     struct stat buf;
     SpxZero(buf);
-    lstat("1.png",&buf);
+    lstat(filename,&buf);
     size_t filesize = buf.st_size;
 
     byte_t *buff = spx_alloc_alone(filesize,&err);
@@ -89,15 +92,36 @@ int main(int argc,char **argv){
     }
     close(fd);
 
+    SpxZero(buf);
+    lstat(rfilename,&buf);
+    size_t rfilesize = buf.st_size;
+    byte_t *rbuff = spx_alloc_alone(rfilesize,&err);
+    if(NULL == rbuff){
+        printf("error!!.");
+        return 0;
+    }
+    int rfd = open(rfilename,O_RDWR);
+    if(0 >= rfd){
+        printf("open rfilename is fail.");
+        return 0;
+    }
+
+    size_t rrecvbytes = 0;
+    err = spx_read(rfd,rbuff,rfilesize,&rrecvbytes);
+    if(0 != err || rrecvbytes != rfilesize){
+        printf("read file bytes is fail.");
+        return 0;
+    }
+    close(rfd);
+
     int i = 0;
     char iname[256] = {0};
     char tname[256] = {0};
+    string_t irfid = NULL;
     for (i = 0; i < 1000; ++i) {
         ifileid = ydb_client_upload(groupname,host,buff,filesize,suffix,timeout,&err);
         ibuf_rc = ydb_client_find(host,ifileid,&ilen,timeout,&err);
-        err = ydb_client_delete(host,ifileid,timeout);
-
-        ibuf_rc1 = ydb_client_find(host,ifileid,&ilen,timeout,&err);
+//        err = ydb_client_delete(host,ifileid,timeout);
 
         printf("%s \n",ifileid);
         snprintf(iname,256,"./img1/%d",i);
@@ -109,10 +133,14 @@ int main(int argc,char **argv){
         close(ifd);
         memset(iname,0,256);
 
-        tfileid = ydb_client_upload(groupname,host,buff,filesize,NULL,timeout,&err);
+//        tfileid = ydb_client_upload(groupname,host,buff,filesize,NULL,timeout,&err);
+//        tbuf_rc = ydb_client_find(host,tfileid,&tlen,timeout,&err);
+
+        tfileid = ydb_client_modify(host,ifileid,rbuff,rfilesize,suffix,timeout,&err);
         tbuf_rc = ydb_client_find(host,tfileid,&tlen,timeout,&err);
-        printf("%s \n",tfileid);
-        snprintf(tname,256,"./img2/%d",i);
+
+        printf("%s \n",irfid);
+        snprintf(tname,256,"./img1/%d_r",i);
         int tfd = open(tname,O_RDWR|O_CREAT);
         if(0 > tfd){
             err = errno;

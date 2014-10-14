@@ -24,6 +24,7 @@
 #include "spx_task_module.h"
 #include "spx_network_module.h"
 #include "spx_io.h"
+#include "spx_alloc.h"
 
 #include "ydb_protocol.h"
 
@@ -84,6 +85,10 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
             }
         case (YDB_STORAGE_MODIFY):
             {
+                if(0 != (err = ydb_storage_dio_modify(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,
+                            "modify file is fail.");
+                }
                 break;
             }
         case (YDB_STORAGE_DELETE):
@@ -97,6 +102,30 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
         default:{
                     SpxLog1(jc->log,SpxLogWarn,
                             "no the protocol for operation.");
+                    spx_task_pool_push(g_spx_task_pool,dc->tc);
+                    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+
+                    jc->writer_header = (struct spx_msg_header *)
+                        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+                    if(NULL == jc->writer_header){
+                        SpxLog2(jc->log,SpxLogError,err,\
+                                "dispatch network module is fail,"
+                                "and push jcontext to pool force.");
+                        spx_job_pool_push(g_spx_job_pool,jc);
+                        return err;
+                    }
+                    jc->writer_header->protocol = jc->reader_header->protocol;
+                    jc->writer_header->bodylen = 0;
+                    jc->writer_header->version = YDB_VERSION;
+                    jc->writer_header->err = EACCES;
+
+                    jc->moore = SpxNioMooreResponse;
+                    size_t idx = spx_network_module_wakeup_idx(jc);
+                    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+                    jc->tc = threadcontext;
+                    err = spx_module_dispatch(threadcontext,
+                            spx_network_module_wakeup_handler,jc);
+
                     break;
                 }
     }
