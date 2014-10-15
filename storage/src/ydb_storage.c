@@ -211,14 +211,12 @@ int main(int argc,char **argv){
 
 
 
-    /*
     pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,mainloop,c->timeout,c,&err);
     if(0 == heartbeat_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new heartbeat thread is fail.");
         return err;
     }
-    */
 
     pthread_t socket_tid =  ydb_storage_mainsocket_thread_new(log,c,&err);
     if(0 == socket_tid && 0 != err){
