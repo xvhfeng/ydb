@@ -63,7 +63,7 @@ int main(int argc,char **argv){
     string_t confname = spx_string_new(argv[1],&err);
     if(NULL == confname){
         SpxLog2(log,SpxLogError,err,"alloc the confname is fail.");
-        return err;
+        abort();
     }
 
     struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) \
@@ -75,7 +75,7 @@ int main(int argc,char **argv){
                                                  &err);
     if(NULL == c || 0 != err){
         SpxLogFmt2(log,SpxLogError,err,"parser the configurtion is fail.file name:%s.",confname);
-        return err;
+        abort();
     }
 
     if(c->daemon){
@@ -104,14 +104,14 @@ int main(int argc,char **argv){
                     c->logsize,\
                     c->loglevel))){
         SpxLog2(log,SpxLogError,err,"init the logger is fail.");
-        return err;
+        abort();
     }
 
     g_ydb_storage_runtime = ydb_storage_runtime_init(mainloop,log,c,&err);
     if(NULL == g_ydb_storage_runtime || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "init storage runtime is fail.");
-        return err;
+        abort();
     }
 
     g_ydb_storage_runtime->status = YDB_STORAGE_INITING;
@@ -119,7 +119,7 @@ int main(int argc,char **argv){
     if(0 != (err = ydb_storage_dio_mountpoint_init(c))){
         SpxLog2(log,SpxLogError,err,
                 "init mountpoint store is fail.");
-        return err;
+        abort();
     }
 
     g_ydb_storage_storefile_pool =
@@ -127,7 +127,7 @@ int main(int argc,char **argv){
     if(NULL == g_ydb_storage_storefile_pool || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storefile pool is fail,");
-        return err;
+        abort();
     }
 
     g_ydb_storage_dio_pool =
@@ -135,14 +135,14 @@ int main(int argc,char **argv){
     if(NULL == g_ydb_storage_dio_pool || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storage dio pool is fail.");
-        return err;
+        abort();
     }
 
     g_ydb_storage_binlog = ydb_storage_binlog_new(log,c,c->basepath,c->machineid);
     if(NULL == g_ydb_storage_binlog || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storage binlog is fail.");
-        return err;
+        abort();
     }
 
     g_spx_job_pool = spx_job_pool_new(log,\
@@ -160,7 +160,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_job_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc job pool is fail.");
-        return err;
+        abort();
     }
 
     g_spx_task_pool = spx_task_pool_new(log,\
@@ -170,7 +170,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_task_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc task pool is fail.");
-        return err;
+        abort();
     }
 
     g_spx_notifier_module = spx_module_new(log,\
@@ -182,7 +182,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_notifier_module){
         SpxLog2(log,SpxLogError,err,\
                 "new notifier module is fail.");
-        return err;
+        abort();
     }
 
     g_spx_network_module = spx_module_new(log,\
@@ -194,7 +194,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_network_module){
         SpxLog2(log,SpxLogError,err,\
                 "new network module is fail.");
-        return err;
+        abort();
     }
 
     g_spx_task_module = spx_module_new(log,\
@@ -206,7 +206,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_task_module){
         SpxLog2(log,SpxLogError,err,\
                 "new task module is fail.");
-        return err;
+        abort();
     }
 
 
@@ -215,13 +215,13 @@ int main(int argc,char **argv){
     if(0 == heartbeat_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new heartbeat thread is fail.");
-        return err;
+        abort();
     }
 
     pthread_t socket_tid =  ydb_storage_mainsocket_thread_new(log,c,&err);
     if(0 == socket_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
-        return err;
+        abort();
     }
 
     //if have maneger code please input here

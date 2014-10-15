@@ -59,7 +59,7 @@ int main(int argc,char **argv){
     string_t confname = spx_string_new(argv[1],&err);
     if(NULL == confname){
         SpxLog2(log,SpxLogError,err,"alloc the confname is fail.");
-        return err;
+        abort();
     }
 
     struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) \
@@ -71,7 +71,7 @@ int main(int argc,char **argv){
                                                  &err);
     if(NULL == c){
         SpxLogFmt2(log,SpxLogError,err,"parser the configurtion is fail.file name:%s.",confname);
-        return err;
+        abort();
     }
 
     if(c->daemon){
@@ -85,7 +85,7 @@ int main(int argc,char **argv){
                     c->logsize,\
                     c->loglevel))){
         SpxLog2(log,SpxLogError,err,"init the logger is fail.");
-        return err;
+        abort();
     }
 
     struct ev_loop *mainloop = NULL;
@@ -113,7 +113,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_job_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc job pool is fail.");
-        return err;
+        abort();
     }
 
     g_spx_task_pool = spx_task_pool_new(log,\
@@ -123,7 +123,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_task_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc task pool is fail.");
-        return err;
+        abort();
     }
 
     g_spx_notifier_module = spx_module_new(log,\
@@ -135,7 +135,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_notifier_module){
         SpxLog2(log,SpxLogError,err,\
                 "new notifier module is fail.");
-        return err;
+        abort();
     }
 
     g_spx_network_module = spx_module_new(log,\
@@ -147,7 +147,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_network_module){
         SpxLog2(log,SpxLogError,err,\
                 "new network module is fail.");
-        return err;
+        abort();
     }
 
     g_spx_task_module = spx_module_new(log,\
@@ -159,14 +159,14 @@ int main(int argc,char **argv){
     if(NULL == g_spx_task_module){
         SpxLog2(log,SpxLogError,err,\
                 "new task module is fail.");
-        return err;
+        abort();
     }
 
 
     pthread_t tid =  ydb_tracker_mainsocket_thread_new(log,c,&err);
     if(0 != err){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
-        return err;
+        abort();
     }
 
     //if have maneger code please input here
