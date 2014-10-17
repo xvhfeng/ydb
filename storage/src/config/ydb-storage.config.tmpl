@@ -1,0 +1,175 @@
+ip=10.97.19.31
+port=8175
+timeout=30
+
+#run by daemon
+#value is true or false
+daemon=true
+stacksize=128KB
+
+heartbeat = 30
+
+network_module_thread_size = 16
+notifier_module_thread_size = 8
+task_module_thread_size=5
+
+#the operator means the job context and task context size
+#job context size must equal task context size
+context_size=64
+
+basepath=/opt/ydb/storage/
+
+logpath=/opt/ydb/storage/log/
+logprefix=ydb-storage
+
+#unit KB MB GB
+logsize=10mb
+
+# Debug 
+# Info 
+# Warn 
+# Error 
+# Mark 
+loglevel=Debug
+
+binlog_size = 4GB
+
+runtime_flush_timespan = 60
+
+tracker=10.97.19.31:4150
+
+#the storage's group
+#in the same group,it will sync data
+groupname=g001
+
+#the storage's id
+#this id is must unqine in the group
+machineid=m001
+
+#the disk io threads count
+#dio_thread_size = 4
+#dio_context_size = 1000
+
+#the data mount point
+#256 mount points must be supported per storage
+#so max mp is mpFF
+#note:the mount point free size is use to single disk sync
+# so the best way for the mount point is that config it to the single mount point 
+# and avoid task over the disk by temp file
+# warn:the mountpoint must exist when the storage starting
+mp00=/opt/ydb/data/
+#mpFF=/opt/ydb/data/
+
+#the mount point balance mode
+#loop:loop the all mount point
+#maxdisk:found the max free  disk
+#turn:all the mount point in turn
+#master:specifies the mount point by master
+balance=loop
+
+#style as mount point key
+#if balance is not master,this config item is unuseful
+master=mp00
+
+#the limit for the mount point min free disk size
+freedisk=4GB
+
+#the store path dir count
+#the max value is 256
+storerooms=64
+
+#if storemode is turn,then this value is useful
+#it means store times
+storecount=100
+
+#the operator is means whether fill the chunkfile if chunkfile has
+#hold by deleting
+#if the value is true,then fill the chunkfile when insert file or 
+#modify the context but the length is more than old size
+fillchunk=false
+
+#the operatot means the hole idx refresh to disk mode
+#the value is repeat is means refresh disk by time interval
+#the value is fixed is means begin refresh disk by fixed time
+#note: the operator enable when fillchunk is true
+holerefresh=fixed
+
+#the operator means the time interval when holerefresh is repeat
+#if holerefresh is fixed, the operator means the fixed time every day
+#if holerefrsh is repeat,the operator means the time stamp
+#note: the operator enable when fillchunk is true
+refreshtime=04:00
+
+#this value means the file context whether compressd by zip
+#if the value is true,enable the switch and must use the zip lib
+compress=false
+
+#the operator means whether enable the chunk file to store buffer
+chunkfile=true
+
+#this operator is the chunkfile size
+#when chunkfile is true,the operator is enable only
+chunksize=64MB
+
+#the single file min size
+#if the file or context size is more than single min 
+#then save it with single file no matter whether the context is the part of
+#the file
+#and the operator must less then chunksize
+singlemin=5mb
+
+#the operator means when store the buffer use disk size 
+# is more than the real buffer size
+# if your app must support for modify and it very frequent
+# pelase open the operator and set the oversize by your real time
+overload=true
+
+# the operator value maybe is relative value　or the absolute value
+# and the operator is useful only when overload is true
+oversize=20%
+
+#the operator means when recv the context buffer
+#if the value is true,then recv the header buffer and the body buffer of
+#protocol control,the file buffer is recving by the writing
+#if the value is false,recv the header buffer and the body buffer of the
+#protocol control and file buffer all to memory 
+lazyrecv = true
+
+#the operator is the min lazy size
+#if lazyrecv is true and recv context size is more than lazyszie
+#then use the lazyrecv
+lazysize = 1MB
+
+#the operator means whether use "sendfile" function to send file context
+sendfile=true
+
+#note:the operator is very import
+#it useful for syncing,when the storage has same syncgroup
+#they are syncing together,so the storages with the same syncgroup
+#is the whole sync
+#if the storage has the same groupname but has not the same syncgroup
+#they are not syncing together.
+syncgroup = s001
+
+#the operator is the max value of syncing storage with some syncgroup
+#it is just the max numbs of storages in the same syncgroup
+sync_threads = 3
+
+#sync
+#value is realtime fixed
+sync=realtime
+
+#the timespan for querying tracker to sync
+#so if you want to check the sync,
+#the max value of timespan is heartbeat + query_sync_timespan
+#usally is 60 seconds.
+query_sync_timespan = 30
+
+#the operator is the timespan for the syncing next times
+#it can use for limit sync speed
+#this operator unit is second
+#but this operator is only useful with realtime sync
+sync_wait = 1
+
+begin=00:00
+end=04:00

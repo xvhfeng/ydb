@@ -32,6 +32,7 @@ struct mainsocket_thread_arg{
     struct ydb_storage_configurtion *c;
 };
 
+spx_private struct ev_loop *main_socket_loop = NULL;
 spx_private void *ydb_storage_mainsocket_create(void *arg);
 
 pthread_t ydb_storage_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err){
@@ -68,6 +69,11 @@ spx_private void *ydb_storage_mainsocket_create(void *arg){
     struct ydb_storage_configurtion *c= mainsocket_arg->c;
     SpxFree(mainsocket_arg);
     err_t err = 0;
+    main_socket_loop = ev_loop_new(0);
+    if(NULL == main_socket_loop){
+        SpxLog2(log,SpxLogError,err,"create main socket loop is fail.");
+        return NULL;
+    }
     int mainsocket =  spx_socket_new(&err);
     if(0 == mainsocket){
         SpxLog2(log,SpxLogError,err,"create main socket is fail.");
@@ -90,7 +96,7 @@ spx_private void *ydb_storage_mainsocket_create(void *arg){
         goto r1;
     }
 
-    spx_socket_accept_nb(c->log,mainsocket);
+    spx_socket_accept_nb(c->log,main_socket_loop,mainsocket);
 r1:
     SpxClose(mainsocket);
     return NULL;
