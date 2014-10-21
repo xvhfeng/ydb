@@ -126,9 +126,10 @@ struct ydb_tracker{
         u32_t query_sync_timespan;
         string_t syncgroup;
         u32_t sync_wait;
-        u32_t sync_threads;
         struct spx_time sync_begin;
         struct spx_time sync_end;
+        u32_t disksync_timespan;
+        u64_t disksync_busysize;
     };
 
     void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err);

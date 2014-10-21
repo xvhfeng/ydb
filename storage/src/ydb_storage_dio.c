@@ -86,7 +86,7 @@ err_t ydb_storage_dio_mountpoint_init(struct ydb_storage_configurtion *c){/*{{{*
         }
     }
 r1:
-    spx_string_free(path);
+    SpxStringFree(path);
     return err;
 }/*}}}*/
 
@@ -607,14 +607,14 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
                 SpxLogFmt2(c->log,SpxLogError,err,\
                         "open chunkfile is fail.",
                         cf->chunkfile.filename);
-                spx_string_free(cf->chunkfile.filename);
+                SpxStringFree(cf->chunkfile.filename);
                 break;
             }
             if(0 != (err = ftruncate(cf->chunkfile.fd,c->chunksize))){
                 SpxLogFmt2(c->log,SpxLogError,err,\
                         "truncate chunkfile:%s to size:%lld is fail.",
                         cf->chunkfile.filename,c->chunksize);
-                spx_string_free(cf->chunkfile.filename);
+                SpxStringFree(cf->chunkfile.filename);
                 SpxClose(cf->chunkfile.fd);
                 break;
             }
@@ -626,7 +626,7 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
                 SpxLogFmt2(c->log,SpxLogError,err,\
                         "mmap the chunkfile file:%s to memory is fail.",
                         cf->chunkfile.filename);
-                spx_string_free(cf->chunkfile.filename);
+                SpxStringFree(cf->chunkfile.filename);
                 SpxClose(cf->chunkfile.fd);
                 break;
             }
@@ -641,7 +641,7 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
             munmap(cf->chunkfile.mptr,c->chunksize);
             cf->chunkfile.mptr = NULL;
             SpxClose(cf->chunkfile.fd);
-            spx_string_free(cf->chunkfile.filename);
+            SpxStringFree(cf->chunkfile.filename);
             cf->chunkfile.offset = 0;
             continue;//reopen a new file
         }

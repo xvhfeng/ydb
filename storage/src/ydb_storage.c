@@ -90,12 +90,6 @@ int main(int argc,char **argv){
         abort();
     }
     ydb_storage_regedit_signal(mainloop);
-    bool_t rc = ev_run(mainloop,EVRUN_NOWAIT);
-    if(rc){
-        printf("ok");
-    }else {
-        printf("error.");
-    }
 
     if(0 != ( err = spx_log_new(\
                     log,\
@@ -138,7 +132,8 @@ int main(int argc,char **argv){
         abort();
     }
 
-    g_ydb_storage_binlog = ydb_storage_binlog_new(log,c,c->basepath,c->machineid);
+    g_ydb_storage_binlog = ydb_storage_binlog_new(log,c->basepath,
+            c->machineid,&err);
     if(NULL == g_ydb_storage_binlog || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storage binlog is fail.");
@@ -223,6 +218,11 @@ int main(int argc,char **argv){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
         abort();
     }
+
+    g_ydb_storage_runtime->status = YDB_STORAGE_DSYNCING;
+
+
+    g_ydb_storage_runtime->status = YDB_STORAGE_CSYNCING;
 
     //if have maneger code please input here
 //    sleep(10);//wait main socket thread

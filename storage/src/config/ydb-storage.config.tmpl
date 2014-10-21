@@ -1,13 +1,20 @@
 ip=10.97.19.31
 port=8175
-timeout=30
+
+# the time or timespan unit support with blow:
+# s/S means second
+# m/M means minute
+# h/H means hour
+# d/D means day
+# if the config use time or timespan,then allways use the units
+timeout=30s
 
 #run by daemon
 #value is true or false
 daemon=true
 stacksize=128KB
 
-heartbeat = 30
+heartbeat = 30s
 
 network_module_thread_size = 16
 notifier_module_thread_size = 8
@@ -34,7 +41,7 @@ loglevel=Debug
 
 binlog_size = 4GB
 
-runtime_flush_timespan = 60
+runtime_flush_timespan = 60s
 
 tracker=10.97.19.31:4150
 
@@ -151,9 +158,6 @@ sendfile=true
 #they are not syncing together.
 syncgroup = s001
 
-#the operator is the max value of syncing storage with some syncgroup
-#it is just the max numbs of storages in the same syncgroup
-sync_threads = 3
 
 #sync
 #value is realtime fixed
@@ -163,13 +167,20 @@ sync=realtime
 #so if you want to check the sync,
 #the max value of timespan is heartbeat + query_sync_timespan
 #usally is 60 seconds.
-query_sync_timespan = 30
+query_sync_timespan = 30s
 
 #the operator is the timespan for the syncing next times
 #it can use for limit sync speed
 #this operator unit is second
 #but this operator is only useful with realtime sync
-sync_wait = 1
+sync_wait = 1s
+
+# the new mountpoint's init time is later than remote storage's mountpoint
+disksync_timespan=1d
+
+# the new mountpoint's used disk size is larger than remote stirage's
+# mountpoint
+disksync_usedsize=512mb
 
 begin=00:00
 end=04:00

@@ -23,13 +23,13 @@
 
 
 #include "spx_types.h"
-#include "spx_queue.h"
 #include "spx_defs.h"
 #include "spx_alloc.h"
 #include "spx_string.h"
 #include "spx_io.h"
 #include "spx_path.h"
 #include "spx_time.h"
+#include "spx_thread.h"
 
 
 #include "ydb_storage_configurtion.h"
@@ -38,19 +38,8 @@
 
 struct ydb_storage_binlog *g_ydb_storage_binlog = NULL;
 
-spx_private err_t ydb_storage_binlog_node_free(void **arg);
 spx_private err_t ydb_storage_binlog_open(struct ydb_storage_binlog *binlog);
 spx_private err_t ydb_storage_binlog_reopen(struct ydb_storage_binlog *binlog);
-spx_private void ydb_storage_do_binlog (struct ev_loop *loop, ev_async *w, int revents);
-spx_private void *ydb_storage_binlog_thread_listening(void *arg);
-
-spx_private err_t ydb_storage_binlog_node_free(void **arg){/*{{{*/
-    string_t *s = (string_t *) arg;
-    if(NULL != s){
-        spx_string_free(*s);
-    }
-    return 0;
-}/*}}}*/
 
 spx_private err_t ydb_storage_binlog_reopen(struct ydb_storage_binlog *binlog){/*{{{*/
     if(NULL != binlog->fp){
@@ -58,7 +47,7 @@ spx_private err_t ydb_storage_binlog_reopen(struct ydb_storage_binlog *binlog){/
         fclose(binlog->fp);
         binlog->off = 0;
         if(NULL != binlog->filename) {
-            spx_string_free(binlog->filename);
+            SpxStringFree(binlog->filename);
         }
     }
 
@@ -67,6 +56,7 @@ spx_private err_t ydb_storage_binlog_reopen(struct ydb_storage_binlog *binlog){/
     if(NULL == binlog->filename){
         SpxLog2(binlog->log,SpxLogError,binlog->err,
                 "make binlog filename is fail.");
+        return binlog->err;
     }
 
     binlog->fp = fopen(binlog->filename,"a+");
@@ -75,9 +65,10 @@ spx_private err_t ydb_storage_binlog_reopen(struct ydb_storage_binlog *binlog){/
         SpxLogFmt2(binlog->log,SpxLogError,binlog->err,\
                 "open binlog file:%s is fail.",\
                 binlog->filename);
-        spx_string_free(binlog->filename);
+        SpxStringFree(binlog->filename);
         return binlog->err;
     }
+    setlinebuf(binlog->fp);
     binlog->off = 0;
     return 0;
 }/*}}}*/
@@ -91,6 +82,7 @@ spx_private err_t ydb_storage_binlog_open(struct ydb_storage_binlog *binlog){/*{
     if(NULL == binlog->filename){
         SpxLog2(binlog->log,SpxLogError,binlog->err,
                 "make binlog filename is fail.");
+        return binlog->err;
     }
 
     struct stat buf;
@@ -104,12 +96,13 @@ spx_private err_t ydb_storage_binlog_open(struct ydb_storage_binlog *binlog){/*{
         SpxLogFmt2(binlog->log,SpxLogError,binlog->err,
                 "get basepath from filename:%s is fail.",
                 binlog->filename);
-        spx_string_free(binlog->filename);
+        SpxStringFree(binlog->filename);
+        return binlog->err;
     }
     if(!spx_is_dir(basepath,&(binlog->err))){
         spx_mkdir(binlog->log,basepath,SpxPathMode);
     }
-    spx_string_free(basepath);
+    SpxStringFree(basepath);
 
     binlog->fp = fopen(binlog->filename,"a+");
     if(NULL == binlog->fp){
@@ -117,60 +110,24 @@ spx_private err_t ydb_storage_binlog_open(struct ydb_storage_binlog *binlog){/*{
         SpxLogFmt2(binlog->log,SpxLogError,binlog->err,\
                 "open binlog file:%s is fail.",\
                 binlog->filename);
-        spx_string_free(binlog->filename);
+        SpxStringFree(binlog->filename);
         return binlog->err;
     }
     if(0 != buf.st_size) {
         fseek(binlog->fp,buf.st_size,SEEK_CUR);
         binlog->off = buf.st_size;
     }
+    setlinebuf(binlog->fp);
     return 0;
 }/*}}}*/
 
-spx_private void *ydb_storage_binlog_thread_listening(void *arg){/*{{{*/
-    struct ydb_storage_binlog *binlog = (struct ydb_storage_binlog *) arg;
-    err_t err = 0;
-    if(0 != (err = ydb_storage_binlog_open(binlog))){
-        SpxLog2(binlog->log,SpxLogError,err,\
-                "open binlog file is fail.");
-        return NULL;
-    }
-    binlog->loop = ev_loop_new(0);
-    ev_async_init (&(binlog->async), ydb_storage_do_binlog);
-    ev_run(binlog->loop,0);
-    return NULL;
-}/*}}}*/
-
-spx_private void ydb_storage_do_binlog (struct ev_loop *loop, ev_async *w, int revents){/*{{{*/
-    struct ydb_storage_binlog *binlog = (struct ydb_storage_binlog *) w;
-    string_t s = NULL;
-    while(NULL != (s = spx_queue_pop(binlog->q,&(binlog->err)))) {//multi-async call will compare to one
-        size_t size = spx_string_len(s);
-        if(ev_now(loop) > spx_zero(&(binlog->d)) + SpxSecondsOfDay){
-            spx_date_add(&(binlog->d),1);
-            ydb_storage_binlog_reopen(binlog);
-        }
-        size_t len = 0;
-        binlog->err = spx_fwrite_string(binlog->fp,s,size,&len);
-        if(0 != binlog->err || size != len){
-            SpxLogFmt2(binlog->log,SpxLogError,binlog->err,\
-                    "write binlog is fail.loginfo:%s,size:%lld,realsize:%lld.",
-                    s,size,len);
-            return;
-        }
-        binlog->off += len;
-        spx_string_free(s);
-    }
-}/*}}}*/
-
 struct ydb_storage_binlog *ydb_storage_binlog_new(SpxLogDelegate *log,\
-        struct ydb_storage_configurtion *c,\
-        string_t path,string_t machineid){/*{{{*/
-    err_t err = 0;
+        string_t path,string_t machineid,
+        err_t *err){/*{{{*/
     struct ydb_storage_binlog *binlog = (struct ydb_storage_binlog *)\
-                                        spx_alloc_alone(sizeof(*binlog),&err);
+                                        spx_alloc_alone(sizeof(*binlog),err);
     if(NULL == binlog){
-        SpxLog2(log,SpxLogError,err,\
+        SpxLog2(log,SpxLogError,*err,\
                 "new storage binlog is fail.");
         return NULL;
     }
@@ -178,40 +135,19 @@ struct ydb_storage_binlog *ydb_storage_binlog_new(SpxLogDelegate *log,\
     binlog->log = log;
     binlog->path = path;
     binlog->machineid = machineid;
-    binlog->q = spx_queue_new(log,ydb_storage_binlog_node_free,&err);
-    if(NULL == binlog->q){
-        SpxLog2(log,SpxLogError,err,\
-                "init binlog queue is fail.");
+    binlog->mlock = spx_thread_mutex_new(log,err);
+    if(NULL == binlog->mlock){
         goto r1;
     }
-
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    size_t ostack_size = 0;
-    pthread_attr_getstacksize(&attr, &ostack_size);
-    do{
-        if (ostack_size != c->stacksize
-                && (0 != (binlog->err = pthread_attr_setstacksize(&attr,c->stacksize)))){
-            SpxLog2(log,SpxLogError,binlog->err,\
-                    "set thread stack size is fail.");
-            pthread_attr_destroy(&attr);
-            goto r1;
-        }
-        if (0 !=(binlog->err =  pthread_create(&(binlog->tid), &attr, ydb_storage_binlog_thread_listening,
-                        binlog))){
-            SpxLog2(log,SpxLogError,binlog->err,\
-                    "create nio thread is fail.");
-            pthread_attr_destroy(&attr);
-            goto r1;
-        }
-    }while(false);
-    pthread_attr_destroy(&attr);
+    if(0 != (*err = ydb_storage_binlog_open(binlog))){
+        SpxLogFmt2(log,SpxLogError,*err,
+                "open binlog:%s is fail.",
+                binlog->filename);
+        goto r1;
+    }
     return binlog;
 r1:
-    if(NULL == binlog->q){
-        spx_queue_free(&(binlog->q));
-    }
-    SpxFree(binlog);
+    ydb_storage_binlog_free(&binlog);
     return NULL;
 }/*}}}*/
 
@@ -238,22 +174,42 @@ void ydb_storage_binlog_write(struct ydb_storage_binlog *binlog,\
             op,issinglefile,mid,ver,opver,fcreatetime,createtime,lastmodifytime,\
             mpidx,p1,p2,tid,rand,begin,totalsize,realsize,SpxStringIsNullOrEmpty(suffix) ? "" : suffix);
 
-    spx_queue_push(binlog->q,loginfo);
-    ev_async_send(binlog->loop,&(binlog->async));
+    size_t size = spx_string_len(loginfo);
+    time_t now = spx_now();
+    if(0 == pthread_mutex_lock(binlog->mlock)){
+        do{
+            if(now > spx_zero(&(binlog->d)) + SpxSecondsOfDay){
+                spx_date_add(&(binlog->d),1);
+                ydb_storage_binlog_reopen(binlog);
+            }
+            size_t len = 0;
+            binlog->err = spx_fwrite_string(binlog->fp,loginfo,size,&len);
+            if(0 != binlog->err || size != len){
+                SpxLogFmt2(binlog->log,SpxLogError,binlog->err,\
+                        "write binlog is fail.loginfo:%s,size:%lld,realsize:%lld.",
+                        loginfo,size,len);
+                break;
+            }
+            binlog->off += len;
+        }while(false);
+        pthread_mutex_unlock(binlog->mlock);
+    }
+    SpxStringFree(loginfo);
+    return;
 }/*}}}*/
 
 void ydb_storage_binlog_free(struct ydb_storage_binlog **binlog){/*{{{*/
-    ev_async_stop((*binlog)->loop,&(*binlog)->async);
     if(NULL != (*binlog)->fp){
         fflush((*binlog)->fp);
         fclose((*binlog)->fp);
         (*binlog)->off = 0;
         if(NULL != (*binlog)->filename) {
-            spx_string_free((*binlog)->filename);
+            SpxStringFree((*binlog)->filename);
         }
     }
-    ev_loop_destroy((*binlog)->loop);
-    spx_queue_free(&((*binlog)->q));
+    if(NULL != (*binlog)->mlock){
+        spx_thread_mutex_free(&(*binlog)->mlock);
+    }
     SpxFree(*binlog);
 }/*}}}*/
 
@@ -272,7 +228,7 @@ string_t ydb_storage_binlog_make_filename(SpxLogDelegate *log,string_t path,stri
     if(NULL == new_filename){
         SpxLog2(log,SpxLogError,*err,
                 "cat binlog filename is fail.");
-        spx_string_free(filename);
+        SpxStringFree(filename);
         return NULL;
     }
     filename = new_filename;
@@ -283,7 +239,6 @@ err_t ydb_storage_binlog_context_parser(SpxLogDelegate *log,string_t line,i32_t 
         string_t *mid,u32_t *ver,u32_t *opver,u64_t *fcreatetime,u64_t *createtime,
         u64_t *lastmodifytime,i32_t *mpidx,i32_t *p1,i32_t *p2,u32_t *tid,u32_t *rand,
         u64_t *begin,u64_t *totalsize,u64_t *realsize,string_t *suffix){/*{{{*/
-
     int count = 0;
     err_t err = 0;
     string_t *contexts = spx_string_split(line,";",strlen(":"),&count,&err);
