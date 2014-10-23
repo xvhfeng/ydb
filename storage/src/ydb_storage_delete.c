@@ -113,6 +113,10 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
                     dc->buf);
         }
 
+    YdbStorageBinlog(YDB_BINLOG_DELETE,dc->issinglefile,dc->ver,dc->opver,dc->storefile->machineid,
+            dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
+            dc->storefile->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
+
 //        YdbStorageBinlog(YDB_BINLOG_DELETE,dc->issignalfile,dc->ver,dc->opver,cf->machineid,
 //                dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,
 //                cf->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
@@ -150,8 +154,10 @@ r1:
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    err = spx_module_dispatch(threadcontext,
-            spx_network_module_wakeup_handler,jc);
+//    err = spx_module_dispatch(threadcontext,
+//            spx_network_module_wakeup_handler,jc);
+    SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
+
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
                 "dispatch network module is fail,"
@@ -218,8 +224,9 @@ r2:
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    err = spx_module_dispatch(threadcontext,
-            spx_network_module_wakeup_handler,jc);
+//    err = spx_module_dispatch(threadcontext,
+//            spx_network_module_wakeup_handler,jc);
+    SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(dc->log,SpxLogError,err,\
                 "notify network module is fail.");

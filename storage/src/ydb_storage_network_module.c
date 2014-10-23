@@ -66,8 +66,10 @@ void ydb_storage_network_module_request_body_handler(
     int idx= spx_task_module_wakeup_idx(tcontext);
     struct spx_thread_context *tc = spx_get_thread(g_spx_task_module,idx);
     jcontext->tc = tc;
-    spx_module_dispatch(tc,spx_task_module_wakeup_handler,tcontext);
+//    spx_task_module_wakeup_handler(EV_WRITE,tcontext);
+//    spx_module_dispatch(tc,spx_task_module_wakeup_handler,tcontext);
 //    spx_module_dispatch(g_spx_task_module,idx,tcontext);
+    SpxModuleDispatch(spx_task_module_wakeup_handler,jcontext);
     return;
 }
 
@@ -83,6 +85,20 @@ void ydb_storage_network_module_response_body_handler(
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "write body buffer is fail.");
     }
-    spx_job_pool_push(g_spx_job_pool,jcontext);
+    if(jcontext->reader_header->is_keepalive){//long connetion mode,but not test
+        spx_job_context_reset(jcontext);
+        size_t idx = spx_network_module_wakeup_idx(jcontext);
+        SpxLogFmt1(jcontext->log,SpxLogDebug,\
+                "recv the client:%s connection.sock:%d."\
+                "and send to thread:%d to deal.",
+                jcontext->client_ip,jcontext->fd,idx);
+        struct spx_thread_context *tc = spx_get_thread(g_spx_network_module,idx);
+        jcontext->tc = tc;
+//        spx_module_dispatch(tc,spx_network_module_wakeup_handler,jcontext);
+//        spx_network_module_wakeup_handler(EV_WRITE,jcontext);
+        SpxModuleDispatch(spx_network_module_wakeup_handler,jcontext);
+    } else {
+        spx_job_pool_push(g_spx_job_pool,jcontext);
+    }
     return;
 }

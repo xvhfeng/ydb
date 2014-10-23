@@ -21,15 +21,12 @@ extern "C" {
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include <ev.h>
 
 #include "spx_types.h"
 
 #include "ydb_storage_configurtion.h"
-    struct ydb_mp_sync{
-        u64_t d;
-        u64_t offset;
-    };
 
     struct ydb_storage_runtime{
         ev_timer w;

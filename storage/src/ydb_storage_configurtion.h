@@ -30,6 +30,8 @@ extern "C" {
         string_t path;
         u64_t disksize;
         u64_t freesize;
+        time_t init_time;
+        time_t last_modify_time;
     };
 
 #define YDB_STORAGE_MOUNTPOINT_LOOP 0

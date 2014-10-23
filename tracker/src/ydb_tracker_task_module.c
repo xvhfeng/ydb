@@ -121,7 +121,8 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,int idx,struct spx_ta
     size_t i = jcontext->idx % g_spx_network_module->threadpool->size;
     struct spx_thread_context *tc = spx_get_thread(g_spx_network_module,i);
     jcontext->tc = tc;
-    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jcontext);
+//    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jcontext);
+    SpxModuleDispatch(spx_network_module_wakeup_handler,jcontext);
     if(0 != err){
             SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                     "dispath network module from task module is fail."\
