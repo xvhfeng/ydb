@@ -485,7 +485,7 @@ u8_t ydb_storage_get_mountpoint_with_loop(
             mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
             continue;
         }
-        u64_t size = spx_mountpoint_freesize(mp->path,err);
+        u64_t size = spx_mountpoint_availsize(mp->path,err);
         if(size <= c->freedisk){
             mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
             continue;
@@ -511,7 +511,7 @@ u8_t ydb_storage_get_mountpoint_with_turn(
             mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
             continue;
         }
-        u64_t size = spx_mountpoint_freesize(mp->path,err);
+        u64_t size = spx_mountpoint_availsize(mp->path,err);
         if(size <= c->freedisk){
             mpidx = (mpidx + 1) % YDB_STORAGE_MOUNTPOINT_MAXSIZE;
             continue;
@@ -538,7 +538,7 @@ u8_t ydb_storage_get_mountpoint_with_maxsize(
         if(NULL == mp || SpxStringIsNullOrEmpty(mp->path)){
             continue;
         }
-        u64_t size = spx_mountpoint_freesize(mp->path,err);
+        u64_t size = spx_mountpoint_availsize(mp->path,err);
         if(size - c->freedisk > max){
             exist = true;
             max = size - c->freedisk;
@@ -559,7 +559,7 @@ u8_t ydb_storage_get_mountpoint_with_master(
     struct ydb_storage_mountpoint *mp = NULL;
     mp = spx_list_get(c->mountpoints,c->master);
     if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)
-            && c->freedisk < spx_mountpoint_freesize(mp->path,err)){
+            && c->freedisk < spx_mountpoint_availsize(mp->path,err)){
         return c->master;
     }
     return ydb_storage_get_mountpoint_with_loop(c,rt,false,err);

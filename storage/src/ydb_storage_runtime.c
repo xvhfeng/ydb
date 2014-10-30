@@ -51,14 +51,6 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     FILE *fp = NULL;
     rt->c = c;
     rt->log = log;
-    /*
-    rt->mp_sync = spx_alloc(YDB_STORAGE_MOUNTPOINT_MAXSIZE,sizeof(struct ydb_mp_sync),err);
-    if(NULL == rt->mp_sync){
-        SpxLog2(log,SpxLogError,*err,
-                "new sync state of mp is fail.");
-        goto r1;
-    }
-    */
     new_basepath = spx_string_dup(c->basepath,err);
     if(NULL == new_basepath){
         SpxLog2(log,SpxLogError,*err,"dup the basepath is fail.");
@@ -116,11 +108,6 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     return rt;
 
 r1:
-    /*
-    if(NULL != rt->mp_sync){
-        SpxFree(rt->mp_sync);
-    }
-    */
     if(NULL != rt){
         SpxFree(rt);
     }
@@ -268,30 +255,6 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         rt->sync_binlog_offset = v;
         goto r1;
     }
-    /*
-    if(0 == spx_string_begin_with(*kv,"mp")){
-        if(2 != count){
-            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of mp sync state.");
-            goto r1;
-        }
-        int idx = atol((*kv) + sizeof("mp"));
-        char *p = index(*(kv + 1),':');
-        if(NULL == p){
-            SpxLogFmt1(rt->log,SpxLogError,"bad value of mp sync state.value:%s.",*(kv + 1));
-            goto r1;
-        }
-        u64_t v1 = strtoul(*(kv + 1),NULL,10);
-        u64_t v2 = strtoul(p + 1,NULL,10);
-        if(ERANGE == v1 || ERANGE == v2) {
-            SpxLog1(rt->log,SpxLogError,"bad the runtime item of sync_binlog_offset.");
-            goto r1;
-        }
-        struct ydb_mp_sync *mp = rt->mp_sync + idx;
-        mp->d = v1;
-        mp->offset = v2;
-        goto r1;
-    }
-    */
 r1:
     spx_string_free_splitres(kv,count);
 }/*}}}*/
@@ -334,23 +297,6 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
         goto r1;
     }
     buf = newbuf;
-    /*
-    int i = 0;
-    for( ; i< YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
-        struct ydb_mp_sync *mp = rt->mp_sync + i;
-        if(0 != mp->d){
-            newbuf = spx_string_cat_printf(&err,buf,
-                    "mp%d = %ulld:%ulld\n",
-                    i,mp->d,mp->offset);
-            if(NULL == newbuf){
-                SpxLog2(rt->log,SpxLogError,err,
-                        "cat mp sync stat to line is fail.");
-            }else {
-                buf = newbuf;
-            }
-        }
-    }
-    */
 
     new_basepath = spx_string_dup(c->basepath,&err);
     if(NULL == new_basepath){

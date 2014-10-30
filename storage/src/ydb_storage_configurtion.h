@@ -29,9 +29,11 @@ extern "C" {
         int idx;
         string_t path;
         u64_t disksize;
-        u64_t freesize;
-        time_t init_time;
+        u64_t freesize;//now
         time_t last_modify_time;
+        //the size is the smallest with the same syncgroup
+        //and then,the item is eq or lt freedisk
+        u64_t availlysize;//the total size can use
     };
 
 #define YDB_STORAGE_MOUNTPOINT_LOOP 0
@@ -132,6 +134,7 @@ struct ydb_tracker{
         struct spx_time sync_end;
         u32_t disksync_timespan;
         u64_t disksync_busysize;
+        time_t start_timespan;
     };
 
     void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err);

@@ -35,7 +35,6 @@
 #include "ydb_storage_configurtion.h"
 
 
-spx_private void *ydb_mountpoint_new(SpxLogDelegate *log,size_t i,void *arg,err_t *err);
 spx_private err_t ydb_mountpoint_free(void **arg);
 spx_private err_t ydb_tracker_free(void **arg);
 spx_private u64_t ydb_storage_hole_idx_refresh_timeout(\
@@ -47,44 +46,6 @@ spx_private u32_t ydb_storage_configurtion_timespan_convert(
         SpxLogDelegate *log,string_t v,u32_t default_unitsize,
         char *errinfo,err_t *err);
 
-spx_private void *ydb_mountpoint_new(SpxLogDelegate *log,size_t i,void *arg,err_t *err){/*{{{*/
-    struct ydb_storage_mountpoint *mp = spx_alloc_alone(sizeof(*mp),err);
-    if(NULL == mp){
-        return NULL;
-    }
-    string_t path = (string_t) arg;
-    mp->path = spx_string_dup(path,err);
-    if(NULL == mp->path){
-        SpxFree(mp);
-        return NULL;
-    }
-    if(!spx_is_dir(path,err)){
-        *err = spx_mkdir(log,path,SpxPathMode);
-        if(0 != *err){
-            SpxLogFmt2(log,SpxLogError,*err,\
-                    "mkdir for mountpoint:%s is fail.",
-                    path);
-            spx_string_free(mp->path);
-            SpxFree(mp);
-            return NULL;
-        }
-    }
-    mp->freesize = spx_mountpoint_freesize(path,err);
-    if(0 != *err){
-        spx_string_free(mp->path);
-        SpxFree(mp);
-        return NULL;
-    }
-    mp->disksize = spx_mountpoint_size(path,err);
-    if(0 != *err){
-        spx_string_free(mp->path);
-        SpxFree(mp);
-        return NULL;
-    }
-    mp->idx = i;
-    return mp;
-}/*}}}*/
-
 spx_private err_t ydb_mountpoint_free(void **arg){/*{{{*/
     if(NULL == arg || NULL == *arg){
         return 0;
@@ -92,7 +53,7 @@ spx_private err_t ydb_mountpoint_free(void **arg){/*{{{*/
     struct ydb_storage_mountpoint **mp = (struct ydb_storage_mountpoint **)arg;
 
     if(NULL != (*mp)->path){
-        spx_string_free((*mp)->path);
+        SpxStringFree((*mp)->path);
     }
     SpxFree(*mp);
     return 0;
@@ -190,6 +151,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     config->sync_end.sec = 0;
     config->disksync_timespan = SpxDayTick;
     config->disksync_busysize = 512 * SpxMB;
+    config->start_timespan = spx_now();
 
     return config;
 }/*}}}*/
@@ -668,11 +630,17 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         int idx = strtol((*kv) + strlen("mp"),\
                 NULL,16);
 
-        struct ydb_storage_mountpoint *mp = (struct ydb_storage_mountpoint *) \
-                                            ydb_mountpoint_new(c->log,idx,*(kv+1),err);
+        struct ydb_storage_mountpoint *mp = spx_alloc_alone(sizeof(*mp),err);
         if(NULL == mp){
-            return;
+            goto r1;
         }
+        mp->path = spx_string_dup(*(kv + 1),err);
+        if(NULL == mp->path){
+            SpxFree(mp);
+            ydb_mountpoint_free((void **) &mp);
+            goto r1;
+        }
+        mp->idx = idx;
         spx_list_insert(c->mountpoints,idx,mp);
         goto r1;
     }
@@ -1133,6 +1101,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
 
 r1:
     spx_string_free_splitres(kv,count);
+    //the size is the smallest with the same syncgroup
 }
 
 

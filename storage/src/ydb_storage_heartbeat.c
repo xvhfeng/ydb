@@ -135,8 +135,8 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
         struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)){
-            mp->freesize = spx_mountpoint_freesize(mp->path,&(err));
-            mp->disksize = spx_mountpoint_size(mp->path,&(err));
+            mp->freesize = spx_mountpoint_availsize(mp->path,&(err));
+            mp->disksize = spx_mountpoint_totalsize(mp->path,&(err));
             mp->freesize = 0 >= mp->freesize - c->freedisk \
                            ? 0 : mp->freesize - c->freedisk;
             disksize += mp->disksize;
@@ -177,8 +177,8 @@ spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_c
     for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
         struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)){
-            mp->freesize = spx_mountpoint_freesize(mp->path,&err);
-            mp->disksize = spx_mountpoint_size(mp->path,&err);
+            mp->freesize = spx_mountpoint_availsize(mp->path,&err);
+            mp->disksize = spx_mountpoint_totalsize(mp->path,&err);
             mp->freesize = 0 >= mp->freesize - c->freedisk \
                            ? 0 : mp->freesize - c->freedisk;
             disksize += mp->disksize;

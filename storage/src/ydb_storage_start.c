@@ -27,6 +27,8 @@
 
 #include "ydb_storage_configurtion.h"
 
+spx_private err_t ydb_storage_mountpoint_status(struct ydb_storage_configurtion *c,
+        struct ydb_storage_mountpoint *mp);
 
 err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c){
     err_t err = 0;
@@ -39,6 +41,16 @@ err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c){
     for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
         struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)){
+            if(!spx_is_dir(mp->path,&err)){
+                err = spx_mkdir(c->log,mp->path,SpxPathMode);
+                if(0 != err){
+                    SpxLogFmt2(c->log,SpxLogError,err,\
+                            "mkdir for mountpoint:%s is fail.",
+                            mp->path);
+                    break;
+                }
+            }
+
             int out = 0;
             for( ; out < c->storerooms; out++){
                 int in = 0;
@@ -62,9 +74,34 @@ err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c){
                     spx_string_clear(path);
                 }
             }
+
+
+            if(0 != (err = ydb_storage_mountpoint_status(c,mp))){
+                break;
+            }
         }
     }
-    spx_string_free(path);
+    SpxStringFree(path);
+    return err;
+}
+
+spx_private err_t ydb_storage_mountpoint_status(struct ydb_storage_configurtion *c,
+        struct ydb_storage_mountpoint *mp){
+    err_t err = 0;
+    mp->freesize = spx_mountpoint_availsize(mp->path,&err);
+    if(0 != err){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "mp:%s get freesize is fail.",
+                mp->path);
+        return err;
+    }
+    mp->disksize = spx_mountpoint_totalsize(mp->path,&err);
+    if(0 != err){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "mp:%s get disksize is fail.",
+                mp->path);
+        return err;
+    }
     return err;
 }
 
