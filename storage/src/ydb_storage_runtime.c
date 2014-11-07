@@ -59,11 +59,11 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
 
     if(SpxStringEndWith(new_basepath,SpxPathDlmt)){
         filename = spx_string_cat_printf(err,new_basepath,\
-                "%s-%s-ydb-storage.rtf",\
+                ".%s-%s-rtf.spx",\
                 c->groupname,c->machineid);
     } else {
         filename = spx_string_cat_printf(err,new_basepath,\
-                "/%s-%s-ydb-storage.rtf",\
+                "/.%s-%s-rtf.spx",\
                 c->groupname,c->machineid);
     }
     if(NULL == filename){
@@ -306,11 +306,11 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
 
     if(SpxStringEndWith(new_basepath,SpxPathDlmt)){
         filename = spx_string_cat_printf(&err,new_basepath,\
-                "%s%s-%s-ydb-storage.rtf",\
+                "%s.%s-%s-rtf.spx",\
                 new_basepath,c->groupname,c->machineid);
     } else {
         filename = spx_string_cat_printf(&err,new_basepath,\
-                "%s/%s-%s-ydb-storage.rtf",\
+                "%s/.%s-%s-rtf.spx",\
                 new_basepath,c->groupname,c->machineid);
     }
     if(NULL == filename){

@@ -25,15 +25,28 @@ extern "C" {
 #include "spx_job.h"
 #include "spx_socket.h"
 
+    struct ydb_storage_transport_context{
+        int fd;
+        struct spx_msg_context *request;
+        struct spx_msg_context *response;
+    };
+
+    //there is mp.rtf file in the every mountpoint
+    //and the file context is
+    //is_disk_sync | last_modify_time | availlysize
+
+    //and theresi mp.init file in the every mountpoint
+    //and the file context is the current time of the initing
     struct ydb_storage_mountpoint{
         int idx;
         string_t path;
         u64_t disksize;
         u64_t freesize;//now
         time_t last_modify_time;
-        //the size is the smallest with the same syncgroup
-        //and then,the item is eq or lt freedisk
-        u64_t availlysize;//the total size can use
+        time_t init_timespan;
+        u64_t last_freesize;
+        bool_t need_dsync;
+        bool_t isusing;
     };
 
 #define YDB_STORAGE_MOUNTPOINT_LOOP 0
@@ -80,7 +93,7 @@ extern "C" {
 struct ydb_tracker{
     struct spx_host host;
     struct spx_job_context *hjc;//heartbeat job context
-    struct spx_job_context *sjc;//query sync storages job context
+    struct ydb_storage_transport_context *ystc;
 };
 
     struct ydb_storage_configurtion{

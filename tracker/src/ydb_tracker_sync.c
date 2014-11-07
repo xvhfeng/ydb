@@ -112,6 +112,7 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
 
         if((0 == spx_string_casecmp_string(s->syncgroup,syncgroup))
                 && (0 != spx_string_casecmp_string(s->machineid,machineid))){
+
             newbuf =   spx_string_catalign(buf,s->machineid,spx_string_len(s->machineid),
                     YDB_MACHINEID_LEN,&(jc->err));
             if(NULL == newbuf){
@@ -160,7 +161,11 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
     jc->writer_header = response_header;
     response_header->protocol = YDB_QUERY_SYNC_STORAGES;
     response_header->version = YDB_VERSION;
-    response_header->bodylen = spx_string_len(buf);
+    if(SpxStringIsNullOrEmpty(buf)){
+        response_header->bodylen = 0;
+    } else {
+        response_header->bodylen = spx_string_len(buf);
+    }
     jc->writer_header_ctx = spx_header_to_msg(response_header,\
             SpxMsgHeaderSize,&(jc->err));
     if(NULL == jc->writer_header_ctx){

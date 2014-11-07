@@ -26,6 +26,8 @@ extern "C" {
 
 
 err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c);
+err_t ydb_storage_mountpoint_initfile_writer(struct ydb_storage_configurtion *c,
+        struct ydb_storage_mountpoint *mp);
 
 #ifdef __cplusplus
 }

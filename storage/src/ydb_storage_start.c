@@ -24,10 +24,13 @@
 #include "spx_path.h"
 #include "spx_list.h"
 #include "spx_string.h"
+#include "spx_limits.h"
 
 #include "ydb_storage_configurtion.h"
 
 spx_private err_t ydb_storage_mountpoint_status(struct ydb_storage_configurtion *c,
+        struct ydb_storage_mountpoint *mp);
+spx_private err_t ydb_storage_mountpoint_initfile(struct ydb_storage_configurtion *c,
         struct ydb_storage_mountpoint *mp);
 
 err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c){
@@ -75,6 +78,9 @@ err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c){
                 }
             }
 
+            if(0 != (err  = ydb_storage_mountpoint_initfile(c,mp))){
+                break;
+            }
 
             if(0 != (err = ydb_storage_mountpoint_status(c,mp))){
                 break;
@@ -105,4 +111,109 @@ spx_private err_t ydb_storage_mountpoint_status(struct ydb_storage_configurtion 
     return err;
 }
 
+spx_private err_t ydb_storage_mountpoint_initfile(struct ydb_storage_configurtion *c,
+        struct ydb_storage_mountpoint *mp){
+    err_t err = 0;
+    string_t new_initfile = NULL;
+    string_t initfile = spx_string_newlen(NULL,SpxFileNameSize,&err)
+    if(NULL == initfile){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "new initfile name for mountpoint:%s is fail.",
+                mp->path);
+        return err;
+    }
+
+    if(SpxStringEndWith(c->basepath,SpxPathDlmt)){
+        new_initfile = spx_string_cat_printf(&err,initfile,
+                "%s.%s-%s-mprtf.spx",c->basepath,
+                c->groupname,c->machineid);
+    } else {
+        new_initfile = spx_string_cat_printf(&err,initfile,
+                "%s%c.%s-%s-mprtf.spx",c->basepath,SpxPathDlmt,
+                c->groupname,c->machineid);
+    }
+    if(NULL == new_initfile){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "make init filename for mountpoint is fail.",
+                mp->path);
+        goto r1;
+    }
+    initfile = new_initfile;
+    if(SpxFileExist(initfile)){
+        FILE *fp = fopen(initfile,"r");
+        if(NULL == fp){
+            err = 0 == errno ? EACCES : errno;
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "open init file :%s is fail.",
+                    intfile);
+            goto r1;
+        }
+        char line[SpxU64MaxLength] = {0};
+        if(NULL != fgets(line,SpxU64MaxLength,fp)){
+            mp->init_timespan = atol(line);
+        }
+        fclose(fp);
+    } else {
+        mp->need_dsync = true;
+        mp->init_timespan = c->start_timespan;
+        char line[SpxU64MaxLength] = {0};
+        sprintf(line,"%ld",mp->init_timespan);
+        FILE *fp = fopen(initfile,"w");
+        if(NULL == fp){
+            err = 0 == errno ? EACCES : errno;
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "open init file :%s is fail.",
+                    intfile);
+            goto r1;
+        }
+        fwrite(line,strlen(line),sizeof(char),fp);
+        fclose(fp);
+    }
+r1:
+    SpxStringFree(initfile);
+    return err;
+}
+
+err_t ydb_storage_mountpoint_initfile_writer(struct ydb_storage_configurtion *c,
+        struct ydb_storage_mountpoint *mp){
+    err_t err = 0;
+    string_t new_initfile = NULL;
+    string_t initfile = spx_string_newlen(NULL,SpxFileNameSize,&err)
+        if(NULL == initfile){
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "new initfile name for mountpoint:%s is fail.",
+                    mp->path);
+            return err;
+        }
+
+    if(SpxStringEndWith(mp->path,SpxPathDlmt)){
+        new_initfile = spx_string_cat_printf(&err,initfile,
+                "%smp.initf",mp->path);
+    } else {
+        new_initfile = spx_string_cat_printf(&err,initfile,
+                "%s.mp,initf",mp->path);
+    }
+    if(NULL == new_initfile){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "make init filename for mountpoint is fail.",
+                mp->path);
+        goto r1;
+    }
+    initfile = new_initfile;
+    char line[SpxU64MaxLength] = {0};
+    sprintf(line,"%ld",mp->init_timespan);
+    FILE *fp = fopen(initfile,"w");
+    if(NULL == fp){
+        err = 0 == errno ? EACCES : errno;
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "open init file :%s is fail.",
+                intfile);
+        goto r1;
+    }
+    fwrite(line,strlen(line),sizeof(char),fp);
+    fclose(fp);
+r1:
+    SpxStringFree(initfile);
+    return err;
+}
 

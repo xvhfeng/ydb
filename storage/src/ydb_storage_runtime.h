@@ -44,6 +44,8 @@ extern "C" {
         struct spx_date sync_binlog_date;
         u32_t sync_binlog_offset;
         u8_t status;
+        bool_t need_dsync;
+        char dsync_mps[YDB_STORAGE_MOUNTPOINT_COUNT];
     //    struct ydb_mp_sync *mp_sync;
     };
 

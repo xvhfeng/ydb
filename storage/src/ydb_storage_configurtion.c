@@ -61,8 +61,32 @@ spx_private err_t ydb_mountpoint_free(void **arg){/*{{{*/
 
 spx_private err_t ydb_tracker_free(void **arg){/*{{{*/
     struct ydb_tracker ** t = (struct ydb_tracker **) arg;
-    if(NULL != (*t)->sjc){
-        spx_job_context_free((void **) &((*t)->sjc));
+    if(NULL != (*t)->ystc){
+        struct ydb_storage_transport_context *ystc = (*t)->ystc;
+        if(NULL != ystc->request){
+            if(NULL != ystc->request->header){
+                SpxFree(ystc->request->header);
+            }
+            if(NULL != ystc->request->body){
+                SpxMsgFree(ystc->request->body);
+            }
+            SpxFree(ystc->request);
+        }
+
+        if(NULL != ystc->response){
+            if(NULL != ystc->response->header){
+                SpxFree(ystc->response->header);
+            }
+            if(NULL != ystc->response->body){
+                SpxMsgFree(ystc->response->body);
+            }
+            SpxFree(ystc->response);
+        }
+
+        if( 0!= ystc->fd){
+            SpxClose(fd);
+        }
+        SpxFree((*t)->ystc);
     }
     if(NULL != (*t)->hjc){
         spx_job_context_free((void **) &((*t)->hjc));
@@ -641,7 +665,8 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
             goto r1;
         }
         mp->idx = idx;
-        spx_list_insert(c->mountpoints,idx,mp);
+        mp->isusing = true;
+        spx_list_set(c->mountpoints,idx,mp);
         goto r1;
     }
 

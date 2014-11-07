@@ -22,7 +22,6 @@ extern "C" {
 #include <stdlib.h>
 #include <stdio.h>
 #include <pthread.h>
-#include <ev.h>
 
 #include "spx_types.h"
 #include "spx_queue.h"
