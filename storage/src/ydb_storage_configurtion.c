@@ -128,7 +128,8 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     }
     config->log = log;
     config->port = 8175;
-    config->timeout = 30;
+    config->timeout = 5;
+    config->waitting = 30;
     config->logsize = 10 * SpxMB;
     config->loglevel = SpxLogInfo;
     config->balance = YDB_STORAGE_MOUNTPOINT_LOOP;
@@ -317,6 +318,23 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         goto r1;
     }
 
+
+    //waitting
+    if(0 == spx_string_casecmp(*kv,"waitting")){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,"use default waitting:%d.",c->waitting);
+        } else {
+            u32_t waitting = ydb_storage_configurtion_timespan_convert(c->log,*(kv + 1),
+                    SpxSecondTick,
+                "bad the configurtion item of waitting.",err);
+            if(0 != *err) {
+                goto r1;
+            }
+            c->waitting = waitting;
+        }
+        goto r1;
+    }
+
     //runtime flush timespan
     if(0 == spx_string_casecmp(*kv,"runtime_flush_timespan")){
         if(1 == count){
@@ -471,6 +489,28 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         }
         goto r1;
     }
+
+    //dologpath
+    if(0 == spx_string_casecmp(*kv,"dologpath")){
+        if(1 == count){
+            c->dologpath = spx_string_new("/opt/ydb/dolog/storage/",err);
+            if(NULL == c->dologpath){
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "alloc default dologpath is fail.");
+                goto r1;
+            }
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "dologpath use default:%s.",c->dologpath);
+        }else {
+            c->dologpath = spx_string_dup(*(kv + 1),err);
+            if(NULL == c->dologpath){
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "dup the string for dologpath is fail.");
+            }
+        }
+        goto r1;
+    }
+
 
     //logprefix
     if(0 == spx_string_casecmp(*kv,"logprefix")){

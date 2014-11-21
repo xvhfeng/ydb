@@ -53,7 +53,6 @@ extern "C" {
         u64_t totalsize;//if file is single file totalsize == realsize
         u64_t realsize;
 
-
         string_t groupname;// from configurtion
         string_t machineid;//same as above
         string_t syncgroup;
@@ -73,10 +72,17 @@ extern "C" {
         struct ydb_storage_storefile *storefile;//disk file for put into buffer
 
         //network buffer for lazy recv,
-        //and if the op is find or delete,
-        //then the member is filename
         string_t buf;
+        //the rfid is recv fileid from client
+        //it support for modify,delete,and find
+        string_t rfid;
+        //the fid is making by storage to return to client
+        string_t fid;
+
+        string_t filename;
         struct spx_msg *metadata;//if the file is chunkfile the member store metadata
+
+        struct spx_date *date;
     };
 
     struct ydb_storage_dio_pool{

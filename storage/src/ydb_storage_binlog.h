@@ -28,6 +28,18 @@ extern "C" {
 
 #include "ydb_storage_configurtion.h"
 
+#define YdbStorageBinlogUploadWriter(fid)  \
+    ydb_storage_binlog_write(g_ydb_storage_binlog,\
+            YDB_STORAGE_ADD,fid,NULL)
+
+#define YdbStorageBinlogDeleteWriter(fid)  \
+    ydb_storage_binlog_write(g_ydb_storage_binlog,\
+            YDB_STORAGE_DELETE,fid,NULL)
+
+#define YdbStorageBinlogModifyWriter(fid,rfid)  \
+    ydb_storage_binlog_write(g_ydb_storage_binlog,\
+            YDB_STORAGE_ADD,fid,rfid)
+
     struct ydb_storage_binlog{
         err_t err;
         FILE *fp;
@@ -41,9 +53,6 @@ extern "C" {
         pthread_mutex_t *mlock;
     };
 
-#define YDB_BINLOG_ADD 'A'
-#define YDB_BINLOG_MODIFY 'M'
-#define YDB_BINLOG_DELETE 'D'
 
     extern struct ydb_storage_binlog *g_ydb_storage_binlog;
 
@@ -52,26 +61,16 @@ extern "C" {
             err_t *err);
 
     void ydb_storage_binlog_write(struct ydb_storage_binlog *binlog,\
-            char op,bool_t issinglefile,\
-            u32_t ver,u32_t opver,\
-            string_t mid,u64_t fcreatetime,u64_t createtime,\
-            u64_t lastmodifytime,u8_t mpidx,u8_t p1,u8_t p2, int tid,\
-            u32_t rand,u64_t begin,u64_t totalsize,u64_t realsize,string_t suffix);
+            char op,string_t fid,string_t rfid);
 
     void ydb_storage_binlog_free(struct ydb_storage_binlog **binlog);
+
     string_t ydb_storage_binlog_make_filename(SpxLogDelegate *log,string_t path,string_t machineid,
             int year,int month,int day,err_t *err);
 
-#define YdbStorageBinlog(op,issinglefile,ver,opver,mid,fcreatetime,\
-        createtime,lastmodifytime,mpidx,p1,p2,tid,rand,begin,totalsize,realsize,suffix) \
-    ydb_storage_binlog_write(g_ydb_storage_binlog,op,issinglefile,ver, opver,\
-            mid, fcreatetime, createtime,lastmodifytime, mpidx, p1, p2,  tid,\
-            rand, begin, totalsize, realsize,suffix)
+    err_t ydb_storage_binlog_line_parser(string_t line,
+            char *op,string_t *fid,string_t *rfid);
 
-    err_t ydb_storage_binlog_context_parser(SpxLogDelegate *log,string_t line,i32_t *op,bool_t *issinglefile,
-            string_t *mid,u32_t *ver,u32_t *opver,u64_t *fcreatetime,u64_t *createtime,
-            u64_t *lastmodifytime,i32_t *mpidx,i32_t *p1,i32_t *p2,u32_t *tid,u32_t *rand,
-            u64_t *begin,u64_t *totalsize,u64_t *realsize,string_t *suffix);
 
 #ifdef __cplusplus
 }

@@ -113,7 +113,7 @@ err_t ydb_storage_dio_pool_push(\
     dc->createtime = 0;
     dc->lastmodifytime = 0;
     if(NULL != dc->hashcode){
-        spx_string_free(dc->hashcode);
+        SpxStringFree(dc->hashcode);
     }
     dc->totalsize = 0;
     dc->realsize = 0;
@@ -128,16 +128,19 @@ err_t ydb_storage_dio_pool_push(\
     dc->begin = 0;
     dc->has_suffix = false;
     if(NULL != dc->suffix){
-        spx_string_free(dc->suffix);
+        SpxStringFree(dc->suffix);
     }
     if(NULL != dc->groupname){
-        spx_string_free(dc->groupname);
+        SpxStringFree(dc->groupname);
     }
     if(NULL != dc->machineid){
-        spx_string_free(dc->machineid);
+        SpxStringFree(dc->machineid);
     }
     if(NULL != dc->syncgroup){
-        spx_string_free(dc->syncgroup);
+        SpxStringFree(dc->syncgroup);
+    }
+    if(NULL != dc->date){
+        SpxFree(dc->date);
     }
 
     dc->jc = NULL;
@@ -145,7 +148,16 @@ err_t ydb_storage_dio_pool_push(\
     dc->storefile = NULL;
 
     if(NULL != dc->buf){
-        spx_string_free(dc->buf);
+        SpxStringFree(dc->buf);
+    }
+    if(NULL != dc->filename){
+        SpxStringFree(dc->filename);
+    }
+    if(NULL != dc->rfid){
+        SpxStringFree(dc->rfid);
+    }
+    if(NULL != dc->fid){
+        SpxStringFree(dc->fid);
     }
     return spx_fixed_vector_push(pool->pool,dc);
 }

@@ -6,30 +6,45 @@ extern "C" {
 
 #include "spx_types.h"
 #include "spx_map.h"
+#include "spx_threadpool.h"
 
 #include "ydb_protocol.h"
 #include "ydb_storage_binlog.h"
+
 
 #define YDB_STORAGE_REMOTE_SYNCSTATE_NONE 0
 #define YDB_STORAGE_REMOTE_SYNCSTATE_DSYNCING 1
 #define YDB_STORAGE_REMOTE_SYNCSTATE_CSYNCING 2
 
-    struct ydb_storage_sync_mp{
-        u8_t mpidx;
-        time_t last_sync_pull_time;
-        time_t last_sync_push_time;
-    };
+extern struct spx_threadpool *g_sync_threadpool;
 
-    struct ydb_storage_sync_remote{
-        string_t machineid;
-        struct spx_host host;
-        i32_t runtime_state;
-        int sync_state;
-        u64_t update_timespan;
-        struct ydb_storage_binlog *read_binlog;
-        struct ydb_storage_synclog *write_synclog;
-        struct ydb_storage_sync_mp sync_mps[YDB_STORAGE_MOUNTPOINT_COUNT];
-    };
+struct ydb_storage_csync_beginpoint{
+            struct spx_date date;
+            u64_t offset;
+};
+
+struct ydb_storage_remote{
+    struct ydb_storage_configurtion *c;
+    string_t machineid;
+    struct spx_host host;
+    i32_t runtime_state;
+    u64_t update_timespan;
+    struct {
+        struct spx_date date;
+        FILE *fp;
+        u64_t offset;
+        string_t fname;
+    }read_binlog;
+    struct {
+        struct spx_date date;
+        FILE *fp;
+        u64_t offset;
+        string_t fname;
+    }synclog;
+    bool_t is_doing;
+    bool_t is_restore_over;
+};
+
 
     extern struct spx_map *g_ydb_storage_remote;
 

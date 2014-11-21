@@ -50,10 +50,9 @@
 #include "ydb_storage_dio.h"
 
 
-spx_private void ydb_storage_dio_do_delete_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents);
 
 err_t ydb_storage_dio_delete(struct ev_loop *loop,\
-        struct ydb_storage_dio_context *dc){
+        struct ydb_storage_dio_context *dc){/*{{{*/
     err_t err = 0;
     struct spx_task_context *tc = dc->tc;
     struct spx_job_context *jc = dc->jc;
@@ -62,15 +61,14 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
     struct spx_msg *ctx = jc->reader_body_ctx;
     size_t len = jc->reader_header->bodylen;
 
-    string_t fid = NULL;
-    fid = spx_msg_unpack_string(ctx,len,&(err));
-    if(NULL == fid){
+    dc->rfid = spx_msg_unpack_string(ctx,len,&(err));
+    if(NULL == dc->rfid){
         SpxLog2(c->log,SpxLogError,err,\
                 "alloc file id for parser is fail.");
         goto r1;
     }
 
-    if(0 != ( err = ydb_storage_dio_parser_fileid(jc->log,fid,
+    if(0 != ( err = ydb_storage_dio_parser_fileid(jc->log,dc->rfid,
         &(dc->groupname),&(dc->machineid),&(dc->syncgroup),
         &(dc->issinglefile),&(dc->mp_idx),&(dc->p1),
         &(dc->p2),&(dc->tidx),&(dc->file_createtime),
@@ -83,43 +81,35 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
                 "parser fid is fail.");
         goto r1;
     }
-    spx_string_free(fid);
-    fid = NULL;
 
-    dc->buf = ydb_storage_dio_make_filename(dc->log,dc->issinglefile,
+    dc->filename = ydb_storage_dio_make_filename(dc->log,dc->issinglefile,
             c->mountpoints,
             dc->mp_idx,
             dc->p1,dc->p2,
             dc->machineid,dc->tidx,dc->file_createtime,
             dc->rand,dc->suffix,&err);
-    if(NULL == dc->buf){
+    if(NULL == dc->filename){
         SpxLog2(dc->log,SpxLogError,err,\
                 "make filename is fail.");
         goto r1;
     }
 
-    if(!SpxFileExist(dc->buf)) {
+    if(!SpxFileExist(dc->filename)) {
         SpxLogFmt1(dc->log,SpxLogWarn,\
                 "deleting-file:%s is not exist.",
-                dc->buf);
+                dc->filename);
         goto r1;
     }
 
     if(dc->issinglefile){
-        if(0 != remove(dc->buf)){
+        if(0 != remove(dc->filename)){
             err = errno;
             SpxLogFmt2(dc->log,SpxLogError,err,\
                     "delete file :%s is fail.",
-                    dc->buf);
+                    dc->filename);
         }
 
-    YdbStorageBinlog(YDB_BINLOG_DELETE,dc->issinglefile,dc->ver,dc->opver,dc->storefile->machineid,
-            dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
-            dc->storefile->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
-
-//        YdbStorageBinlog(YDB_BINLOG_DELETE,dc->issignalfile,dc->ver,dc->opver,cf->machineid,
-//                dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,
-//                cf->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
+        YdbStorageBinlogDeleteWriter(dc->rfid);
         goto r1;
     } else {
         spx_dio_regedit_async(&(dc->async),
@@ -129,9 +119,6 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
     }
     return err;
 r1:
-    if(NULL != fid){
-        spx_string_free(fid);
-    }
     spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
     jc->writer_header = (struct spx_msg_header *)
@@ -143,7 +130,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return err;
     }
-    jc->writer_header->protocol = YDB_STORAGE_DELETE;
+    jc->writer_header->protocol = jc->reader_header->protocol;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -165,9 +152,10 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
     }
     return 0;
-}
+}/*}}}*/
 
-spx_private void ydb_storage_dio_do_delete_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+void ydb_storage_dio_do_delete_form_chunkfile(
+        struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
@@ -177,7 +165,7 @@ spx_private void ydb_storage_dio_do_delete_form_chunkfile(struct ev_loop *loop,e
     struct ydb_storage_configurtion *c = jc->config;
 
     if(0 != (err =  ydb_storage_dio_delete_context_from_chunkfile(
-                    c,dc->buf,dc->begin,dc->totalsize,
+                    c,dc->filename,dc->begin,dc->totalsize,
                     dc->opver,dc->ver,dc->lastmodifytime,
                     dc->realsize,spx_now()))){
         SpxLog2(dc->log,SpxLogError,err,
@@ -185,6 +173,7 @@ spx_private void ydb_storage_dio_do_delete_form_chunkfile(struct ev_loop *loop,e
         goto r1;
     }
 
+    YdbStorageBinlogDeleteWriter(dc->rfid);
     struct spx_msg_header *wh = (struct spx_msg_header *) \
                                 spx_alloc_alone(sizeof(*wh),&err);
     if(NULL == wh){
@@ -195,7 +184,7 @@ spx_private void ydb_storage_dio_do_delete_form_chunkfile(struct ev_loop *loop,e
 
     jc->writer_header = wh;
     wh->version = YDB_VERSION;
-    wh->protocol = YDB_STORAGE_DELETE;
+    wh->protocol = YDB_C2S_DELETE;
     wh->offset = 0;
     wh->bodylen = 0;
     goto r2;
@@ -211,7 +200,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_STORAGE_DELETE;
+    jc->writer_header->protocol = jc->reader_header->protocol;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -234,7 +223,7 @@ r2:
         return;
     }
     return;
-}
+}/*}}}*/
 
 
 err_t ydb_storage_dio_delete_context_from_chunkfile(

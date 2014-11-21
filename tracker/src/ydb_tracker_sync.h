@@ -1,4 +1,3 @@
-
 /*
  * =====================================================================================
  *
@@ -13,6 +12,12 @@
  *
  * =====================================================================================
  */
+#ifndef _YDB_TRACKER_SYNC_H_
+#define _YDB_TRACKER_SYNC_H_
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -23,4 +28,13 @@
 err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
         struct spx_task_context *tcontext);
 
+err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
+        struct spx_task_context *tcontext);
 
+err_t ydb_tracker_query_timespan_for_begining_sync(struct ev_loop *loop,\
+        struct spx_task_context *tcontext);
+
+#ifdef __cplusplus
+}
+#endif
+#endif

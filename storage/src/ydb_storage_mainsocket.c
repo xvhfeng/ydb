@@ -25,7 +25,10 @@
 #include "spx_alloc.h"
 #include "spx_socket_accept.h"
 
+#include "ydb_protocol.h"
+
 #include "ydb_storage_configurtion.h"
+#include "ydb_storage_runtime.h"
 
 struct mainsocket_thread_arg{
     SpxLogDelegate *log;
@@ -96,6 +99,7 @@ spx_private void *ydb_storage_mainsocket_create(void *arg){
         goto r1;
     }
 
+    g_ydb_storage_runtime->status = YDB_STORAGE_ACCEPTING;
     spx_socket_accept_nb(c->log,main_socket_loop,mainsocket);
 r1:
     SpxClose(mainsocket);

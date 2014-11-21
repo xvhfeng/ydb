@@ -38,15 +38,13 @@ extern "C" {
         u32_t storecount;
         u32_t chunkfile_count;
         u32_t singlefile_count;
-        u64_t first_start_time;
+        u64_t this_startup_time;
+        u64_t first_statrup_time;
         u64_t total_disksize;
         u64_t total_freesize;
-        struct spx_date sync_binlog_date;
-        u32_t sync_binlog_offset;
+//        struct spx_date sync_binlog_date;
+//        u32_t sync_binlog_offset;
         u8_t status;
-        bool_t need_dsync;
-        char dsync_mps[YDB_STORAGE_MOUNTPOINT_COUNT];
-    //    struct ydb_mp_sync *mp_sync;
     };
 
     extern struct ydb_storage_runtime *g_ydb_storage_runtime;

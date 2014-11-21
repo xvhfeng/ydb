@@ -41,41 +41,46 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,int idx,struct spx_ta
     err_t err = 0;
     struct spx_job_context *jcontext = tcontext->jcontext;
     switch (jcontext->reader_header->protocol){
-        case YDB_REGEDIT_STORAGE :{
-                                      err = ydb_tracker_regedit_from_storage(loop,tcontext);
-                                      break;
-                                  }
-        case YDB_HEARTBEAT_STORAGE:{
-                                       err =  ydb_tracker_heartbeat_from_storage(loop,tcontext);
-                                       break;
-                                   }
-        case YDB_SHUTDOWN_STORAGE:{
-                                      err =  ydb_tracker_shutdown_from_storage(loop,tcontext);
-                                      break;
-                                  }
-        case YDB_TRACKER_QUERY_UPLOAD_STORAGE:{
-                                                  err =  ydb_tracker_query_upload_storage(loop,tcontext);
-                                                  break;
-                                              }
-        case YDB_TRACKER_QUERY_DELETE_STORAGE :{
-                                                   err =  ydb_tracker_query_modify_storage(loop,tcontext);
+        case YDB_S2T_REGEDIT :{
+                                  err = ydb_tracker_regedit_from_storage(loop,tcontext);
+                                  break;
+                              }
+        case YDB_S2T_HEARTBEAT:{
+                                   err =  ydb_tracker_heartbeat_from_storage(loop,tcontext);
+                                   break;
+                               }
+        case YDB_S2T_SHUTDOWN:{
+                                  err =  ydb_tracker_shutdown_from_storage(loop,tcontext);
+                                  break;
+                              }
+        case YDB_C2T_QUERY_UPLOAD_STORAGE:{
+                                              err =  ydb_tracker_query_upload_storage(loop,tcontext);
+                                              break;
+                                          }
+        case YDB_C2T_QUERY_MODIFY_STORAGE :{
+                                               err =  ydb_tracker_query_modify_storage(loop,tcontext);
+                                               break;
+                                           }
+        case YDB_C2T_QUERY_DELETE_STORAGE:{
+                                              err =  ydb_tracker_query_delete_storage(loop,tcontext);
+                                              break;
+                                          }
+        case YDB_C2T_QUERY_SELECT_STORAGE:{
+                                              err =  ydb_tracker_query_select_storage(loop,tcontext);
+                                              break;
+                                          }
+        case YDB_S2T_QUERY_SYNC_STORAGES:{
+                                             err =  ydb_tracker_query_sync_storage(loop,tcontext);
+                                             break;
+                                         }
+        case YDB_S2T_QUERY_BASE_STORAGE:{
+                                            err = ydb_tracker_query_base_storage(loop,tcontext);
+                                            break;
+                                        }
+        case YDB_S2T_QUERY_SYNC_BEGIN_TIMESPAN:{
+                                                   err = ydb_tracker_query_timespan_for_begining_sync(loop,tcontext);
                                                    break;
                                                }
-        case YDB_TRACKER_QUERY_MODIFY_STORAGE:{
-                                                  err =  ydb_tracker_query_delete_storage(loop,tcontext);
-                                                  break;
-                                              }
-        case YDB_TRACKER_QUERY_SELECT_STORAGE:{
-                                                  err =  ydb_tracker_query_select_storage(loop,tcontext);
-                                                  break;
-                                              }
-        case YDB_QUERY_SYNC_STORAGES:{
-                                               err =  ydb_tracker_query_sync_storage(loop,tcontext);
-                                                break;
-                                     }
-        case YDB_QUERY_STORAGE_STATUS:{
-                                          break;
-                                      }
         default:{
                     err = EPERM;
                     break;
@@ -121,13 +126,13 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,int idx,struct spx_ta
     size_t i = jcontext->idx % g_spx_network_module->threadpool->size;
     struct spx_thread_context *tc = spx_get_thread(g_spx_network_module,i);
     jcontext->tc = tc;
-//    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jcontext);
+    //    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jcontext);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jcontext);
     if(0 != err){
-            SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
-                    "dispath network module from task module is fail."\
-                    "then forced pushing the job context to pool.");
-            spx_job_pool_push(g_spx_job_pool,jcontext);
+        SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
+                "dispath network module from task module is fail."\
+                "then forced pushing the job context to pool.");
+        spx_job_pool_push(g_spx_job_pool,jcontext);
     }
     return err;
 }

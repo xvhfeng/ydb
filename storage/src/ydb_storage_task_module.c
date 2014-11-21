@@ -58,7 +58,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
         size_t idx = spx_network_module_wakeup_idx(jc);
         struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
         jc->tc = threadcontext;
-//        err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
+        //        err = spx_module_dispatch(threadcontext,spx_network_module_wakeup_handler,jc);
         SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
         return err;
     }
@@ -68,7 +68,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
     SpxLogFmt1(tc->log,SpxLogDebug,"jc idx:%d sf idx:%d.tc idx:%d",jc->idx,sf->tidx,tc->idx);
 
     switch (jc->reader_header->protocol){
-        case (YDB_STORAGE_UPLOAD):
+        case (YDB_C2S_UPLOAD):
             {
                 if(0 != (err = ydb_storage_dio_upload(loop,dc))){
                     SpxLog2(jc->log,SpxLogError,err,\
@@ -76,7 +76,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
                 }
                 break;
             }
-        case (YDB_STORAGE_FIND):
+        case (YDB_C2S_FIND):
             {
                 if(0 != (err = ydb_storage_dio_find(loop,dc))){
                     SpxLog2(jc->log,SpxLogError,err,
@@ -84,7 +84,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
                 }
                 break;
             }
-        case (YDB_STORAGE_MODIFY):
+        case (YDB_C2S_MODIFY):
             {
                 if(0 != (err = ydb_storage_dio_modify(loop,dc))){
                     SpxLog2(jc->log,SpxLogError,err,
@@ -92,7 +92,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
                 }
                 break;
             }
-        case (YDB_STORAGE_DELETE):
+        case (YDB_C2S_DELETE):
             {
                 if(0 != (err = ydb_storage_dio_delete(loop,dc))){
                     SpxLog2(jc->log,SpxLogError,err,
@@ -100,6 +100,26 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
                 }
                 break;
             }
+        case (YDB_S2S_QUERY_STORAGE_STATUS):
+            {
+
+                break;
+            }
+        case (YDB_S2S_SYNC_REMOTE_BINLOG):
+            {
+                break;
+            }
+        case (YDB_S2S_SYNC_REMOTE_SYNCLOG):
+            {
+
+                break;
+            }
+        case (YDB_S2S_DSYNC):{
+                                 break;
+                             }
+        case (YDB_S2S_CSYNC):{
+                                 break;
+                             }
         default:{
                     SpxLog1(jc->log,SpxLogWarn,
                             "no the protocol for operation.");
@@ -124,8 +144,8 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
                     size_t idx = spx_network_module_wakeup_idx(jc);
                     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
                     jc->tc = threadcontext;
-//                    err = spx_module_dispatch(threadcontext,
-//                            spx_network_module_wakeup_handler,jc);
+                    //                    err = spx_module_dispatch(threadcontext,
+                    //                            spx_network_module_wakeup_handler,jc);
                     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
 
                     break;

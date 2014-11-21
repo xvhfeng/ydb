@@ -236,7 +236,7 @@ spx_private err_t ydb_storage_mprtf_line_parser(struct ydb_storage_configurtion 
                        }
                        int op = atoi(*(context + i));
                        if(0 != op){
-                           mp->need_dsync = false;
+                           mp->no_dsync_force = true;
                        }
                        break;
                    }
@@ -355,7 +355,7 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
             new_context = spx_string_cat_printf(&err,context,
                     "%d:%d:%lld:%lld:%lld:%s%s",
                     mp->idx,0,mp->init_timespan,
-                    mp->last_modify_time,mp->last_freesize,
+                    mp->last_modify_time,mp->freesize,
                     mp->path,SpxLineEndDlmtString);
             if(NULL == new_context){
                 SpxLogFmt2(c->log,SpxLogError,err,
@@ -393,3 +393,4 @@ r1:
     SpxStringFree(context);
     return err;
 }/*}}}*/
+

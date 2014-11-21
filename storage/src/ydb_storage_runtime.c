@@ -72,7 +72,8 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     }
 
     if(!SpxFileExist(filename)){
-        rt->first_start_time = spx_now();
+        rt->this_startup_time = spx_now();
+        rt->first_statrup_time = rt->this_startup_time;
         spx_string_free(filename);
         return rt;
     }
@@ -102,9 +103,9 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     }
     spx_string_free(line);
     fclose(fp);
-    ev_timer_init(&(rt->w),ydb_storage_runtime_flush,(double) c->runtime_flush_timespan,(double) c->runtime_flush_timespan);
-    ev_timer_start (loop, &(rt->w));
-    ev_run(loop,0);
+//    ev_timer_init(&(rt->w),ydb_storage_runtime_flush,(double) c->runtime_flush_timespan,(double) c->runtime_flush_timespan);
+//    ev_timer_start (loop, &(rt->w));
+//    ev_run(loop,0);
     return rt;
 
 r1:
@@ -137,17 +138,31 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         spx_string_trim(*(kv + 1)," ");
     }
 
-    if(0 == spx_string_casecmp(*kv,"first_start_time")){
+//    if(0 == spx_string_casecmp(*kv,"first_start_time")){
+//        if(2 != count){
+//            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of first_start_time.");
+//            goto r1;
+//        }
+//        u64_t v = strtoul(*(kv + 1),NULL,10);
+//        if(ERANGE == v) {
+//            SpxLog1(rt->log,SpxLogError,"bad the runtime item of first_start_time.");
+//            goto r1;
+//        }
+//        rt->first_start_time = v;
+//        goto r1;
+//    }
+
+    if(0 == spx_string_casecmp(*kv,"first_startup_time")){
         if(2 != count){
-            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of first_start_time.");
+            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of first_startup_time.");
             goto r1;
         }
         u64_t v = strtoul(*(kv + 1),NULL,10);
         if(ERANGE == v) {
-            SpxLog1(rt->log,SpxLogError,"bad the runtime item of first_start_time.");
+            SpxLog1(rt->log,SpxLogError,"bad the runtime item of first_startup_time.");
             goto r1;
         }
-        rt->first_start_time = v;
+        rt->first_statrup_time = v;
         goto r1;
     }
     if(0 == spx_string_casecmp(*kv,"mpidx")){
@@ -228,6 +243,7 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         rt->total_freesize = v;
         goto r1;
     }
+    /*
     if(0 == spx_string_casecmp(*kv,"sync_binlog_date")){
         if(2 != count){
             SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of sync_binlog_date.");
@@ -255,6 +271,7 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         rt->sync_binlog_offset = v;
         goto r1;
     }
+    */
 r1:
     spx_string_free_splitres(kv,count);
 }/*}}}*/
@@ -275,22 +292,22 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
     }
 
     string_t newbuf = spx_string_cat_printf(&err,buf,\
-            "first_start_time = %ulld \n" \
+            "first_startup_time = %ulld \n" \
             "mpidx = %d \n" \
             "p1 = %d \n" \
             "p2 = %d \n" \
             "storecount = %ud \n" \
             "total_disksize = %ulld \n" \
-            "total_freesize = %ulld \n" \
-            "sync_binlog_date = %ud \n" \
-            "sync_binlog_offset = %ulld ",\
-            rt->first_start_time,\
+            "total_freesize = %ulld \n" ,
+//            "sync_binlog_date = %ud \n" \
+//            "sync_binlog_offset = %ulld ",
+            rt->first_statrup_time,
             rt->mpidx,rt->p1,rt->p2,\
             rt->storecount,\
             rt->total_disksize,\
-            rt->total_freesize,\
-            spx_zero(&(rt->sync_binlog_date)),\
-            rt->sync_binlog_offset);
+            rt->total_freesize);
+//            spx_zero(&(rt->sync_binlog_date)),
+//            rt->sync_binlog_offset);
     if(NULL == newbuf){
         SpxLog2(rt->log,SpxLogError,err,
                 "cat line context of runtime is fail.");

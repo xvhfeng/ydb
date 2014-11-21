@@ -119,7 +119,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return err;
     }
-    jc->writer_header->protocol = YDB_STORAGE_UPLOAD;
+    jc->writer_header->protocol = YDB_C2S_UPLOAD;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -151,15 +151,13 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(
 
     }
 
-    YdbStorageBinlog(YDB_BINLOG_ADD,dc->issinglefile,dc->ver,dc->opver,dc->storefile->machineid,
-            dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
-            dc->storefile->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
-
     if(0 != (err = ydb_storage_upload_after(dc))){
         SpxLog2(dc->log,SpxLogError,err,\
                 "make the response for uploading is fail.");
         goto r1;
     }
+
+    YdbStorageBinlogUploadWriter(dc->fid);
 
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
@@ -186,7 +184,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_STORAGE_UPLOAD;
+    jc->writer_header->protocol = YDB_C2S_UPLOAD;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -222,15 +220,14 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(
             cf->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
 */
 
-    YdbStorageBinlog(YDB_BINLOG_ADD,dc->issinglefile,dc->ver,dc->opver,dc->storefile->machineid,
-            dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
-            dc->storefile->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
 
     if(0 != (err = ydb_storage_upload_after(dc))){
         SpxLog2(dc->log,SpxLogError,err,\
                 "make reponse for uploading is fail.");
         goto r1;
     }
+
+    YdbStorageBinlogUploadWriter(dc->fid);
 
     SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
 
@@ -259,7 +256,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_STORAGE_UPLOAD;
+    jc->writer_header->protocol = YDB_C2S_UPLOAD;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -273,59 +270,6 @@ r1:
 //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
-}/*}}}*/
-
-
-spx_private err_t ydb_storage_upload_after(
-        struct ydb_storage_dio_context *dc){/*{{{*/
-    err_t err = 0;
-    struct spx_job_context *jc = dc->jc;
-    struct ydb_storage_configurtion *c = jc->config;
-    struct ydb_storage_storefile *cf = dc->storefile;
-
-    size_t len = 0;
-
-    string_t fid =  ydb_storage_dio_make_fileid(c->log,
-                c->groupname,c->machineid,c->syncgroup,
-                dc->issinglefile,dc->mp_idx,dc->p1,dc->p2,
-                cf->tidx,dc->file_createtime,dc->rand,
-                dc->begin,dc->realsize,dc->totalsize,
-                dc->ver,dc->opver,dc->lastmodifytime,
-                dc->hashcode,dc->has_suffix,dc->suffix,
-                &len,&err);
-
-    if(NULL == fid){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "new file is fail.");
-        return err;
-    }
-    struct spx_msg * ctx = spx_msg_new(len,&err);
-    if(NULL == ctx){
-        SpxLogFmt2(dc->log,SpxLogError,err,\
-                "new response body ctx is fail.the fid:%s.",
-                fid);
-        goto r1;
-    }
-
-    jc->writer_body_ctx = ctx;
-    spx_msg_pack_fixed_string(ctx,fid,len);
-
-    struct spx_msg_header *h = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*h),&err);
-    if(NULL == h){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail.");
-        goto r1;
-    }
-    jc->writer_header = h;
-    h->protocol = YDB_STORAGE_UPLOAD;
-    h->bodylen = len;
-    h->version = YDB_VERSION;
-    h->offset = len;
-    jc->is_sendfile = false;
-r1:
-    spx_string_free(fid);
-    return err;
 }/*}}}*/
 
 err_t ydb_storage_dio_upload_to_chunkfile(
@@ -349,7 +293,7 @@ err_t ydb_storage_dio_upload_to_chunkfile(
                 "alloc metadata for chunkfile is fail.");
         return err;
     }
-
+    dc->opver ++;//begin with 1 and for sync
     spx_msg_pack_false(dc->metadata);//isdelete
     spx_msg_pack_u32(dc->metadata,dc->opver);
     spx_msg_pack_u32(dc->metadata,dc->ver);
@@ -523,3 +467,55 @@ r1:
 
     return err;
 }/*}}}*/
+
+
+spx_private err_t ydb_storage_upload_after(
+        struct ydb_storage_dio_context *dc){/*{{{*/
+    err_t err = 0;
+    struct spx_job_context *jc = dc->jc;
+    struct ydb_storage_configurtion *c = jc->config;
+    struct ydb_storage_storefile *cf = dc->storefile;
+
+    size_t len = 0;
+
+   dc->fid =  ydb_storage_dio_make_fileid(c->log,
+                c->groupname,c->machineid,c->syncgroup,
+                dc->issinglefile,dc->mp_idx,dc->p1,dc->p2,
+                cf->tidx,dc->file_createtime,dc->rand,
+                dc->begin,dc->realsize,dc->totalsize,
+                dc->ver,dc->opver,dc->lastmodifytime,
+                dc->hashcode,dc->has_suffix,dc->suffix,
+                &len,&err);
+
+    if(NULL == dc->fid){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "new file is fail.");
+        return err;
+    }
+    struct spx_msg * ctx = spx_msg_new(len,&err);
+    if(NULL == ctx){
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "new response body ctx is fail.the fid:%s.",
+                fid);
+        return err;
+    }
+
+    jc->writer_body_ctx = ctx;
+    spx_msg_pack_fixed_string(ctx,dc->fid,len);
+
+    struct spx_msg_header *h = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*h),&err);
+    if(NULL == h){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "new response header is fail.");
+        return err;
+    }
+    jc->writer_header = h;
+    h->protocol = YDB_C2S_UPLOAD;
+    h->bodylen = len;
+    h->version = YDB_VERSION;
+    h->offset = len;
+    jc->is_sendfile = false;
+    return err;
+}/*}}}*/
+

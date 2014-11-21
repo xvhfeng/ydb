@@ -27,7 +27,8 @@ extern "C" {
 #include "spx_task.h"
 
     struct ydb_remote_storage{
-        u64_t fisrt_start;
+        u64_t this_startup_time;
+        u64_t first_startup_time;
         u64_t last_heartbeat;
         u64_t disksize;
         u64_t freesize;

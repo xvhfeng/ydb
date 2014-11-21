@@ -184,9 +184,10 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
 
     storage->port = spx_msg_unpack_i32(ctx);
     u64_t first_start = spx_msg_unpack_u64(ctx);
-    if(0 == storage->fisrt_start || first_start < storage->fisrt_start){
-        storage->fisrt_start = first_start;
+    if(0 == storage->first_startup_time || first_start < storage->first_startup_time){
+        storage->first_startup_time = first_start;
     }
+    storage->this_startup_time = spx_msg_unpack_u64(ctx);
     storage->disksize = spx_msg_unpack_u64(ctx);
     storage->freesize = spx_msg_unpack_u64(ctx);
     storage->status = spx_msg_unpack_u32(ctx);
@@ -239,7 +240,8 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->syncgroup,YDB_SYNCGROUP_LEN);
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->ip,SpxIpv4Size);
     spx_msg_pack_i32(response_body_ctx,storage->port);
-    spx_msg_pack_u64(response_body_ctx,storage->fisrt_start);
+    spx_msg_pack_u64(response_body_ctx,storage->first_startup_time);
+    spx_msg_pack_u64(response_body_ctx,storage->this_startup_time);
     spx_msg_pack_u64(response_body_ctx,storage->disksize);
     spx_msg_pack_u64(response_body_ctx,storage->freesize);
     spx_msg_pack_u32(response_body_ctx,storage->status);
@@ -268,7 +270,7 @@ err_t ydb_tracker_regedit_from_storage(struct ev_loop *loop,struct spx_task_cont
     if(NULL == jcontext){
         return EINVAL;
     }
-    return  ydb_remote_storage_report(loop,YDB_REGEDIT_STORAGE,tcontext);
+    return  ydb_remote_storage_report(loop,YDB_S2T_REGEDIT,tcontext);
 }/*}}}*/
 
 err_t ydb_tracker_heartbeat_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
@@ -279,7 +281,7 @@ err_t ydb_tracker_heartbeat_from_storage(struct ev_loop *loop,struct spx_task_co
     if(NULL == jcontext){
         return EINVAL;
     }
-    return  ydb_remote_storage_report(loop,YDB_HEARTBEAT_STORAGE,tcontext);
+    return  ydb_remote_storage_report(loop,YDB_S2T_HEARTBEAT,tcontext);
 }/*}}}*/
 
 err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
@@ -290,5 +292,5 @@ err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_con
     if(NULL == jcontext){
         return EINVAL;
     }
-    return  ydb_remote_storage_report(loop,YDB_SHUTDOWN_STORAGE,tcontext);
+    return  ydb_remote_storage_report(loop,YDB_S2T_SHUTDOWN,tcontext);
 }/*}}}*/

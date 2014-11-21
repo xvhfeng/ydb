@@ -45,6 +45,7 @@ extern "C" {
         time_t last_modify_time;
         time_t init_timespan;
         u64_t last_freesize;
+        bool_t no_dsync_force;
         bool_t need_dsync;
         bool_t isusing;
     };
@@ -101,9 +102,11 @@ struct ydb_tracker{
         string_t ip;
         i32_t port;
         u32_t timeout;
+        u32_t waitting;
         string_t basepath;
         string_t logpath;
         string_t logprefix;
+        string_t dologpath;
         u64_t logsize;
         i8_t loglevel;
         u64_t binlog_size;

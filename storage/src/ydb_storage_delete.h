@@ -42,6 +42,8 @@ err_t ydb_storage_dio_delete_context_from_chunkfile(
         u64_t crealsize,
         u64_t lastmodifytime);
 
+void ydb_storage_dio_do_delete_form_chunkfile(
+        struct ev_loop *loop,ev_async *w,int revents);
 #ifdef __cplusplus
 }
 #endif

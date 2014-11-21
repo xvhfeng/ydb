@@ -102,17 +102,16 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
         struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
-    TypeConvert(struct ydb_storage_dio_context *,dc,w->data);
+    SpxTypeConvert2(struct ydb_storage_dio_context,dc,w->data);
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
 
-    string_t ofid = NULL;
     string_t o_fname = NULL;
 
     struct spx_msg *ctx = jc->reader_body_ctx;
     spx_msg_seek(ctx,0,SpxMsgSeekSet);
     size_t ofid_len = spx_msg_unpack_i32(ctx);
-    ofid =  spx_msg_unpack_string(ctx,ofid_len,&err);
+    dc->rfid =  spx_msg_unpack_string(ctx,ofid_len,&err);
 
     dc->has_suffix = spx_msg_unpack_bool(ctx);
     if(dc->has_suffix){
@@ -139,7 +138,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
     u32_t o_opver = 0;
     u64_t o_lastmodifytime = 0l;
     bool_t o_has_suffix = false;
-    if(0 != ( err = ydb_storage_dio_parser_fileid(jc->log,ofid,
+    if(0 != ( err = ydb_storage_dio_parser_fileid(jc->log,dc->rfid,
                     &(o_groupname),&(o_machineid),&(o_syncgroup),
                     &(o_issinglefile),&(o_mpidx),&(o_p1),
                     &(o_p2),&(o_tidx),&(o_fcreatetime),
@@ -418,9 +417,6 @@ r1:
     if(NULL != o_suffix){
         SpxStringFree(o_suffix);
     }
-    if(NULL != ofid){
-        SpxStringFree(ofid);
-    }
     if(NULL != o_fname){
         SpxStringFree(o_fname);
     }
@@ -436,7 +432,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_STORAGE_MODIFY;
+    jc->writer_header->protocol = YDB_C2S_MODIFY;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -451,6 +447,7 @@ r1:
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r2:
+    YdbStorageBinlogModifyWriter(dc->fid,dc->rfid);
     if(NULL != o_groupname){
         SpxStringFree(o_groupname);
     }
@@ -465,9 +462,6 @@ r2:
     }
     if(NULL != o_suffix){
         SpxStringFree(o_suffix);
-    }
-    if(NULL != ofid){
-        SpxStringFree(ofid);
     }
     if(NULL != o_fname){
         SpxStringFree(o_fname);
@@ -490,16 +484,15 @@ spx_private void ydb_storage_do_modify_to_singlefile(
         struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
-    TypeConvert(struct ydb_storage_dio_context *,dc,w->data);
+    SpxTypeConvert2(struct ydb_storage_dio_context,dc,w->data);
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
-    string_t ofid = NULL;
     string_t o_fname = NULL;
 
     struct spx_msg *ctx = jc->reader_body_ctx;
     spx_msg_seek(ctx,0,SpxMsgSeekSet);
     size_t ofid_len = spx_msg_unpack_i32(ctx);
-    ofid =  spx_msg_unpack_string(ctx,ofid_len,&err);
+    dc->rfid =  spx_msg_unpack_string(ctx,ofid_len,&err);
 
     dc->has_suffix = spx_msg_unpack_bool(ctx);
     if(dc->has_suffix){
@@ -526,7 +519,7 @@ spx_private void ydb_storage_do_modify_to_singlefile(
     u32_t o_opver = 0;
     u64_t o_lastmodifytime = 0l;
     bool_t o_has_suffix = false;
-    if(0 != ( err = ydb_storage_dio_parser_fileid(jc->log,ofid,
+    if(0 != ( err = ydb_storage_dio_parser_fileid(jc->log,dc->rfid,
                     &(o_groupname),&(o_machineid),&(o_syncgroup),
                     &(o_issinglefile),&(o_mpidx),&(o_p1),
                     &(o_p2),&(o_tidx),&(o_fcreatetime),
@@ -710,9 +703,6 @@ r1:
     if(NULL != o_suffix){
         SpxStringFree(o_suffix);
     }
-    if(NULL != ofid){
-        SpxStringFree(ofid);
-    }
     if(NULL != o_fname){
         SpxStringFree(o_fname);
     }
@@ -728,7 +718,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_STORAGE_MODIFY;
+    jc->writer_header->protocol = YDB_C2S_MODIFY;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -743,6 +733,7 @@ r1:
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r2:
+    YdbStorageBinlogModifyWriter(dc->fid,dc->rfid);
     if(NULL != o_groupname){
         SpxStringFree(o_groupname);
     }
@@ -757,9 +748,6 @@ r2:
     }
     if(NULL != o_suffix){
         SpxStringFree(o_suffix);
-    }
-    if(NULL != ofid){
-        SpxStringFree(ofid);
     }
     if(NULL != o_fname){
         SpxStringFree(o_fname);
@@ -784,11 +772,11 @@ spx_private err_t ydb_storage_modify_after(
     err_t err = 0;
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
-    struct ydb_storage_storefile *cf = dc->storefile;
+//    struct ydb_storage_storefile *cf = dc->storefile;
 
     size_t len = 0;
 
-    string_t fid =  ydb_storage_dio_make_fileid(c->log,
+    dc->fid =  ydb_storage_dio_make_fileid(c->log,
             c->groupname,c->machineid,c->syncgroup,
             dc->issinglefile,dc->mp_idx,dc->p1,dc->p2,
             dc->tidx,dc->file_createtime,dc->rand,
@@ -797,7 +785,7 @@ spx_private err_t ydb_storage_modify_after(
             dc->hashcode,dc->has_suffix,dc->suffix,
             &len,&err);
 
-    if(NULL == fid){
+    if(NULL == dc->fid){
         SpxLog2(dc->log,SpxLogError,err,\
                 "new file is fail.");
         return err;
@@ -806,28 +794,26 @@ spx_private err_t ydb_storage_modify_after(
     if(NULL == ctx){
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "new response body ctx is fail.the fid:%s.",
-                fid);
-        goto r1;
+                dc->fid);
+        return err;
     }
 
     jc->writer_body_ctx = ctx;
-    spx_msg_pack_fixed_string(ctx,fid,len);
+    spx_msg_pack_fixed_string(ctx,dc->fid,len);
 
     struct spx_msg_header *h = (struct spx_msg_header *)
         spx_alloc_alone(sizeof(*h),&err);
     if(NULL == h){
         SpxLog2(dc->log,SpxLogError,err,\
                 "new response header is fail.");
-        goto r1;
+        return err;
     }
     jc->writer_header = h;
-    h->protocol = YDB_STORAGE_MODIFY;
+    h->protocol = YDB_C2S_MODIFY;
     h->bodylen = len;
     h->version = YDB_VERSION;
     h->offset = len;
     jc->is_sendfile = false;
-r1:
-    SpxStringFree(fid);
     return err;
 }/*}}}*/
 

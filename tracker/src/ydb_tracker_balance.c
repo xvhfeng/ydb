@@ -313,7 +313,7 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
         goto r1;
     }
     jcontext->writer_header = response_header;
-    response_header->protocol = YDB_TRACKER_QUERY_UPLOAD_STORAGE;
+    response_header->protocol = YDB_C2T_QUERY_UPLOAD_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
     jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
@@ -390,7 +390,7 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
         goto r1;
     }
     jcontext->writer_header = response_header;
-    response_header->protocol = YDB_TRACKER_QUERY_MODIFY_STORAGE;
+    response_header->protocol = YDB_C2T_QUERY_MODIFY_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
     jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
@@ -469,7 +469,7 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
         goto r1;
     }
     jcontext->writer_header = response_header;
-    response_header->protocol = YDB_TRACKER_QUERY_DELETE_STORAGE;
+    response_header->protocol = YDB_C2T_QUERY_DELETE_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
     jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
@@ -548,7 +548,7 @@ err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_cont
         goto r1;
     }
     jcontext->writer_header = response_header;
-    response_header->protocol = YDB_TRACKER_QUERY_SELECT_STORAGE;
+    response_header->protocol = YDB_C2T_QUERY_SELECT_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
     jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));

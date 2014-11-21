@@ -50,13 +50,15 @@ spx_private void *ydb_storage_report(void *arg);
 spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
         struct ydb_tracker *tracker,string_t groupname,string_t machineid,\
         string_t syncgroup,string_t ip,int port,\
-        u64_t first_start,u64_t disksize,u64_t freesize,int status,
+        u64_t first_start,u64_t this_startup_time,
+        u64_t disksize,u64_t freesize,int status,
         u32_t timeout);
 
 spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
         struct ydb_tracker *tracker,string_t groupname,string_t machineid,\
-        string_t syncgroup,string_t ip,int port,\
-        u64_t first_start,u64_t disksize,u64_t freesize,int status,
+        string_t syncgroup,string_t ip,int port,
+        u64_t first_start,u64_t this_startup_time,
+        u64_t disksize,u64_t freesize,int status,
         u32_t timeout){/*{{{*/
     err_t err = 0;
     struct spx_job_context *jc = tracker->hjc;
@@ -110,6 +112,7 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
     spx_msg_pack_fixed_string(ctx,ip,SpxIpv4Size);
     spx_msg_pack_i32(ctx,port);
     spx_msg_pack_u64(ctx,first_start);
+    spx_msg_pack_u64(ctx,this_startup_time);
     spx_msg_pack_u64(ctx,disksize);
     spx_msg_pack_u64(ctx,freesize);
     spx_msg_pack_i32(ctx,status);
@@ -156,10 +159,11 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
 
     struct ydb_tracker *t = NULL;
     while(NULL != (t = spx_vector_iter_next(iter))){
-        ydb_storage_heartbeat_send( hloop,YDB_HEARTBEAT_STORAGE,
-                t,c->groupname,c->machineid,c->syncgroup,\
+        ydb_storage_heartbeat_send( hloop,YDB_S2T_HEARTBEAT,
+                t,c->groupname,c->machineid,c->syncgroup,
                 c->ip,c->port,
-                g_ydb_storage_runtime->first_start_time,\
+                g_ydb_storage_runtime->first_statrup_time,
+                g_ydb_storage_runtime->this_startup_time,
                 disksize,freesize,g_ydb_storage_runtime->status,
                 c->timeout);
     }
@@ -199,9 +203,10 @@ spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_c
     bool_t can_run = false;
     struct ydb_tracker *t = NULL;
     while(NULL != (t = spx_vector_iter_next(iter))){
-        err = ydb_storage_heartbeat_send( loop,YDB_REGEDIT_STORAGE,\
+        err = ydb_storage_heartbeat_send( loop,YDB_S2T_REGEDIT,
                 t,c->groupname,c->machineid,c->syncgroup,c->ip,c->port,
-                g_ydb_storage_runtime->first_start_time,\
+                g_ydb_storage_runtime->first_statrup_time,
+                g_ydb_storage_runtime->this_startup_time,
                 disksize,freesize,g_ydb_storage_runtime->status,
                 c->timeout);
 
@@ -239,13 +244,15 @@ spx_private void *ydb_storage_report(void *arg){/*{{{*/
 void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
         string_t groupname,string_t machineid,\
         string_t syncgroup, string_t ip,int port,\
-        u64_t first_start,u64_t disksize,u64_t freesize,
+        u64_t first_start,u64_t this_startup_time,
+        u64_t disksize,u64_t freesize,
         u32_t timeout){/*{{{*/
     g_ydb_storage_runtime->status = YDB_STORAGE_CLOSING;
     ev_timer_stop(hloop,heartbeat_timer);
-    ydb_storage_heartbeat_send(hloop,YDB_SHUTDOWN_STORAGE,
+    ydb_storage_heartbeat_send(hloop,YDB_S2T_SHUTDOWN,
             tracker,groupname,machineid,syncgroup,ip,port,
-            first_start,disksize,freesize,YDB_STORAGE_CLOSING,
+            first_start,this_startup_time,
+            disksize,freesize,YDB_STORAGE_CLOSING,
             timeout );
     g_ydb_storage_runtime->status = YDB_STORAGE_CLOSED;
 }/*}}}*/
@@ -276,8 +283,8 @@ spx_private void ydb_storage_heartbeat_nio_body_reader(struct ev_loop *loop,
             + YDB_MACHINEID_LEN + YDB_SYNCGROUP_LEN + SpxIpv4Size \
             + sizeof(i32_t),SpxMsgSeekSet);
     u64_t first_start = spx_msg_unpack_u64(ctx);
-    if(first_start < g_ydb_storage_runtime->first_start_time){
-        g_ydb_storage_runtime->first_start_time = first_start;
+    if(first_start < g_ydb_storage_runtime->first_statrup_time){
+        g_ydb_storage_runtime->first_statrup_time = first_start;
     }
 
 r1:
