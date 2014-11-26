@@ -42,16 +42,19 @@ extern "C" {
         u64_t first_statrup_time;
         u64_t total_disksize;
         u64_t total_freesize;
-//        struct spx_date sync_binlog_date;
-//        u32_t sync_binlog_offset;
+        //        struct spx_date sync_binlog_date;
+        //        u32_t sync_binlog_offset;
         u8_t status;
     };
 
     extern struct ydb_storage_runtime *g_ydb_storage_runtime;
 
     struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
-        SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err);
+            SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err);
 
+    string_t ydb_storage_make_runtime_filename(
+            struct ydb_storage_configurtion *c,
+            err_t *err);
 
 #ifdef __cplusplus
 }

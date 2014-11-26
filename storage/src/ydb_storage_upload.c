@@ -171,7 +171,6 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r1:
-
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
@@ -467,7 +466,6 @@ r1:
 
     return err;
 }/*}}}*/
-
 
 spx_private err_t ydb_storage_upload_after(
         struct ydb_storage_dio_context *dc){/*{{{*/

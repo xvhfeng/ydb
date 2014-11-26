@@ -10,6 +10,7 @@ extern "C" {
 
 #include "ydb_protocol.h"
 #include "ydb_storage_binlog.h"
+#include "ydb_storage_synclog.h"
 
 
 #define YDB_STORAGE_REMOTE_SYNCSTATE_NONE 0
@@ -21,6 +22,20 @@ extern struct spx_threadpool *g_sync_threadpool;
 struct ydb_storage_csync_beginpoint{
             struct spx_date date;
             u64_t offset;
+};
+
+
+struct ydb_storage_sync_context {
+    int sock;
+    int fd;
+    char *ptr;
+    size_t len;
+    struct spx_msg_context *request;
+    struct spx_msg_context *response;
+    struct ydb_storage_fid *fid;
+    struct spx_msg *md;
+    string_t fname;
+    string_t smd;
 };
 
 struct ydb_storage_remote{
@@ -35,21 +50,19 @@ struct ydb_storage_remote{
         u64_t offset;
         string_t fname;
     }read_binlog;
-    struct {
-        struct spx_date date;
-        FILE *fp;
-        u64_t offset;
-        string_t fname;
-    }synclog;
+    struct ydb_storage_synclog synclog;
     bool_t is_doing;
     bool_t is_restore_over;
 };
 
 
-    extern struct spx_map *g_ydb_storage_remote;
+extern struct spx_map *g_ydb_storage_remote;
 
 struct spx_periodic *ydb_storage_sync_query_storages_init(
         struct ydb_storage_configurtion *c,err_t *err);
+
+void ydb_storage_sync_context_free(
+        struct ydb_storage_sync_context **ysdc);
 
 #ifdef __cplusplus
 }

@@ -133,7 +133,15 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
         struct ydb_storage_dio_context *dc,\
         struct ydb_storage_storefile *cf);
 
-
+#define YdbStorageParserFileidWithDIOContext(log,fid,dc) \
+    ydb_storage_dio_parser_fileid(log,fid,\
+            &(dc->groupname),&(dc->machineid),&(dc->syncgroup),\
+            &(dc->issinglefile),&(dc->mp_idx),&(dc->p1),\
+            &(dc->p2),&(dc->tidx),&(dc->file_createtime),\
+            &(dc->rand),&(dc->begin),&(dc->realsize),\
+            &(dc->totalsize),&(dc->ver),&(dc->opver),\
+            &(dc->lastmodifytime),&(dc->hashcode),\
+            &(dc->has_suffix),&(dc->suffix))
 
 #ifdef __cplusplus
 }

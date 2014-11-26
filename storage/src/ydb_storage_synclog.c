@@ -75,8 +75,6 @@ spx_private err_t ydb_storage_synclog_reopen(struct ydb_storage_synclog *synclog
 
 spx_private err_t ydb_storage_synclog_open(struct ydb_storage_synclog *synclog){/*{{{*/
     //skip synclog but no flush state into disk
-    spx_get_today(&(synclog->d));
-
     synclog->filename = ydb_storage_synclog_make_filename(synclog->log,synclog->path,
             synclog->machineid,synclog->d.year,synclog->d.month,synclog->d.day,&(synclog->err));
     if(NULL == synclog->filename){
@@ -121,42 +119,46 @@ spx_private err_t ydb_storage_synclog_open(struct ydb_storage_synclog *synclog){
     return 0;
 }/*}}}*/
 
-struct ydb_storage_synclog *ydb_storage_synclog_new(SpxLogDelegate *log,\
-        string_t path,string_t machineid,
-        err_t *err){/*{{{*/
-    struct ydb_storage_synclog *synclog = (struct ydb_storage_synclog *)\
-                                        spx_alloc_alone(sizeof(*synclog),err);
+err_t ydb_storage_synclog_init(
+        struct ydb_storage_synclog *synclog,
+        SpxLogDelegate *log,
+        string_t path,string_t machineid, int year,
+        int month,int day,u64_t offset){/*{{{*/
+    err_t err = 0;
     if(NULL == synclog){
-        SpxLog2(log,SpxLogError,*err,\
+        SpxLog2(log,SpxLogError,err,\
                 "new storage synclog is fail.");
-        return NULL;
+        return err;
     }
 
     synclog->log = log;
     synclog->path = path;
     synclog->machineid = machineid;
-    synclog->mlock = spx_thread_mutex_new(log,err);
-    if(NULL == synclog->mlock){
-        goto r1;
-    }
-    if(0 != (*err = ydb_storage_synclog_open(synclog))){
-        SpxLogFmt2(log,SpxLogError,*err,
+    synclog->d.year = year;
+    synclog->d.month = month;
+    synclog->d.day = day;
+    if(0 != (err = ydb_storage_synclog_open(synclog))){
+        SpxLogFmt2(log,SpxLogError,err,
                 "open synclog:%s is fail.",
                 synclog->filename);
-        goto r1;
+        return err;
     }
-    return synclog;
-r1:
-    ydb_storage_synclog_free(&synclog);
-    return NULL;
+    if(0 != offset){
+        if(0 != fseek(synclog->fp,offset,SEEK_SET)){
+            err = errno;
+            SpxLogFmt2(log,SpxLogError,err,
+                    "seek synclog file pointer to %d is fail."
+                    "reset begining with 0.",
+                    offset);
+        } else {
+            synclog->off = offset;
+        }
+    }
+    return err;;
 }/*}}}*/
 
-void ydb_storage_synclog_write(struct ydb_storage_synclog *synclog,\
-        char op,string_t fid,string_t rfid){/*{{{*/
-    if(NULL == synclog){
-        return;
-    }
-
+void  ydb_storage_synclog_write(struct ydb_storage_synclog *synclog,
+        time_t log_time, char op,string_t fid,string_t rfid){/*{{{*/
     err_t err = 0;
     string_t loginfo = spx_string_newlen(NULL,SpxLineSize,&err);
     if(NULL == loginfo){
@@ -176,25 +178,18 @@ void ydb_storage_synclog_write(struct ydb_storage_synclog *synclog,\
     }
 
     size_t size = spx_string_len(loginfo);
-    time_t now = spx_now();
-    if(0 == pthread_mutex_lock(synclog->mlock)){
-        do{
-            if(now > spx_zero(&(synclog->d)) + SpxSecondsOfDay){
-                spx_date_add(&(synclog->d),1);
-                ydb_storage_synclog_reopen(synclog);
-            }
-            size_t len = 0;
-            synclog->err = spx_fwrite_string(synclog->fp,loginfo,size,&len);
-            if(0 != synclog->err || size != len){
-                SpxLogFmt2(synclog->log,SpxLogError,synclog->err,\
-                        "write synclog is fail.loginfo:%s,size:%lld,realsize:%lld.",
-                        loginfo,size,len);
-                break;
-            }
-            synclog->off += len;
-        }while(false);
-        pthread_mutex_unlock(synclog->mlock);
+    if(log_time != spx_zero(&(synclog->d))){
+        spx_get_date(&log_time,&(synclog->d));
+        ydb_storage_synclog_reopen(synclog);
     }
+    size_t len = 0;
+    synclog->err = spx_fwrite_string(synclog->fp,loginfo,size,&len);
+    if(0 != synclog->err || size != len){
+        SpxLogFmt2(synclog->log,SpxLogError,synclog->err,\
+                "write synclog is fail.loginfo:%s,size:%lld,realsize:%lld.",
+                loginfo,size,len);
+    }
+    synclog->off += len;
     SpxStringFree(loginfo);
     return;
 }/*}}}*/
@@ -207,9 +202,6 @@ void ydb_storage_synclog_free(struct ydb_storage_synclog **synclog){/*{{{*/
         if(NULL != (*synclog)->filename) {
             SpxStringFree((*synclog)->filename);
         }
-    }
-    if(NULL != (*synclog)->mlock){
-        spx_thread_mutex_free(&(*synclog)->mlock);
     }
     SpxFree(*synclog);
 }/*}}}*/
@@ -236,36 +228,4 @@ string_t ydb_storage_synclog_make_filename(SpxLogDelegate *log,string_t path,str
     return filename;
 }/*}}}*/
 
-err_t ydb_storage_synclog_line_parser(string_t line,
-        char *op,string_t *fid,string_t *rfid){/*{{{*/
-    if(SpxStringIsNullOrEmpty(line)){
-        return EINVAL;
-    }
-    if(SpxStringEndWith(line,SpxLineEndDlmt)){
-        spx_string_strip_linefeed(line);
-    }
-    err_t err = 0;
-    int count = 0;
-    string_t *strs = spx_string_split(line,"\t",strlen("\t"),&count,&err);
-    if(0 != err){
-        return err;
-    }
-    if(YDB_STORAGE_MODIFY == *line){
-        if(3 != count){
-            spx_string_free_splitres(strs,count);
-            return EIO;
-        }
-        *op = **strs;
-        *fid = *(strs + 1);
-        *rfid = *(strs + 2);
-    } else {
-        if(2 != count){
-            spx_string_free_splitres(strs,count);
-            return EIO;
-        }
-        *op = **strs;
-        *fid = *(strs + 1);
-    }
-    return 0;
-}/*}}}*/
 

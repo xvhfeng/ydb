@@ -45,27 +45,13 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
                 "new storage runtime is fail.");
         return NULL;
     }
-    string_t new_basepath = NULL;
     string_t line = NULL;
     string_t filename = NULL;
     FILE *fp = NULL;
     rt->c = c;
     rt->log = log;
-    new_basepath = spx_string_dup(c->basepath,err);
-    if(NULL == new_basepath){
-        SpxLog2(log,SpxLogError,*err,"dup the basepath is fail.");
-        goto r1;
-    }
 
-    if(SpxStringEndWith(new_basepath,SpxPathDlmt)){
-        filename = spx_string_cat_printf(err,new_basepath,\
-                ".%s-%s-rtf.spx",\
-                c->groupname,c->machineid);
-    } else {
-        filename = spx_string_cat_printf(err,new_basepath,\
-                "/.%s-%s-rtf.spx",\
-                c->groupname,c->machineid);
-    }
+    filename = ydb_storage_make_runtime_filename(c,err);
     if(NULL == filename){
         SpxLog2(log,SpxLogError,*err,"get storage mid filename is fail.");
         goto r1;
@@ -113,7 +99,7 @@ r1:
         SpxFree(rt);
     }
     if(NULL != filename){
-        spx_string_free(new_basepath);
+        spx_string_free(filename);
     }
     if(NULL != line){
         spx_string_free(line);
@@ -280,10 +266,7 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
     struct ydb_storage_runtime *rt = (struct ydb_storage_runtime *) w;
     struct ydb_storage_configurtion *c = rt->c;
     err_t err = 0;
-
     string_t filename = NULL;
-    string_t new_basepath = NULL;
-
     string_t buf = spx_string_newlen(NULL,SpxLineSize,&err);
     if(NULL == buf){
         SpxLog2(rt->log,SpxLogError,err,\
@@ -315,27 +298,12 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
     }
     buf = newbuf;
 
-    new_basepath = spx_string_dup(c->basepath,&err);
-    if(NULL == new_basepath){
-        SpxLog2(rt->log,SpxLogError,err,"dup the basepath is fail.");
-        goto r1;
-    }
-
-    if(SpxStringEndWith(new_basepath,SpxPathDlmt)){
-        filename = spx_string_cat_printf(&err,new_basepath,\
-                "%s.%s-%s-rtf.spx",\
-                new_basepath,c->groupname,c->machineid);
-    } else {
-        filename = spx_string_cat_printf(&err,new_basepath,\
-                "%s/.%s-%s-rtf.spx",\
-                new_basepath,c->groupname,c->machineid);
-    }
+    filename = ydb_storage_make_runtime_filename(c,&err);
     if(NULL == filename){
-        SpxLog2(rt->log,SpxLogError,err,"get storage mid filename is fail.");
+        SpxLog2(c->log,SpxLogError,err,"get storage mid filename is fail.");
         goto r1;
     }
-    new_basepath = filename;
-    FILE *fp = fopen(new_basepath,"w+");
+    FILE *fp = fopen(filename,"w+");
     if(NULL == fp) {
         err = errno;
         SpxLogFmt2(rt->log,SpxLogError,err,\
@@ -358,9 +326,39 @@ r1:
         spx_string_free(buf);
     }
     if(NULL != filename){
-        spx_string_free(new_basepath);
+        spx_string_free(filename);
     }
     return;
 
+}/*}}}*/
+
+string_t ydb_storage_make_runtime_filename(
+        struct ydb_storage_configurtion *c,
+        err_t *err
+        ){/*{{{*/
+    string_t fname = NULL;
+    string_t new_fname = NULL;
+    fname = spx_string_dup(c->basepath,err);
+    if(NULL == fname){
+        SpxLog2(c->log,SpxLogError,*err,"dup the basepath is fail.");
+        return NULL;
+    }
+
+    if(SpxStringEndWith(fname,SpxPathDlmt)){
+        new_fname = spx_string_cat_printf(err,fname,\
+                ".%s-%s-rtf.spx",\
+                c->groupname,c->machineid);
+    } else {
+        new_fname = spx_string_cat_printf(err,fname,\
+                "/.%s-%s-rtf.spx",\
+                c->groupname,c->machineid);
+    }
+    if(NULL == new_fname){
+        SpxLog2(c->log,SpxLogError,*err,"get storage mid filename is fail.");
+        SpxStringFree(fname);
+        return NULL;
+    }
+    fname = new_fname;
+    return fname;
 }/*}}}*/
 

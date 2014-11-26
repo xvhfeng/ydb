@@ -165,12 +165,8 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
 
     bool_t is_ofile_exist = SpxFileExist(o_fname);
 
-    //if modify the old context buffer,
-    //just only in the chunkfile and old-totalsize >= new-realsize
+    //the file is exist and old-file context can save new file-context
     if(is_ofile_exist && !o_issinglefile && o_totalsize >= dc->realsize){
-        //first check the old file is in the context
-        //if not,then do upload new file
-
         u32_t unit = (int) o_begin / c->pagesize;
         u64_t begin = unit * c->pagesize;
         u64_t offset = o_begin - begin;
@@ -197,7 +193,6 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                     o_fname);
             goto r1;
         }
-
         struct spx_msg *ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
         if(NULL == ioctx){
             SpxLog2(dc->log,SpxLogError,err,\
@@ -248,12 +243,93 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
             goto r1;
         }
 
-        if(o_opver != io_opver || o_ver != io_ver
-                || o_lastmodifytime != io_lastmodifytime
-                || o_totalsize != io_totalsize
-                || o_realsize != io_realsize){
-            SpxLog2(dc->log,SpxLogError,err,\
-                    "the file is not same as want to delete-file.");
+        //the file is want to modify context by client
+        //if not,do upload
+        if(o_opver == io_opver && o_ver == io_ver
+                && o_lastmodifytime == io_lastmodifytime
+                && o_totalsize == io_totalsize
+                && o_realsize == io_realsize){
+
+            dc->totalsize = o_totalsize;//update total size
+            dc->opver ++;
+
+            spx_msg_clear(ioctx);
+            spx_msg_pack_false(ioctx);//isdelete
+            spx_msg_pack_u32(ioctx,dc->opver);
+            spx_msg_pack_u32(ioctx,dc->ver);
+            spx_msg_pack_u64(ioctx,dc->createtime);
+            spx_msg_pack_u64(ioctx,dc->lastmodifytime);
+            spx_msg_pack_u64(ioctx,dc->totalsize);
+            spx_msg_pack_u64(ioctx,dc->realsize);
+            if(dc->has_suffix){
+                spx_msg_pack_fixed_string(ioctx,
+                        dc->suffix,YDB_FILENAME_SUFFIX_SIZE);
+            } else {
+                spx_msg_align(ioctx,YDB_FILENAME_SUFFIX_SIZE);
+            }
+
+            if(NULL == dc->hashcode){
+                spx_msg_align(ioctx,YDB_HASHCODE_SIZE);
+            } else {
+                spx_msg_pack_fixed_string(ioctx,
+                        dc->hashcode,YDB_HASHCODE_SIZE);
+            }
+
+            u64_t off = offset;
+            size_t recvbytes = 0;
+            size_t writebytes = 0;
+            size_t unitlen = 0;
+
+            memcpy(mptr + off,
+                    ioctx->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
+            off += YDB_CHUNKFILE_MEMADATA_SIZE;
+            if(jc->is_lazy_recv){
+                do{
+                    recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
+                                ? YdbBufferSizeForLazyRecv \
+                                : dc->realsize - writebytes;
+                    err = spx_read_nb(jc->fd,(byte_t *) dc->buf,recvbytes,&unitlen);
+                    if(0 != err || recvbytes != unitlen){
+                        SpxLogFmt2(dc->log,SpxLogError,err,\
+                                "lazy read buffer and cp to mmap is fail."
+                                "recvbytes:%lld,real recvbytes:%lld."
+                                "writedbytes:%lld,total size:%lld.",
+                                recvbytes,unitlen,writebytes,dc->realsize);
+
+                        spx_msg_free(&ioctx);
+                        SpxClose(fd);
+                        munmap(mptr,len);
+                        if(NULL != io_suffix){
+                            SpxStringFree(io_suffix);
+                        }
+                        if(NULL != io_hashcode){
+                            SpxStringFree(io_hashcode);
+                        }
+                        goto r1;
+                    }
+
+                    memcpy(mptr + off,dc->buf,unitlen);
+                    off += unitlen;
+                    writebytes += unitlen;
+                    if(writebytes < dc->realsize) {
+                        continue;
+                    }
+                }while(false);
+            } else {
+                memcpy(mptr + off,
+                        jc->reader_body_ctx->buf + jc->reader_header->offset,
+                        jc->reader_header->bodylen - jc->reader_header->offset);
+                off += jc->reader_header->bodylen - jc->reader_header->offset;
+            }
+
+            dc->begin = o_begin;
+            dc->rand = o_rand;
+            dc->tidx = o_tidx;
+            dc->p1 = o_p1;
+            dc->p2 = o_p2;
+            dc->mp_idx = o_mpidx;
+            dc->file_createtime = o_fcreatetime;
+
             spx_msg_free(&ioctx);
             SpxClose(fd);
             munmap(mptr,len);
@@ -263,142 +339,51 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
             if(NULL != io_hashcode){
                 SpxStringFree(io_hashcode);
             }
-            goto r1;
-        }
-
-        dc->totalsize = o_totalsize;//update total size
-        dc->opver ++;
-
-        spx_msg_clear(ioctx);
-        spx_msg_pack_false(ioctx);//isdelete
-        spx_msg_pack_u32(ioctx,dc->opver);
-        spx_msg_pack_u32(ioctx,dc->ver);
-        spx_msg_pack_u64(ioctx,dc->createtime);
-        spx_msg_pack_u64(ioctx,dc->lastmodifytime);
-        spx_msg_pack_u64(ioctx,dc->totalsize);
-        spx_msg_pack_u64(ioctx,dc->realsize);
-        if(dc->has_suffix){
-            spx_msg_pack_fixed_string(ioctx,
-                    dc->suffix,YDB_FILENAME_SUFFIX_SIZE);
-        } else {
-            spx_msg_align(ioctx,YDB_FILENAME_SUFFIX_SIZE);
-        }
-
-        if(NULL == dc->hashcode){
-            spx_msg_align(ioctx,YDB_HASHCODE_SIZE);
-        } else {
-            spx_msg_pack_fixed_string(ioctx,
-                    dc->hashcode,YDB_HASHCODE_SIZE);
-        }
-
-        u64_t off = offset;
-        size_t recvbytes = 0;
-        size_t writebytes = 0;
-        size_t unitlen = 0;
-
-        memcpy(mptr + off,
-                ioctx->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
-        off += YDB_CHUNKFILE_MEMADATA_SIZE;
-        if(jc->is_lazy_recv){
-            do{
-                recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
-                            ? YdbBufferSizeForLazyRecv \
-                            : dc->realsize - writebytes;
-                err = spx_read_nb(jc->fd,(byte_t *) dc->buf,recvbytes,&unitlen);
-                if(0 != err || recvbytes != unitlen){
-                    SpxLogFmt2(dc->log,SpxLogError,err,\
-                            "lazy read buffer and cp to mmap is fail."
-                            "recvbytes:%lld,real recvbytes:%lld."
-                            "writedbytes:%lld,total size:%lld.",
-                            recvbytes,unitlen,writebytes,dc->realsize);
-
-                    spx_msg_free(&ioctx);
-                    SpxClose(fd);
-                    munmap(mptr,len);
-                    if(NULL != io_suffix){
-                        SpxStringFree(io_suffix);
-                    }
-                    if(NULL != io_hashcode){
-                        SpxStringFree(io_hashcode);
-                    }
-                    goto r1;
-                }
-
-                memcpy(mptr + off,dc->buf,unitlen);
-                off += unitlen;
-                writebytes += unitlen;
-                if(writebytes < dc->realsize) {
-                    continue;
-                }
-            }while(false);
-        } else {
-            memcpy(mptr + off,
-                    jc->reader_body_ctx->buf + jc->reader_header->offset,
-                    jc->reader_header->bodylen - jc->reader_header->offset);
-            off += jc->reader_header->bodylen - jc->reader_header->offset;
-        }
-
-        dc->begin = o_begin;
-        dc->rand = o_rand;
-        dc->tidx = o_tidx;
-        dc->p1 = o_p1;
-        dc->p2 = o_p2;
-        dc->mp_idx = o_mpidx;
-        dc->file_createtime = o_fcreatetime;
-
-        spx_msg_free(&ioctx);
-        SpxClose(fd);
-        munmap(mptr,len);
-        if(NULL != io_suffix){
-            SpxStringFree(io_suffix);
-        }
-        if(NULL != io_hashcode){
-            SpxStringFree(io_hashcode);
-        }
-        if(0 != (err = ydb_storage_modify_after(dc))){
-            SpxLog2(dc->log,SpxLogError,err,
-                    "make response for modify is fail.");
-            goto r1;
-        }
-        goto r2;
-    } else {/*{{{*/
-        //if no old-file,old-file is singlefile,old-totalsize < new-realsize,
-        //it means upload a new file with ydb
-        //so,we do upload new file and just only check old-file and delete it
-
-        if(0 != ( err =  ydb_storage_dio_upload_to_chunkfile(dc))){
-            SpxLog2(dc->log,SpxLogError,err,
-                    "modify context convert upload is fail.");
-            goto r1;
-        }
-        if(0 != (err = ydb_storage_modify_after(dc))){
-            SpxLog2(dc->log,SpxLogError,err,
-                    "make response for modify is fail.");
-            goto r1;
-        }
-
-        //delete old context
-        if(o_issinglefile){
-            if(is_ofile_exist
-                    && (0 != remove(o_fname))){
-                SpxLogFmt2(dc->log,SpxLogError,err,
-                        "delete single file:%s is fail.",o_fname);
-                goto r2;
-            }
-        }else {
-            if(!is_ofile_exist){
-                goto r2;//no file no modify metadata
-            }
-            if(0 != (err =  ydb_storage_dio_delete_context_from_chunkfile(
-                            c,o_fname,o_begin,o_totalsize,
-                            o_opver,o_ver,o_lastmodifytime,
-                            o_realsize,spx_now()))){
+            if(0 != (err = ydb_storage_modify_after(dc))){
                 SpxLog2(dc->log,SpxLogError,err,
-                        "delete context form chunkfile is fail.");
-                goto r2;
+                        "make response for modify is fail.");
+                goto r1;
             }
+            goto r2;
         }
-    }/*}}}*/
+    }
+
+    //if no old-file,old-file is singlefile,old-totalsize < new-realsize,
+    //it means upload a new file with ydb
+    //so,we do upload new file and just only check old-file and delete it
+
+    if(0 != ( err =  ydb_storage_dio_upload_to_chunkfile(dc))){
+        SpxLog2(dc->log,SpxLogError,err,
+                "modify context convert upload is fail.");
+        goto r1;
+    }
+    if(0 != (err = ydb_storage_modify_after(dc))){
+        SpxLog2(dc->log,SpxLogError,err,
+                "make response for modify is fail.");
+        goto r1;
+    }
+
+    //delete old context
+    if(o_issinglefile){
+        if(is_ofile_exist
+                && (0 != remove(o_fname))){
+            SpxLogFmt2(dc->log,SpxLogError,err,
+                    "delete single file:%s is fail.",o_fname);
+            goto r2;
+        }
+    }else {
+        if(!is_ofile_exist){
+            goto r2;//no file no modify metadata
+        }
+        if(0 != (err =  ydb_storage_dio_delete_context_from_chunkfile(
+                        c,o_fname,o_begin,o_totalsize,
+                        o_opver,o_ver,o_lastmodifytime,
+                        o_realsize,spx_now()))){
+            SpxLog2(dc->log,SpxLogError,err,
+                    "delete context form chunkfile is fail.");
+            goto r2;
+        }
+    }
     goto r2;
 r1:
 
@@ -442,8 +427,8 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-//    err = spx_module_dispatch(threadcontext_err,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext_err,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r2:
@@ -474,8 +459,8 @@ r2:
     size_t idx = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
