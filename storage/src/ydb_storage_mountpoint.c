@@ -127,11 +127,10 @@ err_t ydb_storage_mprtf_reader(struct ydb_storage_configurtion *c){/*{{{*/
     err_t err = 0;
     string_t new_initfile = NULL;
     string_t line = NULL;
-    string_t initfile = spx_string_newlen(NULL,SpxFileNameSize,&err)
+    string_t initfile = spx_string_newlen(NULL,SpxFileNameSize,&err);
         if(NULL == initfile){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "new initfile name for mountpoint:%s is fail.",
-                    mp->path);
+            SpxLog2(c->log,SpxLogError,err,
+                    "new initfile name for mountpoint is fail.");
             return err;
         }
 
@@ -145,9 +144,8 @@ err_t ydb_storage_mprtf_reader(struct ydb_storage_configurtion *c){/*{{{*/
                 c->groupname,c->machineid);
     }
     if(NULL == new_initfile){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "make init filename for mountpoint is fail.",
-                mp->path);
+        SpxLog2(c->log,SpxLogError,err,
+                "make init filename for mountpoint:%s is fail.");
         goto r1;
     }
     initfile = new_initfile;
@@ -163,7 +161,7 @@ err_t ydb_storage_mprtf_reader(struct ydb_storage_configurtion *c){/*{{{*/
             err = 0 == errno ? EACCES : errno;
             SpxLogFmt2(c->log,SpxLogError,err,
                     "open init file :%s is fail.",
-                    intfile);
+                    initfile);
             goto r1;
         }
 
@@ -287,7 +285,7 @@ spx_private err_t ydb_storage_mprtf_line_parser(struct ydb_storage_configurtion 
                        if(NULL == mp->path){
                            mp->path = spx_string_dup(*(context + i),&err);
                            if(NULL == mp->path){
-                               SpxLogFmt2(c->log,SpxLogError,er,
+                               SpxLogFmt2(c->log,SpxLogError,err,
                                        "dup mp path:%s tomp:%d is fail.",
                                        *(context +i),mp->idx);
                                goto r1;
@@ -317,9 +315,8 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
     string_t new_initfile = NULL;
     string_t initfile = spx_string_newlen(NULL,SpxFileNameSize,&err);
     if(NULL == initfile){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "new initfile name for mountpoint:%s is fail.",
-                mp->path);
+        SpxLog2(c->log,SpxLogError,err,
+                "new initfile name for mountpoint:%s is fail.");
         return err;
     }
 
@@ -333,9 +330,8 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
                 c->groupname,c->machineid);
     }
     if(NULL == new_initfile){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "make init filename for mountpoint is fail.",
-                mp->path);
+        SpxLog2(c->log,SpxLogError,err,
+                "make init filename for mountpoint is fail.");
         goto r1;
     }
     initfile = new_initfile;
@@ -343,7 +339,7 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
     int i = 0;
     context = spx_string_newlen(NULL,SpxLineSize,&err);
     if(NULL == context){
-        SpxLogFmt1(c->log,SpxLogError,err,
+        SpxLog2(c->log,SpxLogError,err,
                 "new context fot mprtf is fail.");
         goto r1;
     }
@@ -377,7 +373,7 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
         err = 0 == errno ? EACCES : errno;
         SpxLogFmt2(c->log,SpxLogError,err,
                 "open init file :%s is fail.",
-                intfile);
+                initfile);
         goto r1;
     }
     err = spx_fwrite_string(fp,context,size,&len);

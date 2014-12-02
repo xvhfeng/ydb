@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <ev.h>
 
 #include "spx_types.h"
 #include "spx_properties.h"
@@ -14,6 +15,9 @@
 #include "spx_alloc.h"
 #include "spx_vector.h"
 #include "spx_thread.h"
+#include "spx_nio.h"
+#include "spx_module.h"
+#include "spx_network_module.h"
 
 #include "ydb_protocol.h"
 
@@ -24,6 +28,7 @@
 #include "ydb_storage_binlog.h"
 #include "ydb_storage_synclog.h"
 #include "ydb_storage_dio.h"
+#include "ydb_storage_dio_context.h"
 
 #define YdbStorageSyncLogFileRecvSize (1 * SpxMB)
 
@@ -50,17 +55,20 @@ struct ydb_storage_dsync_runtime{
     struct ydb_storage_dsync_mp
         ydb_storage_dsync_mps[YDB_STORAGE_MOUNTPOINT_MAXSIZE];
     u64_t begin_dsync_timespan;
-            //do the dsync last time
+    //do the dsync last time
 };
 
-
-
 spx_private struct ydb_storage_remote *base_storage = NULL;
+
+spx_private bool_t ydb_storage_dsync_confim(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_dsync_runtime *dsrt);
 
 spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base(
         struct ydb_storage_configurtion * c,
         err_t *err);
-spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_by_tracker(
+
+spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_from_tracker(
         struct ydb_storage_configurtion *c,
         struct  ydb_tracker *t,
         err_t *err);
@@ -68,18 +76,11 @@ spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_by_tracker(
 spx_private u64_t ydb_storage_dsync_query_begin_timespan(
         struct ydb_storage_configurtion * c,
         err_t *err);
-spx_private u64_t ydb_storage_dsync_query_begin_timespan_by_tracker(
+
+spx_private u64_t ydb_storage_dsync_query_begin_timespan_from_tracker(
         struct ydb_storage_configurtion *c,
         struct  ydb_tracker *t,
         err_t *err);
-
-spx_private err_t ydb_storage_dsync_sync_logfile(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_remote *s,
-        int protocol,
-        string_t machineid,
-        struct spx_date *dtlogf,
-        string_t logfname);
 
 spx_private err_t ydb_storage_dsync_sync_synclogs(
         struct ydb_storage_configurtion *c,
@@ -93,34 +94,6 @@ spx_private err_t ydb_storage_dsync_sync_logfile(
         struct spx_date *dtlogf,
         string_t logfname);
 
-spx_private err_t ydb_storage_dsync_dolog(
-        struct ydb_storage_configurtion *c,
-        string_t logfname,
-        struct ydb_storage_remote *s,
-        struct ydb_storage_remote *base,
-        struct ydb_storage_dsync_runtime *dsrt);
-
-spx_private err_t ydb_storage_dsync_upload(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_remote *s,
-        string_t fid);
-
-spx_private err_t ydb_storage_dsync_delete(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_remote *s,
-        string_t fid);
-
-spx_private err_t ydb_storage_dsync_modify(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_remote *s,
-        string_t fid,
-        string_t ofid);
-
-spx_private err_t ydb_storage_dsync_data_by_remote(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_remote *s,
-        string_t fid);
-
 spx_private err_t ydb_storage_dsync_binlog_data(
         struct ydb_storage_configurtion *c,
         struct ydb_storage_dsync_runtime *dsrt);
@@ -129,10 +102,32 @@ spx_private err_t ydb_storage_dsync_synclog_data(
         struct ydb_storage_configurtion *c,
         struct ydb_storage_dsync_runtime *dsrt);
 
-spx_private void ydb_storage_dsync_data_from_singlefile(
-        struct ev_loop *loop,ev_async *w,int revents);
-spx_private void ydb_storage_dsync_data_from_chunkfile(
-        struct ev_loop *loop,ev_async *w,int revents);
+spx_private err_t ydb_storage_dsync_from_remote_storage(
+        struct ydb_storage_configurtion *c,
+        string_t logfname,
+        struct ydb_storage_remote *s,
+        struct ydb_storage_remote *base,
+        struct ydb_storage_dsync_runtime *dsrt);
+
+spx_private err_t ydb_storage_dsync_delete_request(
+        struct ydb_storage_configurtion *c,
+        string_t fid);
+
+spx_private err_t ydb_storage_dsync_upload_request(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_remote *s,
+        string_t fid);
+
+spx_private err_t ydb_storage_dsync_modify_request(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_remote *s,
+        string_t fid,
+        string_t ofid);
+
+spx_private err_t ydb_storage_dsync_data_to_remote_storage(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_remote *s,
+        string_t fid);
 
 spx_private void ydb_storage_dsync_over(
         struct ydb_storage_configurtion *c,
@@ -143,72 +138,53 @@ spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
         err_t *err);
 
 spx_private void *ydb_storage_dsync_runtime_writer(
-        void *arg
-    );
+        void *arg);
 
-spx_private void ydb_storage_dsync_runtile_remove(
+spx_private string_t ydb_storage_dsync_make_runtime_filename(
+        struct ydb_storage_configurtion *c,
+        err_t *err);
+
+spx_private void ydb_storage_dsync_runtime_file_remove(
         struct ydb_storage_configurtion *c);
 
-spx_private void ydb_storage_dsync_mps_over(
-    struct ydb_storage_dsync_runtime  *dsrt);
+spx_private void ydb_storage_dsync_mountpoint_over(
+        struct ydb_storage_dsync_runtime  *dsrt);
 
-
-spx_private err_t ydb_storage_dsync_get_mps_over_date(
+spx_private err_t ydb_storage_dsync_total_mounpoint_sync_timespan(
         struct ydb_storage_configurtion *c,
         struct ydb_storage_dsync_runtime *dsrt);
 
+spx_private void ydb_storage_dsync_data_from_chunkfile(
+        struct ev_loop *loop,ev_async *w,int revents);
 
+spx_private void ydb_storage_dsync_data_from_singlefile(
+        struct ev_loop *loop,ev_async *w,int revents);
 
+err_t ydb_storage_dsync_logfile(struct ev_loop *loop,\
+        struct ydb_storage_dio_context *dc);
+
+spx_private void ydb_storage_dsync_logfile_context(
+        struct ev_loop *loop,ev_async *w,int revents);
 
 
 /*
  * note:please make sure the mountpoint of storages in the same syncgroup
  * are the same,must is the disksize ,freesize,and blocksize of disk.
  */
-bool_t ydb_storage_dsync_confim(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_dsync_runtime *dsrt
+
+err_t ydb_storage_dsync_startup(struct ydb_storage_configurtion *c,
+        struct ydb_storage_runtime *srt
         ){/*{{{*/
-    bool_t rc = false;
-    ydb_storage_mprtf_reader(c)
-    int i = 0;
-    for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
-        struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
-        if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path) && mp->isusing){
-            if(mp->no_dsync_force){
-                mp->need_dsync = false;
-            } else {
-                if(0 != mp->last_freesize &&
-                        (mp->last_freesize + c->disksync_busysize >= mp->freesize)) {
-                    mp->need_dsync = false;
-                } else {
-                    struct ydb_storage_dsync_mp *mp = dsrt->ydb_storage_dsync_mps + i;
-                    mp->idx = i;
-                    mp->dsync_fail = false;
-                    mp->dsync_over = false;
-                    mp->begin_dsync = false;
-                    mp->need_dsync = true;
-                    rc = true;
-                }
-            }
-        }
-    }
-
-    return rc;
-}/*}}}*/
-
-err_t ydb_storage_dsync_begin(struct ydb_storage_configurtion *c,
-        struct ydb_storage_runtime *srt){/*{{{*/
     err_t err = 0;
     srt->status = YDB_STORAGE_DSYNCING;
 
     struct spx_date dt_sync_begin;
     struct spx_date dt_sync_end;
 
+    struct ydb_storage_dsync_runtime *dsrt = NULL;
     bool_t is_send_dsync_over = false;
     while(true){// for fail twice
         bool_t is_need_dsync = false;
-        struct ydb_storage_dsync_runtime *dsrt;
         dsrt = ydb_storage_dsync_runtime_reader(c,&err);
         if(NULL == dsrt){
             dsrt = spx_alloc_alone(sizeof(*dsrt),&err);
@@ -231,7 +207,7 @@ err_t ydb_storage_dsync_begin(struct ydb_storage_configurtion *c,
                     "do dsync last time goon.");
         }
 
-        err = ydb_storage_dsync_get_mps_over_date(c,dsrt);
+        err = ydb_storage_dsync_total_mounpoint_sync_timespan(c,dsrt);
         if(0 != err){
             SpxFree(dsrt);
             SpxLog2(c->log,SpxLogError,err,
@@ -249,7 +225,7 @@ err_t ydb_storage_dsync_begin(struct ydb_storage_configurtion *c,
                     "and then,this storage:%s is upto base storage.",
                     c->syncgroup,c->machineid);
             //set all mountpoint is not disksync
-            ydb_storage_dsync_mps_over(dsrt);
+            ydb_storage_dsync_mountpoint_over(dsrt);
             SpxFree(dsrt);
             return 0;
         }
@@ -300,7 +276,9 @@ err_t ydb_storage_dsync_begin(struct ydb_storage_configurtion *c,
                 if(0 >= cmp ){ // do dsync
                     SpxLogFmt1(c->log,SpxLogInfo,
                             "check and sync binlog of date: %d-%d-%d.",
-                            dt_sync_curr.year,dt_sync_curr.month,dt_sync_curr.day);
+                            dsrt->sync_date_curr.year,
+                            dsrt->sync_date_curr.month,
+                            dsrt->sync_date_curr.day);
 
                     //sync binlog
                     string_t binlog_filename = ydb_storage_binlog_make_filename(c->log,
@@ -316,8 +294,9 @@ err_t ydb_storage_dsync_begin(struct ydb_storage_configurtion *c,
                         if(0 != err){
                             SpxLogFmt2(c->log,SpxLogError,err,
                                     "sync binlog of  %d-%d-%d is fail.",
-                                    dt_sync_curr.year,dt_sync_curr.month,
-                                    dt_sync_curr,day);
+                                    dsrt->sync_date_curr.year,
+                                    dsrt->sync_date_curr.month,
+                                    dsrt->sync_date_curr.day);
                         }
                     }
                     SpxStringFree(binlog_filename);
@@ -338,59 +317,59 @@ err_t ydb_storage_dsync_begin(struct ydb_storage_configurtion *c,
         }/*}}}*/
 
         /*
-        SpxZero(dsrt->sync_date_curr);
-        spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&(dsrt->sync_date_curr));
+           SpxZero(dsrt->sync_date_curr);
+           spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&(dsrt->sync_date_curr));
+           SpxLogFmt1(c->log,SpxLogInfo,
+           "sync data from binlog and synclog from %d-%d-%d to %d-%d-%d.",
+           dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
+           dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
+
+           if(YDB_STORAGE_DSYNC_SYNCLOGFILE == dsrt->step) {
+           while(true) {
+           int cmp = spx_date_cmp(&(dsrt->sync_date_curr),&dt_sync_end);
+           if(0 > cmp ){ // do dsync
+
+           SpxLogFmt1(c->log,SpxLogInfo,
+           "sync data by binlog of date: %d-%d-%d.",
+           dt_sync_curr.year,dt_sync_curr.month,dt_sync_curr.day);
+
+           string_t synclog_fname = ydb_storage_binlog_make_filename(c->log,
+           c->dologpath,c->machineid,(dsrt->sync_date_curr).year,
+           (dsrt->sync_date_curr).month,(dsrt->sync_date_curr).day,&err);
+
+           if(!SpxFileExist(synclog_fname)){
+           SpxLogFmt1(c->log,SpxLogInfo,
+           "no the operator at %d-%d-%d,and then no binlog.",
+           dt_sync_curr.year,dt_sync_curr.month,dt_sync_curr.day);
+           } else {
+           err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
+        //                        err = ydb_storage_dsync_sync_logfile(c,base_storage,
+        //                                YDB_S2S_SYNC_LOGFILE,
+        //                                c->machineid,
+        //                                &(dsrt->sync_date_curr),
+        //                                synclog_fname);
+        if(0 != err){
+        SpxLogFmt2(c->log,SpxLogError,err,
+        "sync binlog of  %d-%d-%d is fail.",
+        dt_sync_curr.year,dt_sync_curr.month,
+        dt_sync_curr,day);
+        }
+        }
+        SpxStringFree(synclog_fname);
+        SpxErrReset;
+        err = 0;
+        //sync synclog
+        //                    err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
+        } else { //no dsync
         SpxLogFmt1(c->log,SpxLogInfo,
-                "sync data from binlog and synclog from %d-%d-%d to %d-%d-%d.",
-                dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-                dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-
-        if(YDB_STORAGE_DSYNC_SYNCLOGFILE == dsrt->step) {
-            while(true) {
-                int cmp = spx_date_cmp(&(dsrt->sync_date_curr),&dt_sync_end);
-                if(0 > cmp ){ // do dsync
-
-                    SpxLogFmt1(c->log,SpxLogInfo,
-                            "sync data by binlog of date: %d-%d-%d.",
-                            dt_sync_curr.year,dt_sync_curr.month,dt_sync_curr.day);
-
-                    string_t synclog_fname = ydb_storage_binlog_make_filename(c->log,
-                            c->dologpath,c->machineid,(dsrt->sync_date_curr).year,
-                            (dsrt->sync_date_curr).month,(dsrt->sync_date_curr).day,&err);
-
-                    if(!SpxFileExist(synclog_fname)){
-                        SpxLogFmt1(c->log,SpxLogInfo,
-                                "no the operator at %d-%d-%d,and then no binlog.",
-                                dt_sync_curr.year,dt_sync_curr.month,dt_sync_curr.day);
-                    } else {
-                        err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
-//                        err = ydb_storage_dsync_sync_logfile(c,base_storage,
-//                                YDB_S2S_SYNC_LOGFILE,
-//                                c->machineid,
-//                                &(dsrt->sync_date_curr),
-//                                synclog_fname);
-                        if(0 != err){
-                            SpxLogFmt2(c->log,SpxLogError,err,
-                                    "sync binlog of  %d-%d-%d is fail.",
-                                    dt_sync_curr.year,dt_sync_curr.month,
-                                    dt_sync_curr,day);
-                        }
-                    }
-                    SpxStringFree(synclog_fname);
-                    SpxErrReset;
-                    err = 0;
-                    //sync synclog
-//                    err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
-                } else { //no dsync
-                    SpxLogFmt1(c->log,SpxLogInfo,
-                            "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d is over.",
-                            dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-                            dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-                    break;
-                }
-                spx_date_add(&(dsrt->sync_date_curr),1);
-            }
-            dsrt->step = YDB_STORAGE_DSYNC_DATA;
+        "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d is over.",
+        dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
+        dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
+        break;
+        }
+        spx_date_add(&(dsrt->sync_date_curr),1);
+        }
+        dsrt->step = YDB_STORAGE_DSYNC_DATA;
         }
         */
 
@@ -438,20 +417,53 @@ err_t ydb_storage_dsync_begin(struct ydb_storage_configurtion *c,
         spx_periodic_stop(&(dsrt->timer),true);//must blocking to cannel the thread
         SpxLog1(c->log,SpxLogMark,
                 "the thread if dsync runtime writer is channeled,delete the runtime file.");
-        ydb_storage_dsync_runtile_remove(c);
+        ydb_storage_dsync_runtime_file_remove(c);
 
-        ydb_storage_dsync_mps_over(dsrt);
+        ydb_storage_dsync_mountpoint_over(dsrt);
         SpxFree(dsrt);
     }
 
-    ydb_storage_dsync_over(c, &(dsrt-> );
+    ydb_storage_dsync_over(c, dsrt);
     g_ydb_storage_runtime->status = YDB_STORAGE_DSYNCED;
+    return err;
 }/*}}}*/
 
+spx_private bool_t ydb_storage_dsync_confim(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_dsync_runtime *dsrt
+        ){/*{{{*/
+    bool_t rc = false;
+    ydb_storage_mprtf_reader(c);
+    int i = 0;
+    for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
+        struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
+        if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path) && mp->isusing){
+            if(mp->no_dsync_force){
+                mp->need_dsync = false;
+            } else {
+                if(0 != mp->last_freesize &&
+                        (mp->last_freesize + c->disksync_busysize >= mp->freesize)) {
+                    mp->need_dsync = false;
+                } else {
+                    struct ydb_storage_dsync_mp *mp = dsrt->ydb_storage_dsync_mps + i;
+                    mp->idx = i;
+                    mp->dsync_fail = false;
+                    mp->dsync_over = false;
+                    mp->begin_dsync = false;
+                    mp->need_dsync = true;
+                    rc = true;
+                }
+            }
+        }
+    }
+
+    return rc;
+}/*}}}*/
 
 spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base(
         struct ydb_storage_configurtion * c,
-        err_t *err){/*{{{*/
+        err_t *err
+        ){/*{{{*/
     struct ydb_storage_remote *base = NULL;
     struct spx_vector_iter *iter = spx_vector_iter_new(c->trackers ,err);
     if(NULL == iter){
@@ -465,7 +477,7 @@ spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base(
         trys--;
         struct ydb_tracker *t = NULL;
         while(NULL != (t = spx_vector_iter_next(iter))){
-            base = ydb_storage_dsync_query_base_by_tracker(
+            base = ydb_storage_dsync_query_base_from_tracker(
                     c,t,err);
             if(NULL == base){
                 SpxLogFmt2(c->log,SpxLogError,*err,
@@ -494,10 +506,11 @@ spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base(
     return base;
 }/*}}}*/
 
-spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_by_tracker(
+spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_from_tracker(
         struct ydb_storage_configurtion *c,
         struct  ydb_tracker *t,
-        err_t *err){/*{{{*/
+        err_t *err
+        ){/*{{{*/
     struct ydb_storage_remote *base = NULL;
     string_t machineid = NULL;
     struct ydb_storage_transport_context *ystc = NULL;
@@ -655,7 +668,6 @@ spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_by_tracker(
                 t->host.ip,t->host.port);
         goto r1;
     }
-
 r1:
     SpxClose(ystc->fd);
     if(NULL != machineid){
@@ -684,7 +696,8 @@ r1:
 
 spx_private u64_t ydb_storage_dsync_query_begin_timespan(
         struct ydb_storage_configurtion * c,
-        err_t *err){/*{{{*/
+        err_t *err
+        ){/*{{{*/
     u64_t times = 0;
     struct spx_vector_iter *iter = spx_vector_iter_new(c->trackers ,err);
     if(NULL == iter){
@@ -698,7 +711,7 @@ spx_private u64_t ydb_storage_dsync_query_begin_timespan(
         trys--;
         struct ydb_tracker *t = NULL;
         while(NULL != (t = spx_vector_iter_next(iter))){
-            times = ydb_storage_dsync_query_begin_timespan_by_tracker(
+            times = ydb_storage_dsync_query_begin_timespan_from_tracker(
                     c,t,err);
             if(0 == times && 0 != *err){
                 SpxLogFmt2(c->log,SpxLogError,*err,
@@ -727,10 +740,11 @@ spx_private u64_t ydb_storage_dsync_query_begin_timespan(
     return times;
 }/*}}}*/
 
-spx_private u64_t ydb_storage_dsync_query_begin_timespan_by_tracker(
+spx_private u64_t ydb_storage_dsync_query_begin_timespan_from_tracker(
         struct ydb_storage_configurtion *c,
         struct  ydb_tracker *t,
-        err_t *err){/*{{{*/
+        err_t *err
+        ){/*{{{*/
     u64_t times = 0;
     struct ydb_storage_transport_context *ystc = NULL;
     ystc = spx_alloc_alone(sizeof(*ystc),err);
@@ -930,19 +944,20 @@ spx_private err_t ydb_storage_dsync_sync_synclogs(
                                 base_storage->machineid)){
 
                         SpxLogFmt2(c->log,SpxLogInfo,err,
-                                "try with base storage:%s to sync synclog for storage:%s of date:%d-%d-%d.",
+                                "try with base storage:%s "
+                                "to sync synclog for storage:%s "
+                                "of date:%d-%d-%d.",
                                 base_storage->machineid,s->machineid,
-                            dt_sync_curr->year,dt_sync_curr->month,dt_sync_curr->day);
-
-
+                                dt_sync_curr->year,dt_sync_curr->month,dt_sync_curr->day);
                         err = ydb_storage_dsync_sync_logfile(c,base_storage,
-                                YDB_S2S_SYNC_SYNCLOG,
+                                YDB_S2S_SYNC_LOGFILE,
                                 s->machineid,
                                 dt_sync_curr,
                                 synclog_filename);
                         if(0 != err){
                             SpxLogFmt2(c->log,SpxLogInfo,err,
-                                    "try with base storage:%s to sync synclog for storage:%s of date:%d-%d-%d. is fail.",
+                                    "try with base storage:%s "
+                                    "to sync synclog for storage:%s of date:%d-%d-%d. is fail.",
                                     base_storage->machineid,s->machineid,
                                     dt_sync_curr->year,dt_sync_curr->month,dt_sync_curr->day);
                         }
@@ -956,7 +971,6 @@ spx_private err_t ydb_storage_dsync_sync_synclogs(
                     dt_sync_curr->year,dt_sync_curr->month,dt_sync_curr->day);
         }
     }
-
     spx_map_iter_free(&iter);
     return err;
 }/*}}}*/
@@ -1088,12 +1102,12 @@ spx_private err_t ydb_storage_dsync_sync_logfile(
         if(ENOENT == err){
             SpxLogFmt1(c->log,SpxLogWarn,
                     "logfile of machineid:%s date:%d-%d-%d is not exist.",
-                    machineid,dtlogf->year,dtlogf->month,,
+                    machineid,dtlogf->year,dtlogf->month,
                     dtlogf->day);
         } else {
             SpxLogFmt1(c->log,SpxLogWarn,
                     "get logfile of machineid:%s date:%d-%d-%d is fail.",
-                    machineid,dtlogf->year,dtlogf->month,,
+                    machineid,dtlogf->year,dtlogf->month,
                     dtlogf->day);
         }
         goto r1;
@@ -1102,18 +1116,18 @@ spx_private err_t ydb_storage_dsync_sync_logfile(
     binlog_fd = SpxWriteOpen(logfname,true);
     if(0 >= binlog_fd){
         err = 0 == errno ? EACCES : errno;
-        SpxLogFmt2(c->log,SpxLogWarn,err
+        SpxLogFmt2(c->log,SpxLogWarn,err,
                 "create logfile of machineid:%s date:%d-%d-%d is fail.",
-                machineid,dtlogf->year,dtlogf->month,,
+                machineid,dtlogf->year,dtlogf->month,
                 dtlogf->day);
         goto r1;
     }
     filesize = ystc->response->header->bodylen - ystc->response->header->offset;
     if(0 > ftruncate(binlog_fd,filesize)){
         err = 0 == errno ? EACCES : errno;
-        SpxLogFmt2(c->log,SpxLogWarn,err
+        SpxLogFmt2(c->log,SpxLogWarn,err,
                 "change logfile filesize of machineid:%s date:%d-%d-%d is fail.",
-                machineid,dtlogf->year,dtlogf->month,,
+                machineid,dtlogf->year,dtlogf->month,
                 dtlogf->day);
         goto r1;
     }
@@ -1125,8 +1139,8 @@ spx_private err_t ydb_storage_dsync_sync_logfile(
         SpxLogFmt2(c->log,SpxLogError,err,\
                 "mmap the logfile file machineid:%s "
                 "date:%d-%d-%d to memory is fail.",
-                c->machineid,binlog_dt->year,
-                binlog_dt->month,binlog_dt->day);
+                machineid,dtlogf->year,dtlogf->month,
+                dtlogf->day);
         goto r1;
     }
 
@@ -1135,8 +1149,8 @@ spx_private err_t ydb_storage_dsync_sync_logfile(
         SpxLogFmt2(c->log,SpxLogError,err,\
                 "write the logfile file machineid:%s "
                 "date:%d-%d-%d to memory is fail.",
-                c->machineid,binlog_dt->year,
-                binlog_dt->month,binlog_dt->day);
+                machineid,dtlogf->year,dtlogf->month,
+                dtlogf->day);
     }
 
 r1:
@@ -1151,8 +1165,8 @@ r1:
                     "write the logfile file machineid:%s "
                     "date:%d-%d-%d to memory is fail."
                     " and remove it.",
-                    c->machineid,binlog_dt->year,
-                    binlog_dt->month,binlog_dt->day);
+                    machineid,dtlogf->year,dtlogf->month,
+                    dtlogf->day);
             remove(logfname);
         }
     }
@@ -1183,9 +1197,9 @@ spx_private err_t ydb_storage_dsync_binlog_data(
     err_t err = 0;
     string_t blog_fname = ydb_storage_binlog_make_filename(c->log,
             c->dologpath,c->machineid,
-            dsrt->sync_date_curr->year,
-            dsrt->sync_date_curr->month,
-            dsrt->sync_date_curr->day,
+            dsrt->sync_date_curr.year,
+            dsrt->sync_date_curr.month,
+            dsrt->sync_date_curr.day,
             &err);
     if(NULL == blog_fname) {
         SpxLog2(c->log,SpxLogError,err,
@@ -1194,7 +1208,7 @@ spx_private err_t ydb_storage_dsync_binlog_data(
     }
 
     if(SpxFileExist(blog_fname)){
-        err =  ydb_storage_dsync_dolog(c,
+        err =  ydb_storage_dsync_from_remote_storage(c,
                 blog_fname,base_storage,NULL,dsrt);
     }
     SpxStringFree(blog_fname);
@@ -1219,36 +1233,36 @@ spx_private err_t ydb_storage_dsync_synclog_data(
             string_t synclog_filename =
                 ydb_storage_synclog_make_filename(c->log,
                         c->basepath,s->machineid,
-                        dsrt->sync_date_curr->year,
-                        dsrt->sync_date_curr->month,
-                        dsrt->sync_date_curr->day,
+                        dsrt->sync_date_curr.year,
+                        dsrt->sync_date_curr.month,
+                        dsrt->sync_date_curr.day,
                         &err);
 
             SpxLogFmt1(c->log,SpxLogInfo,
                     "check and sync synclog of storage:%s and date: %d-%d-%d.",
                     s->machineid,
-                    dsrt->sync_date_curr->year,
-                    dsrt->sync_date_curr->month,
-                    dsrt->sync_date_curr->day);
+                    dsrt->sync_date_curr.year,
+                    dsrt->sync_date_curr.month,
+                    dsrt->sync_date_curr.day);
 
             if(SpxFileExist(synclog_filename)){
-                err = ydb_storage_dsync_dolog(c,
+                err = ydb_storage_dsync_from_remote_storage(c,
                         synclog_filename,s,base_storage,dsrt);
             }
             SpxStringFree(synclog_filename);
             SpxLogFmt1(c->log,SpxLogInfo,
                     "check and sync over synclog of storage:%s date: %d-%d-%d.",
                     s->machineid,
-                    dsrt->sync_date_curr->year,
-                    dsrt->sync_date_curr->month,
-                    dsrt->sync_date_curr->day);
+                    dsrt->sync_date_curr.year,
+                    dsrt->sync_date_curr.month,
+                    dsrt->sync_date_curr.day);
         }
     }
     spx_map_iter_free(&iter);
     return err;
 }/*}}}*/
 
-spx_private err_t ydb_storage_dsync_dolog(
+spx_private err_t ydb_storage_dsync_from_remote_storage(
         struct ydb_storage_configurtion *c,
         string_t logfname,
         struct ydb_storage_remote *s,
@@ -1292,7 +1306,7 @@ spx_private err_t ydb_storage_dsync_dolog(
     while(NULL != fgets(line,SpxLineSize,fp)){
         spx_string_updatelen(line);
         dsrt->last_linelen = spx_string_len(line);
-        dsrt->offset += line_size;
+        dsrt->offset += dsrt->last_linelen;
         spx_string_strip_linefeed(line);
         string_t *strs = spx_string_split(line,"\t",size,&count,&err);
         if(NULL == strs){
@@ -1302,58 +1316,69 @@ spx_private err_t ydb_storage_dsync_dolog(
             continue;
         }
         switch (**strs){
-            case (YDB_STORAGE_ADD) : {
-                                         err = ydb_storage_dsync_upload(c,s,(*strs + 1));
+            case (YDB_STORAGE_LOG_UPLOAD) : {
+                                         err = ydb_storage_dsync_upload_request(c,s,(*strs + 1));
                                          if(0 != err ) {
                                              if(NULL == base){
                                                  SpxLogFmt2(c->log,SpxLogError,err,
-                                                         "upload of dsync file:%s in the file:%s from remote:%s is fail,"
+                                                         "upload of dsync file:%s "
+                                                         "in the file:%s from remote:%s is fail,"
                                                          "and base storage:%s is not support.",
                                                          line,logfname,s->machineid,base->machineid);
                                              } else {
                                                  SpxLogFmt2(c->log,SpxLogError,err,
-                                                         "upload of dsync file:%s in the file:%s from remote:%s is fail,"
+                                                         "upload of dsync file:%s "
+                                                         "in the file:%s from remote:%s is fail,"
                                                          "and try base storage:%s again.",
                                                          line,logfname,s->machineid,base->machineid);
-                                                 err = ydb_storage_upload of dsync_upload(c,base,(*strs + 1));
+                                                 err = ydb_storage_dsync_upload_request(c,
+                                                         base,(*strs + 1));
                                                  if(0 != err){
                                                      SpxLogFmt2(c->log,SpxLogError,err,
-                                                             "upload of dsync file:%s in the file:%s from base storage:%s is fail,"
+                                                             "upload of dsync file:%s "
+                                                             "in the file:%s "
+                                                             "from base storage:%s is fail,",
                                                              line,logfname,base->machineid);
                                                  }
                                              }
                                          }
                                          break;
                                      }
-            case (YDB_STORAGE_MODIFY) : {
-                                            err = ydb_storage_dsync_modify(c,s,(*strs + 1),(*strs + 2));
+            case (YDB_STORAGE_LOG_MODIFY) : {
+                                            err = ydb_storage_dsync_modify_request(c,
+                                                    s,(*strs + 1),(*strs + 2));
                                             if(0 != err ) {
                                                 if(NULL == base){
                                                     SpxLogFmt2(c->log,SpxLogError,err,
-                                                            "modify of dsync file:%s in the file:%s from remote:%s is fail,"
+                                                            "modify of dsync file:%s "
+                                                            "in the file:%s from remote:%s is fail,"
                                                             "and base storage:%s is not support.",
                                                             line,logfname,s->machineid,base->machineid);
                                                 } else {
                                                     SpxLogFmt2(c->log,SpxLogError,err,
-                                                            "modify of dsync file:%s in the file:%s from remote:%s is fail,"
+                                                            "modify of dsync file:%s "
+                                                            "in the file:%s from remote:%s is fail,"
                                                             "and try base storage:%s again.",
                                                             line,logfname,s->machineid,base->machineid);
-                                                    err = ydb_storage_modify of dsync_modify(c,base,(*strs + 1),(*strs + 2));
+                                                    err = ydb_storage_dsync_modify_request(c,
+                                                            base,(*strs + 1),(*strs + 2));
                                                     if(0 != err){
                                                         SpxLogFmt2(c->log,SpxLogError,err,
-                                                                "modify of dsync file:%s in the file:%s from base storage:%s is fail,"
+                                                                "modify of dsync file:%s "
+                                                                "in the file:%s "
+                                                                "from base storage:%s is fail,",
                                                                 line,logfname,base->machineid);
                                                     }
                                                 }
                                             }
                                             break;
                                         }
-            case (YDB_STORAGE_DELETE):{
-                                          err = ydb_storage_dsync_delete(c,(*strs + 1));
+            case (YDB_STORAGE_LOG_DELETE):{
+                                          err = ydb_storage_dsync_delete_request(c,(*strs + 1));
                                           if(0 != err){
                                               SpxLogFmt2(c->log,SpxLogError,err,
                                                       "delete of dsync file:%s in the file:%s is fail,"
-                                                      "and delete in the local,so not base storage."
+                                                      "and delete in the local,so not base storage.",
                                                       line,logfname);
                                           }
                                           break;
@@ -1378,8 +1403,7 @@ r1:
     return err;
 }/*}}}*/
 
-
-spx_private err_t ydb_storage_dsync_delete(
+spx_private err_t ydb_storage_dsync_delete_request(
         struct ydb_storage_configurtion *c,
         string_t fid
         ){/*{{{*/
@@ -1423,7 +1447,7 @@ spx_private err_t ydb_storage_dsync_delete(
             fidbuf->tidx,fidbuf->fcreatetime,fidbuf->rand,
             fidbuf->suffix,&err);
     if(NULL == fname){
-        SpxLogFmt2(c->log,SPxLogError,err,
+        SpxLogFmt2(c->log,SpxLogError,err,
                 "make filename from fid:%s for dsync of deleting file is fail.",
                 fid);
         goto r1;
@@ -1440,89 +1464,89 @@ spx_private err_t ydb_storage_dsync_delete(
                 fname);
         goto r1;
     }
-        if(fidbuf->issinglefile){
-            remove(fname);
+    if(fidbuf->issinglefile){
+        remove(fname);
+        goto r1;
+    } else {
+        int fd = SpxWriteOpen(fname,false);
+        if(0 >= fd){
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "open chunkfile:%s for dsync of deleting file is fail.",
+                    fname);
             goto r1;
-        } else {
-            int fd = SpxWriteOpen(filename,false);
-            if(0 >= fd){
-                SpxLogFmt2(c->log,SpxLogError,err,
-                        "open chunkfile:%s for dsync of deleting file is fail.",
-                        fname);
-                goto r1;
-            }
-            ysdc->fd = fd;
-            unit = (int) fidbuf->begin / c->pagesize;
-            begin = unit * c->pagesize;
-            offset = fidbuf->begin - begin;
-            len = offset + fidbuf->totalsize;
-
-            char *ptr = SpxMmap(fd,begin,len);
-            if(NULL == ptr){
-                SpxLogFmt2(c->log,SpxLogError,err,
-                        "mmap chunkfile:%s for dsync of  deleting file is fail.",
-                        fname);
-                goto r1;
-            }
-            ysdc->ptr = ptr;
-
-            struct spx_msg *ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
-            if(NULL == ioctx){
-                SpxLogFmt2(c->log,SpxLogError,err,
-                        "alloc metadata for fid:%s to dsync of deleting bu file:%s is fail.",
-                        fid,fname);
-                goto r1;
-            }
-            ysdc->md = ioctx;
-
-            if(0 != (err = spx_msg_pack_ubytes(ioctx,
-                            ((ubyte_t *) (mptr+ offset)),
-                            YDB_CHUNKFILE_MEMADATA_SIZE))){
-                SpxLogFmt2(c->log,SpxLogError,err,
-                        "cp metadata to ioctx is fail,fid:%s,fname:%s.",
-                        fid,fname);
-                goto r1;
-            }
-            spx_msg_seek(ioctx,0,SpxMsgSeekSet);
-
-            bool_t io_isdelete = false;
-            u32_t io_opver = 0;
-            u32_t io_ver = 0;
-            u64_t io_createtime = 0;
-            u64_t io_lastmodifytime = 0;
-            u64_t io_totalsize = 0;
-            u64_t io_realsize = 0;
-            string_t io_suffix = NULL;
-            string_t io_hashcode = NULL;
-
-            err = ydb_storage_dio_parser_metadata(dc->log,ioctx,
-                    &io_isdelete,&io_opver,
-                    &io_ver,&io_createtime,
-                    &io_lastmodifytime,&io_totalsize,&io_realsize,
-                    &io_suffix,&io_hashcode);
-            if(fidbuf->opver > io_opver){
-                spx_msg_seek(ioctx,0,SpxMsgSeekSet);
-                spx_msg_pack_true(ioctx);//isdelete
-                spx_msg_pack_u32(ioctx,fidbuf->opver);
-                spx_msg_pack_u32(ioctx,YDB_VERSION);
-                spx_msg_seek(ioctx,sizeof(u64_t),SpxMsgSeekCurrent);//jump createtime
-                spx_msg_pack_u64(ioctx,fidbuf->lastmodifytime);
-
-                memcpy(mptr + offset,ioctx->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
-            }
-            if(NULL != io_suffix){
-                SpxStringFree(io_suffxi);
-            }
-            if(NULL != io_hashcode){
-                SpxStringFree(io_hashcode);
-            }
         }
+        ysdc->fd = fd;
+        unit = (int) fidbuf->begin / c->pagesize;
+        begin = unit * c->pagesize;
+        offset = fidbuf->begin - begin;
+        len = offset + fidbuf->totalsize;
+
+        char *ptr = SpxMmap(fd,begin,len);
+        if(NULL == ptr){
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "mmap chunkfile:%s for dsync of  deleting file is fail.",
+                    fname);
+            goto r1;
+        }
+        ysdc->ptr = ptr;
+
+        struct spx_msg *ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
+        if(NULL == ioctx){
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "alloc metadata for fid:%s to dsync of deleting bu file:%s is fail.",
+                    fid,fname);
+            goto r1;
+        }
+        ysdc->md = ioctx;
+
+        if(0 != (err = spx_msg_pack_ubytes(ioctx,
+                        ((ubyte_t *) (ptr+ offset)),
+                        YDB_CHUNKFILE_MEMADATA_SIZE))){
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "cp metadata to ioctx is fail,fid:%s,fname:%s.",
+                    fid,fname);
+            goto r1;
+        }
+        spx_msg_seek(ioctx,0,SpxMsgSeekSet);
+
+        bool_t io_isdelete = false;
+        u32_t io_opver = 0;
+        u32_t io_ver = 0;
+        u64_t io_createtime = 0;
+        u64_t io_lastmodifytime = 0;
+        u64_t io_totalsize = 0;
+        u64_t io_realsize = 0;
+        string_t io_suffix = NULL;
+        string_t io_hashcode = NULL;
+
+        err = ydb_storage_dio_parser_metadata(c->log,ioctx,
+                &io_isdelete,&io_opver,
+                &io_ver,&io_createtime,
+                &io_lastmodifytime,&io_totalsize,&io_realsize,
+                &io_suffix,&io_hashcode);
+        if(fidbuf->opver > io_opver){
+            spx_msg_seek(ioctx,0,SpxMsgSeekSet);
+            spx_msg_pack_true(ioctx);//isdelete
+            spx_msg_pack_u32(ioctx,fidbuf->opver);
+            spx_msg_pack_u32(ioctx,YDB_VERSION);
+            spx_msg_seek(ioctx,sizeof(u64_t),SpxMsgSeekCurrent);//jump createtime
+            spx_msg_pack_u64(ioctx,fidbuf->lastmodifytime);
+
+            memcpy(ptr + offset,ioctx->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
+        }
+        if(NULL != io_suffix){
+            SpxStringFree(io_suffix);
+        }
+        if(NULL != io_hashcode){
+            SpxStringFree(io_hashcode);
+        }
+    }
 r1:
     ydb_storage_sync_context_free(&ysdc);
     return err;
 }/*}}}*/
 
-spx_private err_t ydb_storage_dsync_upload(
+spx_private err_t ydb_storage_dsync_upload_request(
         struct ydb_storage_configurtion *c,
         struct ydb_storage_remote *s,
         string_t fid
@@ -1589,7 +1613,7 @@ spx_private err_t ydb_storage_dsync_upload(
             goto r1;
         } else {
 
-            int fd = SpxWriteOpen(filename,false);
+            int fd = SpxWriteOpen(fname,false);
             if(0 >= fd){
                 SpxLogFmt2(c->log,SpxLogError,err,
                         "open chunkfile:%s for fid:%s is fail.",
@@ -1622,7 +1646,7 @@ spx_private err_t ydb_storage_dsync_upload(
             ysdc->md = ioctx;
 
             if(0 != (err = spx_msg_pack_ubytes(ioctx,
-                            ((ubyte_t *) (mptr+ offset)),
+                            ((ubyte_t *) (ptr+ offset)),
                             YDB_CHUNKFILE_MEMADATA_SIZE))){
                 SpxLogFmt2(c->log,SpxLogError,err,
                         "pack metadata for fid:%s with fname:%s is fail.",
@@ -1641,7 +1665,7 @@ spx_private err_t ydb_storage_dsync_upload(
             string_t io_suffix = NULL;
             string_t io_hashcode = NULL;
 
-            err = ydb_storage_dio_parser_metadata(dc->log,ioctx,
+            err = ydb_storage_dio_parser_metadata(c->log,ioctx,
                     &io_isdelete,&io_opver,
                     &io_ver,&io_createtime,
                     &io_lastmodifytime,&io_totalsize,&io_realsize,
@@ -1669,9 +1693,9 @@ spx_private err_t ydb_storage_dsync_upload(
     }
 
     //need disksync
-    if(0 == ystc->sock) {
-        ystc->sock  = spx_socket_new(&err);
-        if(0 >= ystc->sock){
+    if(0 == ysdc->sock) {
+        ysdc->sock  = spx_socket_new(&err);
+        if(0 >= ysdc->sock){
             SpxLogFmt2(c->log,SpxLogError,err,
                     "new socket to remote storage:%s,"
                     "host:%s:%d for dsync file:%s is fail.",
@@ -1680,7 +1704,7 @@ spx_private err_t ydb_storage_dsync_upload(
             goto r1;
         }
 
-        if(0 != (err = spx_socket_set(ystc->sock,SpxKeepAlive,SpxAliveTimeout,\
+        if(0 != (err = spx_socket_set(ysdc->sock,SpxKeepAlive,SpxAliveTimeout,\
                         SpxDetectTimes,SpxDetectTimeout,\
                         SpxLinger,SpxLingerTimeout,\
                         SpxNodelay,\
@@ -1692,7 +1716,7 @@ spx_private err_t ydb_storage_dsync_upload(
                     fid);
             goto r1;
         }
-        if(0 != (err = spx_socket_connect_nb(ystc->sock,
+        if(0 != (err = spx_socket_connect_nb(ysdc->sock,
                         s->host.ip,s->host.port,c->timeout))){
             SpxLogFmt2(c->log,SpxLogError,err,
                     "connect to remote storage:%s,"
@@ -1703,9 +1727,9 @@ spx_private err_t ydb_storage_dsync_upload(
         }
     }
 
-    if(NULL == ystc->request){
-        ystc->request = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
-        if(NULL == ystc->request){
+    if(NULL == ysdc->request){
+        ysdc->request = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
+        if(NULL == ysdc->request){
             SpxLogFmt2(c->log,SpxLogError,err,
                     "new request to remote storage:%s,"
                     "host:%s:%d for dsync file:%s is fail.",
@@ -1715,7 +1739,7 @@ spx_private err_t ydb_storage_dsync_upload(
         }
     }
 
-    if(NULL == ystc->request->header){
+    if(NULL == ysdc->request->header){
         struct spx_msg_header *header = spx_alloc_alone(sizeof(struct spx_msg_header),&err);
         if(NULL == header){
             SpxLogFmt2(c->log,SpxLogError,err,
@@ -1728,45 +1752,45 @@ spx_private err_t ydb_storage_dsync_upload(
         header->protocol = YDB_S2S_DSYNC;
         header->bodylen = spx_string_len(fid);
         header->is_keepalive = false;//persistent connection
-        ystc->request->header = header;
+        ysdc->request->header = header;
     }
 
-    if(NULL == ystc->request->body) {
-        struct spx_msg *body = spx_msg_new(ystc->request->header->bodylen,&err);
+    if(NULL == ysdc->request->body) {
+        struct spx_msg *body = spx_msg_new(ysdc->request->header->bodylen,&err);
         if(NULL == body){
-            SpxLog2(c->log,SpxLogError,err,
+            SpxLogFmt2(c->log,SpxLogError,err,
                     "new request's body to remote storage:%s,"
                     "host:%s:%d for dsync file:%s is fail.",
                     s->machineid,s->host.ip,s->host.port,
                     fid);
             goto r1;
         }
-        spx_msg_pack_string(ctx,fid);
+        spx_msg_pack_string(body,fid);
     }
 
-    err = spx_write_context_nb(c->log,ystc->sock,ystc->request);
+    err = spx_write_context_nb(c->log,ysdc->sock,ysdc->request);
     if(0 != err){
         SpxLogFmt2(c->log,SpxLogError,err,
-                    "send request to remote storage:%s,"
-                    "host:%s:%d for dsync file:%s is fail.",
-                    s->machineid,s->host.ip,s->host.port,
-                    fid);
+                "send request to remote storage:%s,"
+                "host:%s:%d for dsync file:%s is fail.",
+                s->machineid,s->host.ip,s->host.port,
+                fid);
         goto r1;
 
     }
 
-    if(!spx_socket_read_timeout(ystc->sock,c->timeout)){
+    if(!spx_socket_read_timeout(ysdc->sock,c->timeout)){
         //timeout
         SpxLogFmt1(c->log,SpxLogError,
-                    "response it timeout from  remote storage:%s,"
-                    "host:%s:%d for dsync file:%s .",
-                    s->machineid,s->host.ip,s->host.port,
-                    fid);
+                "response it timeout from  remote storage:%s,"
+                "host:%s:%d for dsync file:%s .",
+                s->machineid,s->host.ip,s->host.port,
+                fid);
         goto r1;
     }
 
-    ystc->response->header =  spx_read_header_nb(c->log,ystc->sock,&err);
-    if(NULL == ystc->response->header){
+    ysdc->response->header =  spx_read_header_nb(c->log,ysdc->sock,&err);
+    if(NULL == ysdc->response->header){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "recving data for dsync fid:%s,"
                 "from remote storage:%s,ip:%s,port:%d is fail.",
@@ -1774,14 +1798,14 @@ spx_private err_t ydb_storage_dsync_upload(
         goto r1;
     }
 
-    err = ystc->response->header->err;
+    err = ysdc->response->header->err;
     if(0 != err){
         if(ENOENT == err){
             SpxLogFmt1(c->log,SpxLogWarn,
                     "file:%s is not in the remote storage:%s,host:%s:%d.",
                     fid,s->machineid,s->host.ip,s->host.port);
         } else {
-            SpxLogFmt2(c->log,SpxLogError,err
+            SpxLogFmt2(c->log,SpxLogError,err,
                     "request file:%s from remote storage:%s,host:%s:%d is fail.",
                     fid,s->machineid,s->host.ip,s->host.port);
         }
@@ -1790,16 +1814,16 @@ spx_private err_t ydb_storage_dsync_upload(
 
     //store file
     if(0 == ysdc->fd){
-        int fd = SpxWriteOpen(filename,false);
+        int fd = SpxWriteOpen(fname,false);
         if(0 >= fd){
             SpxLogFmt2(c->log,SpxLogError,err,
-                    "open file:%s is fail."
+                    "open file:%s is fail.",
                     fname);
             goto r1;
         }
         ysdc->fd = fd;
         if(fidbuf->issinglefile) {
-            if(0 > ftruncate(ysdc->fd,filesize)){
+            if(0 > ftruncate(ysdc->fd,fidbuf->totalsize)){
                 SpxLogFmt2(c->log,SpxLogError,err,
                         "truncate file:%s is fail.",
                         fname);
@@ -1843,23 +1867,24 @@ r1:
     return err;
 }/*}}}*/
 
-spx_private err_t ydb_storage_dsync_modify(
+spx_private err_t ydb_storage_dsync_modify_request(
         struct ydb_storage_configurtion *c,
         struct ydb_storage_remote *s,
         string_t fid,
         string_t ofid
         ){/*{{{*/
-    err = ydb_storage_dsync_delete(c,s,ofid);
-    err = ydb_storage_dsync_upload(c,s,fid);
+    err_t err = 0;
+    err = ydb_storage_dsync_delete_request(c,ofid);
+    err = ydb_storage_dsync_upload_request(c,s,fid);
     return err;
 }/*}}}*/
 
-
-spx_private err_t ydb_storage_dsync_data_by_remote(
+spx_private err_t ydb_storage_dsync_data_to_remote_storage(
         struct ydb_storage_configurtion *c,
         struct ydb_storage_remote *s,
         string_t fid
         ){/*{{{*/
+    /*
     // 1: the file is exist ?
     // 2: if is singlefile => pass
     // 3: if is chunkfile open chunkile and check buff
@@ -1870,46 +1895,46 @@ spx_private err_t ydb_storage_dsync_data_by_remote(
     struct ydb_storage_sync_context *ysdc = NULL;
     ysdc = spx_alloc_alone(sizeof(*ysdc),&err);
     if(NULL == ysdc){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "alloc dsync remote object is fail.",
-                "fid:%s.",fid);
-        return err;
+    SpxLogFmt2(c->log,SpxLogError,err,
+    "alloc dsync remote object is fail.",
+    "fid:%s.",fid);
+    return err;
     }
     struct ydb_storage_fid *fidbuf =
-        spx_alloc_alone(sizeof(struct ydb_storage_fid),&err);
+    spx_alloc_alone(sizeof(struct ydb_storage_fid),&err);
     if(NULL == fidbuf){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "alloc fid object is fail.",
-                "fid:%s.",fid);
-        goto r1;
+    SpxLogFmt2(c->log,SpxLogError,err,
+    "alloc fid object is fail.",
+    "fid:%s.",fid);
+    goto r1;
     }
     ysdc->fid = fidbuf;
     err = ydb_storage_dio_parser_fileid(c->log,fid,
-            &(fidbuf->groupname),&(fidbuf->machineid),
-            &(fidbuf->syncgroup),&(fidbuf->issinglefile),
-            &(fidbuf->mpidx),&(fidbuf->p1),&(fidbuf->p2),
-            &(fidbuf->tidx),&(fidbuf->fcreatetime),
-            &(fidbuf->rand),&(fidbuf->begin),&(fidbuf->realsize),
-            &(fidbuf->totalsize),&(fidbuf->ver),&(fidbuf->opver),
-            &(fidbuf->lastmodifytime),&(fidbuf->hashcode),
-            &(fidbuf->has_suffix),&(fidbuf->suffix));
+    &(fidbuf->groupname),&(fidbuf->machineid),
+    &(fidbuf->syncgroup),&(fidbuf->issinglefile),
+    &(fidbuf->mpidx),&(fidbuf->p1),&(fidbuf->p2),
+    &(fidbuf->tidx),&(fidbuf->fcreatetime),
+    &(fidbuf->rand),&(fidbuf->begin),&(fidbuf->realsize),
+    &(fidbuf->totalsize),&(fidbuf->ver),&(fidbuf->opver),
+    &(fidbuf->lastmodifytime),&(fidbuf->hashcode),
+    &(fidbuf->has_suffix),&(fidbuf->suffix));
     if(0 != err){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "parser fid:%s is fail.",
-                fid);
-        goto r1;
+    SpxLogFmt2(c->log,SpxLogError,err,
+    "parser fid:%s is fail.",
+    fid);
+    goto r1;
     }
 
     string_t fname = ydb_storage_dio_make_filename(c->log,
-            fidbuf->issinglefile,c->mountpoints,fidbuf->mpidx,
-            fidbuf->p1,fidbuf->p2,fidbuf->machineid,
-            fidbuf->tidx,fidbuf->fcreatetime,fidbuf->rand,
-            fidbuf->suffix,&err);
+    fidbuf->issinglefile,c->mountpoints,fidbuf->mpidx,
+    fidbuf->p1,fidbuf->p2,fidbuf->machineid,
+    fidbuf->tidx,fidbuf->fcreatetime,fidbuf->rand,
+    fidbuf->suffix,&err);
     if(NULL == fname){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "make fname by fid:%s  is fail.",
-                fid);
-        goto r1;
+    SpxLogFmt2(c->log,SpxLogError,err,
+    "make fname by fid:%s  is fail.",
+    fid);
+    goto r1;
     }
     ysdc->fname = fname;
 
@@ -1918,279 +1943,594 @@ spx_private err_t ydb_storage_dsync_data_by_remote(
     u64_t offset = 0;
     u64_t len = 0;
     if(SpxFileExist(fname)){
-        if(fidbuf->issinglefile){
-            SpxLogFmt1(c->log,SpxLogDebug,
-                    "file:%s is not exist.",
-                    fname);
-            goto r1;
-        } else {
-            int fd = SpxWriteOpen(filename,false);
-            if(0 >= fd){
-                SpxLogFmt2(c->log,SpxLogError,err,
-                        "open chunkfile:%s is fail.",
-                        fname);
-            }
-            ysdc->fd = fd;
-            unit = (int) fidbuf->begin / c->pagesize;
-            begin = unit * c->pagesize;
-            offset = fidbuf->begin - begin;
-            len = offset + fidbuf->totalsize;
+    if(fidbuf->issinglefile){
+    SpxLogFmt1(c->log,SpxLogDebug,
+    "file:%s is not exist.",
+    fname);
+    goto r1;
+    } else {
+    int fd = SpxWriteOpen(filename,false);
+    if(0 >= fd){
+    SpxLogFmt2(c->log,SpxLogError,err,
+    "open chunkfile:%s is fail.",
+    fname);
+    }
+    ysdc->fd = fd;
+    unit = (int) fidbuf->begin / c->pagesize;
+    begin = unit * c->pagesize;
+    offset = fidbuf->begin - begin;
+    len = offset + fidbuf->totalsize;
 
-            char *ptr = SpxMmap(fd,begin,len);
-            if(NULL == ptr){
+    char *ptr = SpxMmap(fd,begin,len);
+    if(NULL == ptr){
 
-            }
-            ysdc->ptr = ptr;
+    }
+    ysdc->ptr = ptr;
 
-            struct spx_msg *ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
-            if(NULL == ioctx){
-                goto r1;
-            }
-            ysdc->md = ioctx;
+    struct spx_msg *ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
+    if(NULL == ioctx){
+        goto r1;
+    }
+    ysdc->md = ioctx;
 
-            if(0 != (err = spx_msg_pack_ubytes(ioctx,
-                            ((ubyte_t *) (mptr+ offset)),
-                            YDB_CHUNKFILE_MEMADATA_SIZE))){
-                goto r1;
-            }
-            spx_msg_seek(ioctx,0,SpxMsgSeekSet);
+    if(0 != (err = spx_msg_pack_ubytes(ioctx,
+                    ((ubyte_t *) (mptr+ offset)),
+                    YDB_CHUNKFILE_MEMADATA_SIZE))){
+        goto r1;
+    }
+    spx_msg_seek(ioctx,0,SpxMsgSeekSet);
 
-            bool_t io_isdelete = false;
-            u32_t io_opver = 0;
-            u32_t io_ver = 0;
-            u64_t io_createtime = 0;
-            u64_t io_lastmodifytime = 0;
-            u64_t io_totalsize = 0;
-            u64_t io_realsize = 0;
-            string_t io_suffix = NULL;
-            string_t io_hashcode = NULL;
+    bool_t io_isdelete = false;
+    u32_t io_opver = 0;
+    u32_t io_ver = 0;
+    u64_t io_createtime = 0;
+    u64_t io_lastmodifytime = 0;
+    u64_t io_totalsize = 0;
+    u64_t io_realsize = 0;
+    string_t io_suffix = NULL;
+    string_t io_hashcode = NULL;
 
-            err = ydb_storage_dio_parser_metadata(dc->log,ioctx,
-                    &io_isdelete,&io_opver,
-                    &io_ver,&io_createtime,
-                    &io_lastmodifytime,&io_totalsize,&io_realsize,
-                    &io_suffix,&io_hashcode);
-            if(fidbuf->opver <= io_opver){
-                //no sync
+    err = ydb_storage_dio_parser_metadata(dc->log,ioctx,
+            &io_isdelete,&io_opver,
+            &io_ver,&io_createtime,
+            &io_lastmodifytime,&io_totalsize,&io_realsize,
+            &io_suffix,&io_hashcode);
+    if(fidbuf->opver <= io_opver){
+        //no sync
 
-            }
+    }
+}
+} else {
+    int fd = SpxWriteOpen(filename,false);
+    if(0 >= fd){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "open chunkfile:%s is fail.",
+                fname);
+    }
+    ysdc->fd = fd;
+    if(fidbuf->issinglefile) {
+        if(0 > ftruncate(ysdc->fd,filesize)){
         }
     } else {
-        int fd = SpxWriteOpen(filename,false);
-        if(0 >= fd){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "open chunkfile:%s is fail.",
-                    fname);
-        }
-        ysdc->fd = fd;
-        if(fidbuf->issinglefile) {
-            if(0 > ftruncate(ysdc->fd,filesize)){
-            }
-        } else {
-            if(0 > ftruncate(ysdc->fd,c->chunksize)){
-            }
+        if(0 > ftruncate(ysdc->fd,c->chunksize)){
         }
     }
+}
 
-    if(0 == ystc->sock) {
-        ystc->sock  = spx_socket_new(&err);
-        if(0 >= ystc->sock){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "new socket to remote storage:%s,"
-                    "net address %s:%d is fail.",
-                    s->machineid,
-                    s->host.ip,s->host.port);
-            goto r1;
-        }
-
-        if(0 != (err = spx_socket_set(ystc->sock,SpxKeepAlive,SpxAliveTimeout,\
-                        SpxDetectTimes,SpxDetectTimeout,\
-                        SpxLinger,SpxLingerTimeout,\
-                        SpxNodelay,\
-                        true,c->timeout))){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "set socket to remote storage:%s,"
-                    "net address %s:%d is fail.",
-                    s->machineid,
-                    s->host.ip,s->host.port);
-            goto r1;
-        }
-        if(0 != (err = spx_socket_connect_nb(ystc->sock,
-                        s->host.ip,s->host.port,c->timeout))){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "connect to remote storage:%s,"
-                    "address %s:%d is fail.",
-                    s->machineid,
-                    s->host.ip,s->host.port);
-            goto r1;
-        }
+if(0 == ystc->sock) {
+    ystc->sock  = spx_socket_new(&err);
+    if(0 >= ystc->sock){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "new socket to remote storage:%s,"
+                "net address %s:%d is fail.",
+                s->machineid,
+                s->host.ip,s->host.port);
+        goto r1;
     }
 
+    if(0 != (err = spx_socket_set(ystc->sock,SpxKeepAlive,SpxAliveTimeout,\
+                    SpxDetectTimes,SpxDetectTimeout,\
+                    SpxLinger,SpxLingerTimeout,\
+                    SpxNodelay,\
+                    true,c->timeout))){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "set socket to remote storage:%s,"
+                "net address %s:%d is fail.",
+                s->machineid,
+                s->host.ip,s->host.port);
+        goto r1;
+    }
+    if(0 != (err = spx_socket_connect_nb(ystc->sock,
+                    s->host.ip,s->host.port,c->timeout))){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "connect to remote storage:%s,"
+                "address %s:%d is fail.",
+                s->machineid,
+                s->host.ip,s->host.port);
+        goto r1;
+    }
+}
+
+if(NULL == ystc->request){
+    ystc->request = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
     if(NULL == ystc->request){
-        ystc->request = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
-        if(NULL == ystc->request){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "new request for sync logfile "
-                    "to remote storage %s address %s:%d is fail.",
-                    s->machineid,s->host.ip,s->host.port);
-            goto r1;
-        }
-    }
-
-    if(NULL == ystc->request->header){
-        struct spx_msg_header *header = spx_alloc_alone(sizeof(struct spx_msg_header),&err);
-        if(NULL == header){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "new request header for sync logfile "
-                    "to remote storage:%s,ip:%s,port:%d.",
-                    s->machineid,s->host.ip,s->host.port);
-            goto r1;
-        }
-        header->protocol = protocol;
-        header->bodylen = YDB_MACHINEID_LEN + spx_string_len(fid);
-        header->is_keepalive = false;//persistent connection
-        ystc->request->header = header;
-    }
-
-    if(NULL == ystc->request->body) {
-        struct spx_msg *body = spx_msg_new(ystc->request->header->bodylen,&err);
-        if(NULL == body){
-            SpxLog2(c->log,SpxLogError,err,
-                    "new body of request for sync logfile is fail.");
-            goto r1;
-        }
-        spx_msg_pack_fixed_string(body,c->machineid,YDB_MACHINEID_LEN);
-        spx_msg_pack_string(ctx,fid);
-    }
-
-    err = spx_write_context_nb(c->log,ystc->sock,ystc->request);
-    if(0 != err){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "send request for sync logfile "
-                "to remote storage:%s,ip:%s,port:%d is fail.",
-                s->machineid,s->host.ip,s->host.port);
-        goto r1;
-
-    }
-
-    if(!spx_socket_read_timeout(ystc->sock,c->timeout)){
-        //timeout
-        SpxLogFmt1(c->log,SpxLogError,
-                "recving data for query mountpoint state "
-                "from remote storage:%s,ip:%s,port:%d is timeout.",
+                "new request for sync logfile "
+                "to remote storage %s address %s:%d is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
+}
 
-    ystc->response->header =  spx_read_header_nb(c->log,ystc->sock,&err);
-    if(NULL == ystc->response->header){
+if(NULL == ystc->request->header){
+    struct spx_msg_header *header = spx_alloc_alone(sizeof(struct spx_msg_header),&err);
+    if(NULL == header){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "recving data for query mountpoint state "
-                "from remote storage:%s,ip:%s,port:%d is fail.",
+                "new request header for sync logfile "
+                "to remote storage:%s,ip:%s,port:%d.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
+    header->protocol = protocol;
+    header->bodylen = YDB_MACHINEID_LEN + spx_string_len(fid);
+    header->is_keepalive = false;//persistent connection
+    ystc->request->header = header;
+}
 
-    err = ystc->response->header->err;
-    if(0 != err){
-        if(ENOENT == err){
-            SpxLogFmt1(c->log,SpxLogWarn,
-                    "logfile of machineid:%s date:%d-%d-%d is not exist.",
-                    machineid,dtlogf->year,dtlogf->month,,
-                    dtlogf->day);
-        } else {
-            SpxLogFmt1(c->log,SpxLogWarn,
-                    "get logfile of machineid:%s date:%d-%d-%d is fail.",
-                    machineid,dtlogf->year,dtlogf->month,,
-                    dtlogf->day);
-        }
+if(NULL == ystc->request->body) {
+    struct spx_msg *body = spx_msg_new(ystc->request->header->bodylen,&err);
+    if(NULL == body){
+        SpxLog2(c->log,SpxLogError,err,
+                "new body of request for sync logfile is fail.");
+        goto r1;
+    }
+    spx_msg_pack_fixed_string(body,c->machineid,YDB_MACHINEID_LEN);
+    spx_msg_pack_string(ctx,fid);
+}
+
+err = spx_write_context_nb(c->log,ystc->sock,ystc->request);
+if(0 != err){
+    SpxLogFmt2(c->log,SpxLogError,err,
+            "send request for sync logfile "
+            "to remote storage:%s,ip:%s,port:%d is fail.",
+            s->machineid,s->host.ip,s->host.port);
+    goto r1;
+
+}
+
+if(!spx_socket_read_timeout(ystc->sock,c->timeout)){
+    //timeout
+    SpxLogFmt1(c->log,SpxLogError,
+            "recving data for query mountpoint state "
+            "from remote storage:%s,ip:%s,port:%d is timeout.",
+            s->machineid,s->host.ip,s->host.port);
+    goto r1;
+}
+
+ystc->response->header =  spx_read_header_nb(c->log,ystc->sock,&err);
+if(NULL == ystc->response->header){
+    SpxLogFmt2(c->log,SpxLogError,err,
+            "recving data for query mountpoint state "
+            "from remote storage:%s,ip:%s,port:%d is fail.",
+            s->machineid,s->host.ip,s->host.port);
+    goto r1;
+}
+
+err = ystc->response->header->err;
+if(0 != err){
+    if(ENOENT == err){
+        SpxLogFmt1(c->log,SpxLogWarn,
+                "logfile of machineid:%s date:%d-%d-%d is not exist.",
+                machineid,dtlogf->year,dtlogf->month,,
+                dtlogf->day);
+    } else {
+        SpxLogFmt1(c->log,SpxLogWarn,
+                "get logfile of machineid:%s date:%d-%d-%d is fail.",
+                machineid,dtlogf->year,dtlogf->month,,
+                dtlogf->day);
+    }
+    goto r1;
+}
+
+if(fidbuf->issinglefile) {
+    ysdc->fd  = SpxWriteOpen(logfname,true);
+    if(0 >= ysdc->fd){
+        err = 0 == errno ? EACCES : errno;
+        SpxLogFmt2(c->log,SpxLogWarn,err
+                "create logfile of machineid:%s date:%d-%d-%d is fail.",
+                machineid,dtlogf->year,dtlogf->month,,
+                dtlogf->day);
+        goto r1;
+    }
+    len = ystc->response->header->bodylen - ystc->response->header->offset;
+    if(0 > ftruncate(ysdc->fd,filesize)){
+        err = 0 == errno ? EACCES : errno;
+        SpxLogFmt2(c->log,SpxLogWarn,err
+                "change logfile filesize of machineid:%s date:%d-%d-%d is fail.",
+                machineid,dtlogf->year,dtlogf->month,,
+                dtlogf->day);
         goto r1;
     }
 
-    if(fidbuf->issinglefile) {
-        ysdc->fd  = SpxWriteOpen(logfname,true);
-        if(0 >= ysdc->fd){
-            err = 0 == errno ? EACCES : errno;
-            SpxLogFmt2(c->log,SpxLogWarn,err
-                    "create logfile of machineid:%s date:%d-%d-%d is fail.",
-                    machineid,dtlogf->year,dtlogf->month,,
-                    dtlogf->day);
-            goto r1;
-        }
-        len = ystc->response->header->bodylen - ystc->response->header->offset;
-        if(0 > ftruncate(ysdc->fd,filesize)){
-            err = 0 == errno ? EACCES : errno;
-            SpxLogFmt2(c->log,SpxLogWarn,err
-                    "change logfile filesize of machineid:%s date:%d-%d-%d is fail.",
-                    machineid,dtlogf->year,dtlogf->month,,
-                    dtlogf->day);
-            goto r1;
-        }
-
-        ptr = mmap(NULL,\
-                filesize,PROT_READ | PROT_WRITE ,\
-                MAP_SHARED,ysdc->fd,0);
-        if(MAP_FAILED == ptr){
-            err = errno;
-            SpxLogFmt2(c->log,SpxLogError,err,\
-                    "mmap the logfile file machineid:%s "
-                    "date:%d-%d-%d to memory is fail.",
-                    c->machineid,binlog_dt->year,
-                    binlog_dt->month,binlog_dt->day);
-            goto r1;
-        }
-        ysdc->ptr = ptr;
-    }
-
-    err = spx_lazy_mmap_nb(c->log,ysdc->ptr + offset,ystc->sock,len,0);
-    if(0 != err){
+    ptr = mmap(NULL,\
+            filesize,PROT_READ | PROT_WRITE ,\
+            MAP_SHARED,ysdc->fd,0);
+    if(MAP_FAILED == ptr){
+        err = errno;
         SpxLogFmt2(c->log,SpxLogError,err,\
-                "write the logfile file machineid:%s "
+                "mmap the logfile file machineid:%s "
                 "date:%d-%d-%d to memory is fail.",
                 c->machineid,binlog_dt->year,
                 binlog_dt->month,binlog_dt->day);
+        goto r1;
     }
+    ysdc->ptr = ptr;
+}
+
+err = spx_lazy_mmap_nb(c->log,ysdc->ptr + offset,ystc->sock,len,0);
+if(0 != err){
+    SpxLogFmt2(c->log,SpxLogError,err,\
+            "write the logfile file machineid:%s "
+            "date:%d-%d-%d to memory is fail.",
+            c->machineid,binlog_dt->year,
+            binlog_dt->month,binlog_dt->day);
+}
 
 r1:
-    SpxClose(ystc->fd);
-    SpxClose(binlog_fd);
-    if(NULL != ptr){
-        munmap(ptr,filesize);
+SpxClose(ystc->fd);
+SpxClose(binlog_fd);
+if(NULL != ptr){
+    munmap(ptr,filesize);
+}
+if(0 != err){
+    if(SpxFileExist(logfname)){
+        SpxLogFmt2(c->log,SpxLogError,err,\
+                "write the logfile file machineid:%s "
+                "date:%d-%d-%d to memory is fail."
+                " and remove it.",
+                c->machineid,binlog_dt->year,
+                binlog_dt->month,binlog_dt->day);
+        remove(logfname);
     }
-    if(0 != err){
-        if(SpxFileExist(logfname)){
-            SpxLogFmt2(c->log,SpxLogError,err,\
-                    "write the logfile file machineid:%s "
-                    "date:%d-%d-%d to memory is fail."
-                    " and remove it.",
-                    c->machineid,binlog_dt->year,
-                    binlog_dt->month,binlog_dt->day);
-            remove(logfname);
+}
+if(NULL != ystc && NULL != ystc->request){
+    if(NULL !=ystc->request->header){
+        SpxFree(ystc->request->header);
+    }
+    if(NULL != ystc->request->body){
+        SpxFree(ystc->request->body);
+    }
+}
+if(NULL != ystc && NULL != ystc->response){
+    if(NULL != ystc->response->header){
+        SpxFree(ystc->response->header);
+    }
+    if(NULL != ystc->response->body){
+        SpxMsgFree(ystc->response->body);
+    }
+    SpxFree(ystc->response);
+}
+return err;
+*/
+return 0;
+}/*}}}*/
+
+spx_private void ydb_storage_dsync_over(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_dsync_runtime *dsrt
+        ){/*{{{*/
+    err_t err = 0;
+    struct spx_map_iter *iter = spx_map_iter_new(g_ydb_storage_remote,&(err));
+    if(NULL == iter){
+        SpxLog2(c->log,SpxLogError,err,\
+                "init iter of remote storage is fail.");
+        return;
+    }
+    struct spx_map_node *n = NULL;
+    while(NULL != (n = spx_map_iter_next(iter,&err))){
+        if(NULL != n && NULL != n->v){
+            SpxTypeConvert2(struct ydb_storage_remote,s,n->v);
+            s->synclog.d.year = dsrt->sync_date_curr.year;
+            s->synclog.d.month = dsrt->sync_date_curr.month;
+            s->synclog.d.day = dsrt->sync_date_curr.day;
+            s->synclog.off = 0;//can set offset ,because maybe the storage is offline
+            //and the  offset must send by csync begin and with synclog file
+            //stat(fname) for file size
         }
     }
-    if(NULL != ystc && NULL != ystc->request){
-        if(NULL !=ystc->request->header){
-            SpxFree(ystc->request->header);
+    spx_map_iter_free(&iter);
+    return;
+}/*}}}*/
+
+spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
+        struct ydb_storage_configurtion *c,
+        err_t *err
+        ){/*{{{*/
+    struct ydb_storage_dsync_runtime  *dsrt;
+    FILE *fp = NULL;
+    string_t line = NULL;
+    string_t fname = ydb_storage_dsync_make_runtime_filename(c,err);
+    if(NULL == fname){
+        SpxLog2(c->log,SpxLogError,*err,
+                "make dsync runtime filename is fail.");
+        return NULL;
+    }
+
+    if(!SpxFileExist(fname)){
+        *err = ENOENT;
+        goto r1;
+    }
+
+    dsrt = spx_alloc_alone(sizeof(*dsrt),err);
+    if(NULL == dsrt){
+        SpxLog2(c->log,SpxLogError,*err,
+                "new dsync runtime is fail.");
+        goto r1;
+    }
+
+    line = spx_string_newlen(NULL,SpxStringRealSize(SpxLineSize),err);
+    if(NULL == line){
+        SpxLog2(c->log,SpxLogError,*err,
+                "new line for parsering dsync runtime file is fail.");
+        goto r1;
+    }
+
+    fp = SpxFReadOpen(fname);
+    if(NULL == fp){
+        *err = 0 == errno ? EACCES : errno;
+        SpxLogFmt2(c->log,SpxLogError,*err,
+                "open dsync runtime file:%s is fail.",
+                fname);
+        goto r1;
+    }
+
+    int i = 0;
+    while(NULL != (fgets(line,SpxLineSize,fp))){
+        spx_string_updatelen(line);
+        spx_string_strip_linefeed(line);
+        if('#' == *line || SpxStringIsEmpty(line)){
+            continue;
         }
-        if(NULL != ystc->request->body){
-            SpxFree(ystc->request->body);
+        switch(i){
+            case (0):{
+                         dsrt->step = atoi(line);
+                         i++;
+                         break;
+                     }
+            case (1):{
+                         spx_date_convert(c->log,
+                                 &(dsrt->sync_date_curr),line,"YYYY-MM-DD",err);
+                         i++;
+                         break;
+                     }
+            case (2):{
+                         dsrt->offset = atoll(line);
+                         i++;
+                         break;
+                     }
+            case (3):{
+                         dsrt->last_linelen = atoll(line);
+                         i++;
+                         break;
+                     }
+            case (4):{
+                         spx_date_convert(c->log,
+                                 &(dsrt->sync_date_curr),line,"YYYY-MM-DD",err);
+                         i++;
+                         break;
+                     }
+            case (5):{
+                         dsrt->begin_dsync_timespan = atoll(line);
+                         i++;
+                         break;
+                     }
+            case (6):{
+                         int i = 0;
+                         for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
+                             if('1' == *(line + i)){
+                                 (dsrt->ydb_storage_dsync_mps + i)->need_dsync = true;
+                             }
+                         }
+                         i++;
+                         break;
+                     }
+            default:{
+                        break;
+                    }
         }
     }
-    if(NULL != ystc && NULL != ystc->response){
-        if(NULL != ystc->response->header){
-            SpxFree(ystc->response->header);
+    goto r2;
+r1:
+    if(NULL != dsrt){
+        SpxFree(dsrt);
+    }
+r2:
+    if(NULL != fname){
+        SpxStringFree(fname);
+    }
+    if(NULL != fp){
+        fclose(fp);
+        fp = NULL;
+    }
+    if(NULL != line){
+        SpxStringFree(line);
+    }
+    return dsrt;
+}/*}}}*/
+
+spx_private void *ydb_storage_dsync_runtime_writer(
+        void *arg
+        ){/*{{{*/
+    if(NULL == arg){
+        return NULL;
+    }
+    SpxTypeConvert2(struct ydb_storage_dsync_runtime,dsrt,arg);
+    struct ydb_storage_configurtion *c = dsrt->c;
+    err_t err = 0;
+    FILE *fp = NULL;
+    string_t line = NULL;
+    string_t fname = ydb_storage_dsync_make_runtime_filename(c,&err);
+    if(NULL == fname){
+        SpxLog2(c->log,SpxLogError,err,
+                "make dsync runtime filename is fail.");
+        return NULL;
+    }
+
+    line = spx_string_newlen(NULL,SpxStringRealSize(SpxLineSize),&err);
+    if(NULL == line){
+        SpxLog2(c->log,SpxLogError,err,
+                "new line for parsering dsync runtime file is fail.");
+        goto r1;
+    }
+
+    string_t new_line = spx_string_cat_printf(&err,line,
+            "%d\n%d-%d-%d\n%lld\n%lld\n%d-%d-%d\n%lld\n",
+            dsrt->step,dsrt->sync_date_curr.year,
+            dsrt->sync_date_curr.month,
+            dsrt->sync_date_curr.day,
+            dsrt->offset,dsrt->last_linelen,
+            dsrt->dsync_over_of_mps.year,
+            dsrt->dsync_over_of_mps.month,
+            dsrt->dsync_over_of_mps.day,
+            dsrt->begin_dsync_timespan);
+    if(NULL == new_line){
+        SpxLog2(c->log,SpxLogError,err,
+                "make context for dsync runtime file is fail.");
+        goto r1;
+    }
+    line = new_line;
+    int i = 0;
+    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
+        new_line = spx_string_cat(line,
+                (dsrt->ydb_storage_dsync_mps + i)->need_dsync ? "1" :"0",
+                &err);
+        if(NULL == new_line){
+            SpxLog2(c->log,SpxLogError,err,
+                    "make context for dsync runtime file is fail.");
+            break;
         }
-        if(NULL != ystc->response->body){
-            SpxMsgFree(ystc->response->body);
+        line = new_line;
+    }
+
+
+    fp = SpxFWriteOpen(fname,true);
+    if(NULL == fp){
+        err = 0 == errno ? EACCES : errno;
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "open dsync runtime file:%s is fail.",
+                fname);
+        goto r1;
+    }
+
+    size_t size = spx_string_len(line);
+    size_t len = 0;
+    err = spx_fwrite_string(fp,line,size,&len);
+    if(0 != err || size != len){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "write dsync runtime file is fail."
+                "size:%d,len:%d",size,len);
+    }
+    fclose(fp);
+r1:
+    if(NULL != line){
+        SpxStringFree(line);
+    }
+    if(NULL != fname){
+        SpxStringFree(fname);
+    }
+    return NULL;
+}/*}}}*/
+
+spx_private string_t ydb_storage_dsync_make_runtime_filename(
+        struct ydb_storage_configurtion *c,
+        err_t *err
+        ){/*{{{*/
+    string_t fname = spx_string_newlen(NULL,SpxStringRealSize(SpxPathSize),err);
+    if(NULL == fname){
+        SpxLog2(c->log,SpxLogError,*err,
+                "new dsync runtime filename is fail.");
+        return NULL;
+    }
+    string_t new_fname = NULL;
+    if(SpxStringEndWith(c->basepath,SpxPathDlmt)){
+        new_fname = spx_string_cat_printf(err,fname,"%s.%s-dsync.rtf",
+                c->basepath,c->machineid);
+    } else {
+        new_fname = spx_string_cat_printf(err,fname,"%s%c.%s-dsync.rtf",
+                c->basepath,SpxPathDlmt,c->machineid);
+    }
+    if(NULL == new_fname){
+        SpxLog2(c->log,SpxLogError,*err,
+                "make dsync runtime filename is fail.");
+        SpxStringFree(fname);
+        return NULL;
+    }
+    fname = new_fname;
+    return fname;
+}/*}}}*/
+
+spx_private void ydb_storage_dsync_runtime_file_remove(
+        struct ydb_storage_configurtion *c
+        ){/*{{{*/
+    err_t err = 0;
+    string_t fname = ydb_storage_dsync_make_runtime_filename(c,&err);
+    if(NULL == fname){
+        SpxLog2(c->log,SpxLogError,err,
+                "make dsync runtime file to remove is fail.");
+        return;
+    }
+    remove(fname);
+    SpxStringFree(fname);
+    return;
+}/*}}}*/
+
+spx_private void ydb_storage_dsync_mountpoint_over(
+        struct ydb_storage_dsync_runtime  *dsrt
+        ){/*{{{*/
+    int i = 0;
+    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
+        struct ydb_storage_dsync_mp *mp = dsrt->ydb_storage_dsync_mps + i;
+        if(mp->need_dsync){
+            struct ydb_storage_mountpoint *mp = spx_list_get(dsrt->c->mountpoints,i);
+            if(mp->isusing){
+                mp->last_freesize = mp->freesize;
+            }
         }
-        SpxFree(ystc->response);
+    }
+    return;
+}/*}}}*/
+
+spx_private err_t ydb_storage_dsync_total_mounpoint_sync_timespan(
+        struct ydb_storage_configurtion *c,
+        struct ydb_storage_dsync_runtime *dsrt
+        ){/*{{{*/
+    err_t err = 0;
+    string_t fname = NULL;
+    if(0 == dsrt->dsync_over_of_mps.year){
+        fname = ydb_storage_make_runtime_filename(c,&err);
+        if(NULL == fname){
+            SpxLog2(c->log,SpxLogError,err,
+                    "make runtime filename is fail.");
+            return err;
+        }
+        if(SpxFileExist(fname)){
+            struct stat buf;
+            SpxZero(buf);
+            stat(fname,&buf);
+            spx_get_date((time_t *) &(buf.st_mtime),&(dsrt->dsync_over_of_mps));
+        } else {
+            spx_get_today(&(dsrt->dsync_over_of_mps));
+        }
+        SpxStringFree(fname);
     }
     return err;
 }/*}}}*/
 
+
 //server
 err_t ydb_storage_dsync_sync_data(struct ev_loop *loop,\
-        struct ydb_storage_dio_context *dc){/*{{{*/
+        struct ydb_storage_dio_context *dc
+        ){/*{{{*/
     err_t err = 0;
     struct spx_task_context *tc = dc->tc;
     struct spx_job_context *jc = dc->jc;
@@ -2272,8 +2612,8 @@ r1:
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
@@ -2285,7 +2625,8 @@ r1:
 }/*}}}*/
 
 spx_private void ydb_storage_dsync_data_from_chunkfile(
-        struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+        struct ev_loop *loop,ev_async *w,int revents
+        ){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
@@ -2403,7 +2744,7 @@ spx_private void ydb_storage_dsync_data_from_chunkfile(
     jc->moore = SpxNioMooreResponse;
     jc->writer_header =wh;
     wh->version = YDB_VERSION;
-    wh->protocol = YDB_C2S_FIND;
+    jc->writer_header->protocol = YDB_S2S_DSYNC;
     wh->offset = 0;
     wh->bodylen = dc->realsize + YDB_CHUNKFILE_MEMADATA_SIZE;
 
@@ -2411,10 +2752,11 @@ spx_private void ydb_storage_dsync_data_from_chunkfile(
         jc->is_sendfile = true;
         jc->sendfile_fd = fd;
         jc->sendfile_begin = dc->begin ;
-        jc->sendfile_size = dc->realsize;
+        jc->sendfile_size =YDB_CHUNKFILE_MEMADATA_SIZE +  dc->realsize;
     } else {
         jc->is_sendfile = false;
-        struct spx_msg *ctx = spx_msg_new(dc->realsize,&err);
+        struct spx_msg *ctx = spx_msg_new(
+                YDB_CHUNKFILE_MEMADATA_SIZE + dc->realsize,&err);
         if(NULL == ctx){
             SpxLog2(dc->log,SpxLogError,err,\
                     "alloc buffer ctx for finding writer is fail.");
@@ -2426,7 +2768,7 @@ spx_private void ydb_storage_dsync_data_from_chunkfile(
         jc->writer_body_ctx = ctx;
         spx_msg_pack_ubytes(ctx,
                 (ubyte_t *)mptr + begin,
-                dc->realsize);
+                YDB_CHUNKFILE_MEMADATA_SIZE + dc->realsize);
         SpxClose(fd);
     }
 
@@ -2446,7 +2788,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_C2S_FIND;
+    jc->writer_header->protocol = YDB_S2S_DSYNC;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -2459,8 +2801,8 @@ r2:
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -2472,7 +2814,8 @@ r2:
 }/*}}}*/
 
 spx_private void ydb_storage_dsync_data_from_singlefile(
-        struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+        struct ev_loop *loop,ev_async *w,int revents
+        ){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
@@ -2509,7 +2852,7 @@ spx_private void ydb_storage_dsync_data_from_singlefile(
     jc->writer_header =wh;
     jc->moore = SpxNioMooreResponse;
     wh->version = YDB_VERSION;
-    wh->protocol = YDB_C2S_FIND;
+    jc->writer_header->protocol = YDB_S2S_DSYNC;
     wh->offset = 0;
     wh->bodylen = dc->realsize;
 
@@ -2566,7 +2909,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_C2S_FIND;
+    jc->writer_header->protocol = YDB_S2S_DSYNC;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -2578,8 +2921,8 @@ r2:
     size_t idx = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(jc->log,SpxLogError,err,\
@@ -2590,19 +2933,19 @@ r2:
 }/*}}}*/
 
 err_t ydb_storage_dsync_logfile(struct ev_loop *loop,\
-        struct ydb_storage_dio_context *dc){/*{{{*/
+        struct ydb_storage_dio_context *dc
+        ){/*{{{*/
     err_t err = 0;
     struct spx_task_context *tc = dc->tc;
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
 
     struct spx_msg *ctx = jc->reader_body_ctx;
-    size_t len = jc->reader_header->bodylen;
 
-    dc->machineid = spx_msg_unpack_string(ctx->,YDB_MACHINEID_LEN,&err);
+    dc->machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&err);
     dc->date = spx_alloc_alone(sizeof(struct spx_date),&err);
     if(NULL == dc->date){
-        SpxLogFmt2(c->log,SpxLogError,err,
+        SpxLog2(c->log,SpxLogError,err,
                 "new dsync logfile date is fail.");
         goto r1;
     }
@@ -2677,7 +3020,8 @@ r1:
 }/*}}}*/
 
 spx_private void ydb_storage_dsync_logfile_context(
-        struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+        struct ev_loop *loop,ev_async *w,int revents
+        ){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
@@ -2696,11 +3040,11 @@ spx_private void ydb_storage_dsync_logfile_context(
         goto r1;
     }
 
-    size_t len = buf->st_size;
+    size_t len = buf.st_size;
     size_t begin = 0;
     if(0 == len){
         SpxLogFmt1(c->log,SpxLogWarn,
-                "logfile:%s size is 0 and context is empty."<
+                "logfile:%s size is 0 and context is empty.",
                 dc->filename);
         goto r1;
     }
@@ -2728,10 +3072,18 @@ spx_private void ydb_storage_dsync_logfile_context(
     }
 
 
-    jc->moore = SpxNioMooreResponse;
+    struct spx_msg_header *wh = (struct spx_msg_header *)
+        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    if(NULL == wh){
+        SpxLog2(dc->log,SpxLogError,err,\
+                "new response header is fail."
+                "no notify client and push jc force.");
+        goto r1;
+    }
     jc->writer_header =wh;
+    jc->moore = SpxNioMooreResponse;
     wh->version = YDB_VERSION;
-    wh->protocol = YDB_S2S_DSYNC_LOGFILE;
+    wh->protocol = YDB_S2S_SYNC_LOGFILE;
     wh->offset = 0;
     wh->bodylen = len;
     dc->realsize = len;
@@ -2759,12 +3111,13 @@ spx_private void ydb_storage_dsync_logfile_context(
     }
 
     munmap(mptr,len);
-    spx_msg_free(&ioctx);
     goto r2;
 r1:
 
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    if(NULL == jc->writer_header){
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+    }
     if(NULL == jc->writer_header){
         SpxLog2(dc->log,SpxLogError,err,\
                 "new response header is fail."
@@ -2774,7 +3127,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_S2S_DSYNC_LOGFILE;
+    jc->writer_header->protocol = YDB_S2S_SYNC_LOGFILE;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -2787,8 +3140,8 @@ r2:
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     if(0 != err){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -2797,315 +3150,6 @@ r2:
         return;
     }
     return;
-}/*}}}*/
-
-spx_private void ydb_storage_dsync_over(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_dsync_runtime *dsrt
-        ){/*{{{*/
-    err_t err = 0;
-    struct spx_map_iter *iter = spx_map_iter_new(g_ydb_storage_remote,&(err));
-    if(NULL == iter){
-        SpxLog2(c->log,SpxLogError,err,\
-                "init iter of remote storage is fail.");
-        return err;
-    }
-    struct spx_map_node *n = NULL;
-    while(NULL != (n = spx_map_iter_next(iter,&err))){
-        if(NULL != n && NULL != n->v){
-            SpxTypeConvert2(struct ydb_storage_remote,s,n->v);
-            s->synclog.d.year = dsrt->sync_date_curr.year;
-            s->synclog.d.month = dsrt->sync_date_curr.month;
-            s->synclog.d.day = dsrt->sync_date_curr.day;
-            s->synclog.off = 0;//can set offset ,because maybe the storage is offline
-            //and the  offset must send by csync begin and with synclog file
-            //stat(fname) for file size
-        }
-    }
-    spx_map_iter_free(&iter);
-    return err;
-}/*}}}*/
-
-spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
-        struct ydb_storage_configurtion *c,
-        err_t *err
-        ){/*{{{*/
-    struct ydb_storage_dsync_runtime  *dsrt;
-    FILE *fp = NULL;
-    string_t line = NULL;
-    string_t fname = ydb_storage_dsync_make_runtime_filename(c,err);
-    if(NULL == fname){
-        SpxLog2(c->log,SpxLogError,*err,
-                "make dsync runtime filename is fail.");
-        return NULL;
-    }
-
-    if(!SpxFileExist(fname)){
-        *err = ENOENT;
-        goto r1;
-    }
-
-    dsrt = spx_alloc_alone(sizeof(*dsrt),err);
-    if(NULL == dsrt){
-        SpxLog2(c->log,SpxLogError,*err,
-                "new dsync runtime is fail.");
-        goto r1;
-    }
-
-    line = spx_string_newlen(NULL,SpxStringRealSize(SpxLineSize),err);
-    if(NULL == line){
-        SpxLog2(c->log,SpxLogError,*err,
-                "new line for parsering dsync runtime file is fail.");
-        goto r1;
-    }
-
-    fp = SpxFReadOpen(fname);
-    if(NULL == fp){
-        *err = 0 == errno ? EACCES : errno;
-        SpxLogFmt2(c->log,SpxLogError,*err,
-                "open dsync runtime file:%s is fail.",
-                fname);
-        goto r1;
-    }
-
-    int i = 0;
-    while(NULL != (fgets(line,SpxLineSize,fp))){
-        spx_string_updatelen(line);
-        spx_string_strip_linefeed(line);
-        if('#' == *line || SpxStringIsEmpty(line)){
-            continue;
-        }
-        switch(i){
-            case (0):{
-                         dsrt->step = atoi(line);
-                         i++;
-                         break;
-                     }
-            case (1):{
-                         spx_date_convert(&(dsrt->sync_date_curr),line,"%Y-%m-%d");
-                         i++;
-                         break;
-                     }
-            case (2):{
-                         dsrt->offset = atoll(line);
-                         i++;
-                         break;
-                     }
-            case (3):{
-                         dsrt->last_linelen = atoll(line);
-                         i++;
-                         break;
-                     }
-            case (4):{
-                         spx_date_convert(&(dsrt->ydb_storage_dsync_mps),line,"%Y-%m-%d");
-                         i++;
-                         break;
-                     }
-            case (5):{
-                         dsrt->begin_dsync_timespan = atoll(line);
-                         i++;
-                         break;
-                     }
-            case (6):{
-                         int i = 0;
-                         for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
-                             if('1' == (line + i)){
-                                (dsrt->ydb_storage_dsync_mps + i)->need_dsync = true;
-                             }
-                         }
-                         i++;
-                         break;
-                     }
-            default:{
-                        break;
-                    }
-        }
-    }
-    goto r2;
-r1:
-    if(NULL != dsrt){
-        SpxFree(dsrt);
-    }
-r2:
-    if(NULL != fname){
-        SpxStringFree(fname);
-    }
-    if(NULL != fp){
-        fclose(fp);
-        fp = NULL;
-    }
-    if(NULL != line){
-        SpxStringFree(line);
-    }
-    return dsrt;
-}/*}}}*/
-
-spx_private void *ydb_storage_dsync_runtime_writer(
-        void *arg
-    ){/*{{{*/
-    if(NULL == arg){
-        return;
-    }
-    SpxTypeCpnvert2(struct ydb_storage_dsync_runtime,dsrt,arg);
-    struct ydb_storage_configurtion *c = dsrt->c;
-    err_t err = 0;
-    FILE *fp = NULL;
-    string_t line = NULL;
-    string_t fname = ydb_storage_dsync_make_runtime_filename(c,&err);
-    if(NULL == fname){
-        SpxLog2(c->log,SpxLogError,err,
-                "make dsync runtime filename is fail.");
-        return NULL;
-    }
-
-    line = spx_string_newlen(NULL,SpxStringRealSize(SpxLineSize),&err);
-    if(NULL == line){
-        SpxLog2(c->log,SpxLogError,err,
-                "new line for parsering dsync runtime file is fail.");
-        goto r1;
-    }
-
-    string_t new_line = spx_string_cat_printf(&err,line,
-            "%d\n%d-%d-%d\n%lld\n%lld\n%d-%d-%d\n%lld\n"
-            dsrt->step,dsrt->sync_date_curr.year,
-            dsrt->sync_date_curr.month,
-            dsrt->sync_date_curr.day,
-            dsrt->offset,dsrt->last_linelen,
-            dsrt->dsync_over_of_mps.year,
-            dsrt->dsync_over_of_mps.month,
-            dsrt->dsync_over_of_mps.day,
-            dsrt->begin_dsync_timespan);
-    if(NULL == new_line){
-        SpxLog2(c->log,SpxLogError,err,
-                "make context for dsync runtime file is fail.");
-        goto r1;
-    }
-    line = new_line;
-    int i = 0;
-    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
-        new_line = spx_string_cat(line,
-                (dsrt->ydb_storage_dsync_mps + i)->need_dsync ? "1" :"0",
-                &err);
-        if(NULL == new_line){
-            SpxLog2(c->log,SpxLogError,err,
-                    "make context for dsync runtime file is fail.");
-            break;
-        }
-        line = new_line;
-    }
-
-
-    fp = SpxFWriteOpen(fname,true);
-    if(NULL == fp){
-        err = 0 == errno ? EACCES : errno;
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "open dsync runtime file:%s is fail.",
-                fname);
-        goto r1;
-    }
-
-    size_t size = spx_string_len(line);
-    int len = 0;
-    err = spx_fwrite_string(fp,line,size,&len);
-    if(0 != err || size != len){
-        SpxLogFmt2(c->log,SpxLogError,err,
-                "write dsync runtime file is fail."
-                "size:%d,len:%d",size,len);
-    }
-    fclose(fp);
-r1:
-    if(NULL != line){
-        SpxStringFree(line);
-    }
-    if(NULL != fname){
-        SpxStringFree(fname);
-    }
-    return err;
-}/*}}}*/
-
-spx_private string_t ydb_storage_dsync_make_runtime_filename(
-        struct ydb_storage_configurtion *c,
-        err_t *err
-        ){/*{{{*/
-    string_t fname = spx_string_newlen(NULL,SpxStringRealSize(SpxPathSize),err);
-    if(NULL == fname){
-        SpxLog2(c->log,SpxLogError,*err,
-                "new dsync runtime filename is fail.");
-        return NULL;
-    }
-    string_t new_fname = NULL;
-    if(SpxStringEndWith(c->basepath,SpxPathDlmt)){
-        new_fname = spx_string_cat_printf(err,fname,"%s.%s-dsync.rtf",
-                c->basepath,c->machineid);
-    } else {
-        new_fname = spx_string_cat_printf(err,fname,"%s%c.%s-dsync.rtf",
-                c->basepath,SpxPathDlmt,c->machineid);
-    }
-    if(NULL == new_fname){
-        SpxLog2(c->log,SpxLogError,*err,
-                "make dsync runtime filename is fail.");
-        SpxStringFree(fname);
-        return NULL;
-    }
-    fname = new_fname;
-    return fname;
-}/*}}}*/
-
-spx_private void ydb_storage_dsync_runtime_file_remove(
-        struct ydb_storage_configurtion *c
-        ){/*{{{*/
-    err_t err = 0;
-    string_t fname = ydb_storage_dsync_make_runtime_filename(c,&err);
-    if(NULL == fname){
-        SpxLog2(c->log,SpxLogError,err,
-                "make dsync runtime file to remove is fail.");
-        return;
-    }
-    remove(fname);
-    SpxStringFree(fname);
-    return;
-}/*}}}*/
-
-spx_private void ydb_storage_dsync_mps_over(
-    struct ydb_storage_dsync_runtime  *dsrt
-        ){/*{{{*/
-    int i = 0;
-    for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
-        struct ydb_storage_dsync_mp *mp = dsrt->ydb_storage_dsync_mps + i;
-        if(mp->need_dsync){
-            struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
-            if(mp->isusing){
-                mp->last_freesize = mp->freesize;
-            }
-        }
-    }
-    return;
-}/*}}}*/
-
-spx_private err_t ydb_storage_dsync_get_mps_over_date(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_dsync_runtime *dsrt
-        ){/*{{{*/
-    err_t err = 0;
-    string_t fname = NULL;
-    if(0 == dsrt->dsync_over_of_mps.year){
-        fname = ydb_storage_make_runtime_filename(c,&err);
-        if(NULL == fname){
-            SpxLog2(c->log,SpxLogError,err,
-                    "make runtime filename is fail.");
-            return err;
-        }
-        if(SpxFileExist(fname)){
-            struct stat buf;
-            SpxZero(buf);
-            stat(fname,&buf);
-            spx_get_date(buf.st_mtime,&(dsrt->dsync_over_of_mps));
-        } else {
-            spx_get_today(&(dsrt->dsync_over_of_mps));
-        }
-        SpxStringFree(fname);
-    }
-    return err;
 }/*}}}*/
 
 

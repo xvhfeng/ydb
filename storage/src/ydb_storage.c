@@ -36,6 +36,9 @@
 #include "spx_notifier_module.h"
 #include "spx_network_module.h"
 #include "spx_task_module.h"
+#include "spx_periodic.h"
+
+#include "ydb_protocol.h"
 
 #include "ydb_storage_configurtion.h"
 #include "ydb_storage_mainsocket.h"
@@ -45,8 +48,10 @@
 #include "ydb_storage_dio.h"
 #include "ydb_storage_runtime.h"
 #include "ydb_storage_binlog.h"
+#include "ydb_storage_lifecycle.h"
+#include "ydb_storage_disksync.h"
+#include "ydb_storage_sync.h"
 
-#include "ydb_protocol.h"
 
 spx_private void ydb_storage_regedit_signal(struct ev_loop *loop);
 spx_private void ydb_storage_sig_empty (struct ev_loop *loop, ev_signal *w, int revents);
@@ -101,7 +106,7 @@ int main(int argc,char **argv){
         abort();
     }
 
-    g_ydb_storage_runtime = ydb_storage_runtime_init(mainloop,log,c,&err);
+    g_ydb_storage_runtime = ydb_storage_runtime_init(log,c,&err);
     if(NULL == g_ydb_storage_runtime || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "init storage runtime is fail.");
@@ -171,7 +176,6 @@ int main(int argc,char **argv){
     g_spx_notifier_module = spx_module_new(log,\
             c->notifier_module_thread_size,\
             c->stacksize,\
-//            spx_notifier_module_wakeup_handler,
             spx_notifier_module_receive_handler,\
             &err);
     if(NULL == g_spx_notifier_module){
@@ -183,7 +187,6 @@ int main(int argc,char **argv){
     g_spx_network_module = spx_module_new(log,\
             c->network_module_thread_size,\
             c->stacksize,\
-//            spx_network_module_wakeup_handler,
             spx_network_module_receive_handler,\
             &err);
     if(NULL == g_spx_network_module){
@@ -195,7 +198,6 @@ int main(int argc,char **argv){
     g_spx_task_module = spx_module_new(log,\
             c->task_module_thread_size,\
             c->stacksize,\
-//            spx_task_module_wakeup_handler,
             spx_task_module_receive_handler,\
             &err);
     if(NULL == g_spx_task_module){
@@ -213,23 +215,38 @@ int main(int argc,char **argv){
         abort();
     }
 
-    pthread_t socket_tid =  ydb_storage_mainsocket_thread_new(log,c,&err);
-    if(0 == socket_tid && 0 != err){
+    struct ydb_storage_mainsocket *socket=
+        ydb_storage_mainsocket_thread_new(c,&err);
+    if(NULL == socket){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
         abort();
     }
 
-    g_ydb_storage_runtime->status = YDB_STORAGE_DSYNCING;
+    err = ydb_storage_sync_restore(c);
 
+    struct spx_periodic *pdQueryRemoteStorages =  spx_periodic_exec_and_async_run(c->log,
+            c->waitting,0,
+            ydb_storage_sync_query_remote_storages,
+            (void *) c,
+            c->stacksize,
+            &err);
+
+    err =  ydb_storage_dsync_startup(c,g_ydb_storage_runtime);
+
+    g_sync_threadpool = spx_threadpool_new(c->log,c->sync_threads_count,
+            c->stacksize,&err);
 
     g_ydb_storage_runtime->status = YDB_STORAGE_CSYNCING;
 
-    //if have maneger code please input here
-//    sleep(10);//wait main socket thread
-    g_ydb_storage_runtime->status = YDB_STORAGE_RUNNING;
-    ev_run(mainloop,0);
-//    pthread_join(socket_tid,NULL);
+    struct spx_periodic *pdSyncHeartbeat = spx_periodic_exec_and_async_run(c->log,
+            c->query_sync_timespan,0,ydb_storage_sync_heartbeat,
+            g_ydb_storage_runtime,c->stacksize,&err);
 
+    struct spx_periodic *pdRuntimeFlush = spx_periodic_exec_and_async_run(c->log,
+            c->refreshtime,0,ydb_storage_startup_runtime_flush,
+            g_ydb_storage_runtime,c->stacksize,&err);
+
+    ev_run(mainloop,0);
     return 0;
 }
 
@@ -271,17 +288,26 @@ spx_private void ydb_storage_sig_empty (struct ev_loop *loop, ev_signal *w, int 
 
 spx_private void ydb_storage_sig_abort (struct ev_loop *loop, ev_signal *w, int revents){
     SpxLogDelegate *log = spx_log;
-    switch(w->signum){
+    int numb = w->signum;
+    switch(numb){
         case SIGPIPE:{
-                         SpxLog1(log,SpxLogError,"catch the sigpipe and abort the process.");
+                         SpxLog1(log,SpxLogError,
+                                 "catch the sigpipe and abort the process.");
+                         exit(numb);
                          break;
                      }
         case SIGINT:{
-                        SpxLog1(log,SpxLogError,"catch the sigint and abort the process.");
+                        SpxLog1(log,SpxLogError,
+                                "catch the sigint and abort the process.");
+                         exit(numb);
                         break;
                     }
         default:{
-                    SpxLogFmt1(log,SpxLogError,"catch the sig:%d and abort it,but no regedit the sig handler.",w->signum);
+                    SpxLogFmt1(log,SpxLogError,
+                            "catch the sig:%d and abort it,"
+                            "but no regedit the sig handler.",
+                            w->signum);
+                        exit(numb);
                     break;
                 }
     }

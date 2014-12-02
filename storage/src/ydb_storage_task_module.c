@@ -35,6 +35,8 @@
 #include "ydb_storage_find.h"
 #include "ydb_storage_delete.h"
 #include "ydb_storage_modify.h"
+#include "ydb_storage_disksync.h"
+#include "ydb_storage_sync.h"
 
 err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
         int tidx,struct spx_task_context *tc){
@@ -100,26 +102,72 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
                 }
                 break;
             }
-        case (YDB_S2S_QUERY_STORAGE_STATUS):
+
+        case (YDB_S2S_DSYNC):
             {
+                if(0 != (err = ydb_storage_dsync_sync_data(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "dsync file is fail.");
+                }
 
                 break;
             }
-        case (YDB_S2S_SYNC_REMOTE_BINLOG):
+        case (YDB_S2S_SYNC_LOGFILE):
             {
+                if(0 != (err = ydb_storage_dsync_logfile(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "sync log file is fail.");
+                }
                 break;
             }
-        case (YDB_S2S_SYNC_REMOTE_SYNCLOG):
+        case (YDB_S2S_CSYNC_BEGIN):
             {
-
+                if(0 != (err = ydb_storage_sync_reply_begin(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "csync begin is fail.");
+                }
                 break;
             }
-        case (YDB_S2S_DSYNC):{
-                                 break;
-                             }
-        case (YDB_S2S_CSYNC):{
-                                 break;
-                             }
+        case (YDB_S2S_QUERY_CSYNC_BEGINPOINT):
+            {
+                if( 0!= (err = ydb_storage_sync_reply_sync_beginpoint(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "query csync beginpoint file is fail.");
+                }
+                break;
+            }
+        case (YDB_S2S_CSYNC_ADD):
+            {
+                if(0 != (err = ydb_storage_sync_upload(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "csync file is fail.");
+                }
+                break;
+            }
+        case (YDB_S2S_CSYNC_DELETE):
+            {
+                if(0 != (err = ydb_storage_sync_delete(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "csync delete file is fail.");
+                }
+                break;
+            }
+        case (YDB_S2S_CSYNC_MODIFY):
+            {
+                if(0 != (err = ydb_storage_sync_modify(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "csync modify file is fail.");
+                }
+                break;
+            }
+        case (YDB_S2S_RESTORE_CSYNC_OVER):
+            {
+                if(0 != (err = ydb_storage_ydb_storage_sync_reply_consistency(loop,dc))){
+                    SpxLog2(jc->log,SpxLogError,err,\
+                            "restore sync file over is fail.");
+                }
+                break;
+            }
         default:{
                     SpxLog1(jc->log,SpxLogWarn,
                             "no the protocol for operation.");

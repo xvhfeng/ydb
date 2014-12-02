@@ -48,7 +48,6 @@ extern "C" {
 #define YDB_S2T_QUERY_SYNC_BEGIN_TIMESPAN 262
 
 //storage to storage
-#define YDB_S2S_QUERY_STORAGE_STATUS 385
 #define YDB_S2S_SYNC_LOGFILE 386
 #define YDB_S2S_DSYNC 387
 #define YDB_S2S_CSYNC_ADD 388
@@ -82,7 +81,7 @@ extern "C" {
 #define YDB_FILENAME_SUFFIX_SIZE 7
 #define YDB_HASHCODE_SIZE 64
 //reserve zone and for funtrue
-#define YDB_RESERVEZONE_SIZE (4 * sizeog(u64_t))
+#define YDB_RESERVEZONE_SIZE (4 * sizeof(u64_t))
 
 #define YDB_CHUNKFILE_MEMADATA_SIZE \
     sizeof(char) + sizeof(u32_t) + sizeof(u64_t) + sizeof(u64_t) \

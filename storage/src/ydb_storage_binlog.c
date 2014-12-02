@@ -166,7 +166,7 @@ void ydb_storage_binlog_write(struct ydb_storage_binlog *binlog,\
         return;
     }
 
-    if(YDB_STORAGE_MODIFY == op){
+    if(YDB_STORAGE_LOG_MODIFY == op){
         spx_string_cat_printf(&err,loginfo,\
                 "%c\t%s\t%s\n",
                 op,fid,rfid);
@@ -251,7 +251,7 @@ err_t ydb_storage_binlog_line_parser(string_t line,
     if(0 != err){
         return err;
     }
-    if(YDB_STORAGE_MODIFY == *line){
+    if(YDB_STORAGE_LOG_MODIFY == *line){
         if(3 != count){
             spx_string_free_splitres(strs,count);
             return EIO;

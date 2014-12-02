@@ -29,7 +29,6 @@ extern "C" {
 #include "ydb_storage_configurtion.h"
 
     struct ydb_storage_runtime{
-        ev_timer w;
         SpxLogDelegate *log;
         struct ydb_storage_configurtion *c;
         u8_t mpidx;
@@ -42,15 +41,16 @@ extern "C" {
         u64_t first_statrup_time;
         u64_t total_disksize;
         u64_t total_freesize;
-        //        struct spx_date sync_binlog_date;
-        //        u32_t sync_binlog_offset;
         u8_t status;
     };
 
     extern struct ydb_storage_runtime *g_ydb_storage_runtime;
 
-    struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
+    struct ydb_storage_runtime *ydb_storage_runtime_init(
             SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err);
+
+void ydb_storage_runtime_flush(
+       struct ydb_storage_runtime *srt);
 
     string_t ydb_storage_make_runtime_filename(
             struct ydb_storage_configurtion *c,

@@ -84,7 +84,7 @@ spx_private err_t ydb_tracker_free(void **arg){/*{{{*/
         }
 
         if( 0!= ystc->fd){
-            SpxClose(fd);
+            SpxClose(ystc->fd);
         }
         SpxFree((*t)->ystc);
     }
@@ -119,66 +119,67 @@ spx_private u64_t ydb_storage_hole_idx_refresh_timeout(\
 
 void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
 
-    struct ydb_storage_configurtion *config = (struct ydb_storage_configurtion *) \
-                                              spx_alloc_alone(sizeof(*config),err);
-    if(NULL == config){
+    struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) \
+                                              spx_alloc_alone(sizeof(*c),err);
+    if(NULL == c){
         SpxLog2(log,SpxLogError,*err,\
                 "alloc the storage config is fail.");
         return NULL;
     }
-    config->log = log;
-    config->port = 8175;
-    config->timeout = 5;
-    config->waitting = 30;
-    config->logsize = 10 * SpxMB;
-    config->loglevel = SpxLogInfo;
-    config->balance = YDB_STORAGE_MOUNTPOINT_LOOP;
-    config->heartbeat = 30;
-    config->daemon = true;
-    config->stacksize = 128 * SpxKB;
-    config->notifier_module_thread_size = 4;
-    config->network_module_thread_size = 8;
-    config->task_module_thread_size = 4;
-    config->context_size = 256;
-    config->freedisk =(u64_t) 4 * SpxGB;
-    config->mountpoints = spx_list_new(log,\
+    c->log = log;
+    c->port = 8175;
+    c->timeout = 5;
+    c->waitting = 30;
+    c->logsize = 10 * SpxMB;
+    c->loglevel = SpxLogInfo;
+    c->balance = YDB_STORAGE_MOUNTPOINT_LOOP;
+    c->heartbeat = 30;
+    c->daemon = true;
+    c->stacksize = 128 * SpxKB;
+    c->notifier_module_thread_size = 4;
+    c->network_module_thread_size = 8;
+    c->task_module_thread_size = 4;
+    c->context_size = 256;
+    c->freedisk =(u64_t) 4 * SpxGB;
+    c->mountpoints = spx_list_new(log,\
             YDB_STORAGE_MOUNTPOINT_COUNT,ydb_mountpoint_free,err);
-    config->trackers = spx_vector_init(log,\
+    c->trackers = spx_vector_init(log,\
             ydb_tracker_free,err);
-    config->storerooms = 256;
-    config->storemode = YDB_STORAGE_STOREMODE_TURN;
-    config->storecount = 4096;
-    config->fillchunk = true;
-    config->holerefresh = YDB_STORAGE_HOLEREFRESH_FIXEDTIME;
-    config->refreshtime = ydb_storage_hole_idx_refresh_timeout(6,0,0,err);
+    c->storerooms = 256;
+    c->storemode = YDB_STORAGE_STOREMODE_TURN;
+    c->storecount = 4096;
+    c->fillchunk = true;
+    c->holerefresh = YDB_STORAGE_HOLEREFRESH_FIXEDTIME;
+    c->refreshtime = ydb_storage_hole_idx_refresh_timeout(6,0,0,err);
 
-    config->compress = false;
-    config->chunkfile = true;
-    config->chunksize = 64 * SpxMB;
-    config->overload = true;
-    config->oversize = 10;
-    config->overmode = YDB_STORAGE_OVERMODE_RELATIVE;
-    config->singlemin = 10 * SpxKB;
-    config->lazyrecv = true;
-    config->lazysize = 1 * SpxMB;
-    config->sendfile = true;
-    config->binlog_size =(u64_t) 2 * SpxGB;
-    config->runtime_flush_timespan = 60;
-    config->pagesize = getpagesize();
-    config->query_sync_timespan = 30;
-    config->sync = YDB_STORAGE_SYNC_REALTIME;
-    config->sync_wait = 1;
-    config->sync_begin.hour =4;
-    config->sync_begin.min = 0;
-    config->sync_begin.sec = 0;
-    config->sync_end.hour = 6;
-    config->sync_end.min = 0;
-    config->sync_end.sec = 0;
-    config->disksync_timespan = SpxDayTick;
-    config->disksync_busysize = 512 * SpxMB;
-    config->start_timespan = spx_now();
+    c->compress = false;
+    c->chunkfile = true;
+    c->chunksize = 64 * SpxMB;
+    c->overload = true;
+    c->oversize = 10;
+    c->overmode = YDB_STORAGE_OVERMODE_RELATIVE;
+    c->singlemin = 10 * SpxKB;
+    c->lazyrecv = true;
+    c->lazysize = 1 * SpxMB;
+    c->sendfile = true;
+    c->binlog_size =(u64_t) 2 * SpxGB;
+    c->runtime_flush_timespan = 60;
+    c->pagesize = getpagesize();
+    c->query_sync_timespan = 30;
+    c->sync = YDB_STORAGE_SYNC_REALTIME;
+    c->sync_wait = 1;
+    c->sync_begin.hour =4;
+    c->sync_begin.min = 0;
+    c->sync_begin.sec = 0;
+    c->sync_end.hour = 6;
+    c->sync_end.min = 0;
+    c->sync_end.sec = 0;
+    c->disksync_timespan = SpxDayTick;
+    c->disksync_busysize = 512 * SpxMB;
+    c->start_timespan = spx_now();
+    c->sync_threads_count = 3;
 
-    return config;
+    return c;
 }/*}}}*/
 
 spx_private u64_t ydb_storage_configurtion_iosize_convert(
@@ -1163,7 +1164,22 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         goto r1;
     }
 
-
+    //sync_threads_count
+    if(0 == spx_string_casecmp(*kv,"sync_threads_count")){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "sync_threads_count use default:%d.",c->sync_threads_count);
+        } else {
+            u32_t sync_threads_count = strtol(*(kv + 1),NULL,10);
+            if(ERANGE == sync_threads_count) {
+                SpxLog2(c->log,SpxLogError,*err,\
+                        "convect sync_threads_count is fail.");
+                goto r1;
+            }
+            c->sync_threads_count = sync_threads_count;
+        }
+        goto r1;
+    }
 r1:
     spx_string_free_splitres(kv,count);
     //the size is the smallest with the same syncgroup

@@ -145,6 +145,7 @@ struct ydb_tracker{
         u8_t sync;
         u32_t query_sync_timespan;
         string_t syncgroup;
+        u32_t sync_threads_count;
         u32_t sync_wait;
         struct spx_time sync_begin;
         struct spx_time sync_end;

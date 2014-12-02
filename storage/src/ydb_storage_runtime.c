@@ -15,7 +15,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <ev.h>
 
 #include "spx_io.h"
 #include "spx_time.h"
@@ -33,9 +32,8 @@ struct ydb_storage_runtime *g_ydb_storage_runtime = NULL;
 
 spx_private void ydb_storage_runtime_line_parser(string_t line,\
         struct ydb_storage_runtime *rt,err_t *err);
-spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int revents);
 
-struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
+struct ydb_storage_runtime *ydb_storage_runtime_init(
         SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err){/*{{{*/
 
     struct ydb_storage_runtime *rt = (struct ydb_storage_runtime *) \
@@ -89,9 +87,6 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(struct ev_loop *loop,\
     }
     spx_string_free(line);
     fclose(fp);
-//    ev_timer_init(&(rt->w),ydb_storage_runtime_flush,(double) c->runtime_flush_timespan,(double) c->runtime_flush_timespan);
-//    ev_timer_start (loop, &(rt->w));
-//    ev_run(loop,0);
     return rt;
 
 r1:
@@ -262,14 +257,15 @@ r1:
     spx_string_free_splitres(kv,count);
 }/*}}}*/
 
-spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int revents){/*{{{*/
-    struct ydb_storage_runtime *rt = (struct ydb_storage_runtime *) w;
-    struct ydb_storage_configurtion *c = rt->c;
+void ydb_storage_runtime_flush(
+       struct ydb_storage_runtime *srt
+        ){/*{{{*/
+    struct ydb_storage_configurtion *c = srt->c;
     err_t err = 0;
     string_t filename = NULL;
     string_t buf = spx_string_newlen(NULL,SpxLineSize,&err);
     if(NULL == buf){
-        SpxLog2(rt->log,SpxLogError,err,\
+        SpxLog2(srt->log,SpxLogError,err,\
                 "new runtime buffer is fail.");
         return;
     }
@@ -282,17 +278,17 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
             "storecount = %ud \n" \
             "total_disksize = %ulld \n" \
             "total_freesize = %ulld \n" ,
-//            "sync_binlog_date = %ud \n" \
+//            "sync_binlog_date = %ud \n"
 //            "sync_binlog_offset = %ulld ",
-            rt->first_statrup_time,
-            rt->mpidx,rt->p1,rt->p2,\
-            rt->storecount,\
-            rt->total_disksize,\
-            rt->total_freesize);
-//            spx_zero(&(rt->sync_binlog_date)),
-//            rt->sync_binlog_offset);
+            srt->first_statrup_time,
+            srt->mpidx,srt->p1,srt->p2,\
+            srt->storecount,\
+            srt->total_disksize,\
+            srt->total_freesize);
+//            spx_zero(&(srt->sync_binlog_date)),
+//            srt->sync_binlog_offset);
     if(NULL == newbuf){
-        SpxLog2(rt->log,SpxLogError,err,
+        SpxLog2(srt->log,SpxLogError,err,
                 "cat line context of runtime is fail.");
         goto r1;
     }
@@ -306,8 +302,9 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
     FILE *fp = fopen(filename,"w+");
     if(NULL == fp) {
         err = errno;
-        SpxLogFmt2(rt->log,SpxLogError,err,\
-                "open the mid file is fail.filename:&s.",new_basepath);
+        SpxLogFmt2(srt->log,SpxLogError,err,
+                "open the mid file is fail.filename:%s.",
+                filename);
         goto r1;
     }
     size_t size = spx_string_len(buf);
@@ -316,7 +313,7 @@ spx_private void ydb_storage_runtime_flush(struct ev_loop *loop,ev_timer *w,int 
     fflush(fp);
     fclose(fp);
     if(size != len){
-        SpxLogFmt2(rt->log,SpxLogError,err,\
+        SpxLogFmt2(srt->log,SpxLogError,err,\
                 "write buf to runtime file is fail."
                 "size:%d,write size:%d.",
                 size,len);

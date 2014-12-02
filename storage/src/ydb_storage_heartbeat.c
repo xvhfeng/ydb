@@ -169,8 +169,6 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     }
     spx_vector_iter_free(&iter);
 
-    //    ev_timer_set (heartbeat_timer, (double) 10, 0.);
-    //    ev_timer_again(hloop,heartbeat_timer);
 }/*}}}*/
 
 spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_configurtion *c){/*{{{*/
@@ -219,8 +217,6 @@ spx_private bool_t ydb_storage_regedit(struct ev_loop *loop,struct ydb_storage_c
         }
     }
     spx_vector_iter_free(&iter);
-//    ev_run(loop,EVRUN_NOWAIT);//the ev_run must add,if not the loop will not loop
-
 
     if(!can_run){
         SpxLog1(c->log,SpxLogError,\
@@ -235,7 +231,9 @@ spx_private void *ydb_storage_report(void *arg){/*{{{*/
     if(NULL == c){
         return NULL;
     }
-    ev_timer_init(heartbeat_timer,ydb_storage_heartbeat_handler,(double) c->heartbeat ,(double) c->heartbeat);
+    ev_timer_init(heartbeat_timer,
+            ydb_storage_heartbeat_handler,
+            (double) c->heartbeat ,(double) c->heartbeat);
     ev_timer_start(hloop,heartbeat_timer);
     ev_run(hloop,0);
     return NULL;
@@ -348,7 +346,6 @@ pthread_t ydb_storage_heartbeat_service_init(
         goto r1;
     }
 
-//    ydb_storage_regedit(loop,config);
 
     pthread_t tid = 0;
     pthread_attr_t attr;

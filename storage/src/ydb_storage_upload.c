@@ -494,7 +494,7 @@ spx_private err_t ydb_storage_upload_after(
     if(NULL == ctx){
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "new response body ctx is fail.the fid:%s.",
-                fid);
+                dc->fid);
         return err;
     }
 

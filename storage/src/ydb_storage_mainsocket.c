@@ -29,16 +29,13 @@
 
 #include "ydb_storage_configurtion.h"
 #include "ydb_storage_runtime.h"
+#include "ydb_storage_mainsocket.h"
 
-struct mainsocket_thread_arg{
-    SpxLogDelegate *log;
-    struct ydb_storage_configurtion *c;
-};
 
-spx_private struct ev_loop *main_socket_loop = NULL;
 spx_private void *ydb_storage_mainsocket_create(void *arg);
 
-pthread_t ydb_storage_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err){
+struct ydb_storage_mainsocket *ydb_storage_mainsocket_thread_new(
+        struct ydb_storage_configurtion *c,err_t *err){
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     size_t ostack_size = 0;
@@ -46,63 +43,73 @@ pthread_t ydb_storage_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_stora
     if (ostack_size != c->stacksize
             && (0 != (*err = pthread_attr_setstacksize(&attr,c->stacksize)))){
         pthread_attr_destroy(&attr);
-        SpxLog2(log,SpxLogError,*err,
+        SpxLog2(c->log,SpxLogError,*err,
                 "set stacksize is fail.");
-        return 0;
+        return NULL;
     }
-    struct mainsocket_thread_arg *arg = (struct mainsocket_thread_arg *)spx_alloc_alone(sizeof(*arg),err);
-    arg->log = log;
-    arg->c = c;
+    struct ydb_storage_mainsocket *mainsocket =
+        (struct ydb_storage_mainsocket *) spx_alloc_alone(sizeof(*mainsocket),err);
+    if(NULL == mainsocket){
+        SpxLog2(c->log,SpxLogError,*err,
+                "new mainsocket is fail.");
+        pthread_attr_destroy(&attr);
+        return NULL;
+    }
 
-    pthread_t tid = 0;
-    if (0 !=(*err =  pthread_create(&tid, &attr, ydb_storage_mainsocket_create,
-                    arg))){
-        SpxLog2(log,SpxLogError,*err,
+    mainsocket->log = c->log;
+    mainsocket->c = c;
+    if (0 !=(*err =  pthread_create(&(mainsocket->tid), &attr, ydb_storage_mainsocket_create,
+                    (void *) mainsocket))){
+        SpxLog2(c->log,SpxLogError,*err,
                 "create mainsocket thread is fail.");
         pthread_attr_destroy(&attr);
-        SpxFree(arg);
-        return 0;
+        SpxFree(mainsocket);
+        return NULL;
     }
-    return tid;
+    return mainsocket;
 }
 
 spx_private void *ydb_storage_mainsocket_create(void *arg){
-    struct mainsocket_thread_arg *mainsocket_arg = (struct mainsocket_thread_arg *) arg;
-    SpxLogDelegate *log = mainsocket_arg->log;
-    struct ydb_storage_configurtion *c= mainsocket_arg->c;
-    SpxFree(mainsocket_arg);
+    SpxTypeConvert2(struct ydb_storage_mainsocket,mainsocket,arg);
+    SpxTypeConvert2(struct ydb_storage_configurtion,c,mainsocket->c);
     err_t err = 0;
-    main_socket_loop = ev_loop_new(0);
-    if(NULL == main_socket_loop){
-        SpxLog2(log,SpxLogError,err,"create main socket loop is fail.");
+    mainsocket->loop = ev_loop_new(0);
+    if(NULL == mainsocket->loop){
+        SpxLog2(mainsocket->log,SpxLogError,err,"create main socket loop is fail.");
         return NULL;
     }
-    int mainsocket =  spx_socket_new(&err);
-    if(0 == mainsocket){
-        SpxLog2(log,SpxLogError,err,"create main socket is fail.");
-        return NULL;
+    int socket =  spx_socket_new(&err);
+    if(0 >= socket){
+        SpxLog2(mainsocket->log,SpxLogError,err,"create main socket is fail.");
+        goto r1;
     }
+    mainsocket->socket = socket;
 
-    if(0!= (err = spx_set_nb(mainsocket))){
-        SpxLog2(log,SpxLogError,err,"set main socket nonblock is fail.");
+    if(0!= (err = spx_set_nb(socket))){
+        SpxLog2(mainsocket->log,SpxLogError,err,"set main socket nonblock is fail.");
         goto r1;
     }
 
-    if(0 != (err =  spx_socket_start(mainsocket,c->ip,c->port,\
+    if(0 != (err =  spx_socket_start(socket,c->ip,c->port,\
                     true,c->timeout,\
                     3,c->timeout,\
                     false,0,\
                     true,\
                     true,c->timeout,
                     1024))){
-        SpxLog2(log,SpxLogError,err,"start main socket is fail.");
+        SpxLog2(c->log,SpxLogError,err,"start main socket is fail.");
         goto r1;
     }
 
     g_ydb_storage_runtime->status = YDB_STORAGE_ACCEPTING;
-    spx_socket_accept_nb(c->log,main_socket_loop,mainsocket);
+    spx_socket_accept_nb(c->log,mainsocket->loop,socket);
 r1:
-    SpxClose(mainsocket);
+    if(NULL != mainsocket->loop){
+        ev_loop_destroy(mainsocket->loop);
+    }
+
+    SpxClose(socket);
+    SpxFree(mainsocket);
     return NULL;
 }
 

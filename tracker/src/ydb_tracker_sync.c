@@ -306,8 +306,8 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
                 "no the base storage for querying from group:%s,"
                 "syncgroup:%s,storage:%s,"
                 "ip:%s.",
-                groupname,syncgroup,machineid,jc->client_ip
-        err = ENOENT;
+                groupname,syncgroup,machineid,jc->client_ip);
+        jc->err = ENOENT;
         goto r1;
     }
 
@@ -319,7 +319,7 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
         goto r1;
     }
     jc->writer_header = response_header;
-    response_header->protocol = YDB_T2S_QUERY_BASE_STORAGE;
+    response_header->protocol = YDB_S2T_QUERY_BASE_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = YDB_MACHINEID_LEN;
 

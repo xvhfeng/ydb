@@ -26,19 +26,21 @@ extern "C" {
 #include "spx_types.h"
 #include "spx_queue.h"
 
+#include "ydb_protocol.h"
+
 #include "ydb_storage_configurtion.h"
 
 #define YdbStorageBinlogUploadWriter(fid)  \
     ydb_storage_binlog_write(g_ydb_storage_binlog,\
-            YDB_STORAGE_ADD,fid,NULL)
+            YDB_STORAGE_LOG_UPLOAD,fid,NULL)
 
 #define YdbStorageBinlogDeleteWriter(fid)  \
     ydb_storage_binlog_write(g_ydb_storage_binlog,\
-            YDB_STORAGE_DELETE,fid,NULL)
+            YDB_STORAGE_LOG_DELETE,fid,NULL)
 
 #define YdbStorageBinlogModifyWriter(fid,rfid)  \
     ydb_storage_binlog_write(g_ydb_storage_binlog,\
-            YDB_STORAGE_ADD,fid,rfid)
+            YDB_STORAGE_LOG_MODIFY,fid,rfid)
 
     struct ydb_storage_binlog{
         err_t err;

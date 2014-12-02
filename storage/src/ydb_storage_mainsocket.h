@@ -27,7 +27,17 @@ extern "C" {
 
 #include "ydb_storage_configurtion.h"
 
-pthread_t ydb_storage_mainsocket_thread_new(SpxLogDelegate *log,struct ydb_storage_configurtion *c,err_t *err);
+struct ydb_storage_mainsocket{
+    SpxLogDelegate *log;
+    struct ydb_storage_configurtion *c;
+    pthread_t tid;
+    int socket;
+    struct ev_loop *loop;
+
+};
+
+struct ydb_storage_mainsocket *ydb_storage_mainsocket_thread_new(
+        struct ydb_storage_configurtion *c,err_t *err);
 
 #ifdef __cplusplus
 }

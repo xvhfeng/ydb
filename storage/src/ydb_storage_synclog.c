@@ -167,7 +167,7 @@ void  ydb_storage_synclog_write(struct ydb_storage_synclog *synclog,
         return;
     }
 
-    if(YDB_STORAGE_MODIFY == op){
+    if(YDB_STORAGE_LOG_MODIFY == op){
         spx_string_cat_printf(&err,loginfo,\
                 "%c\t%s\t%s\n",
                 op,fid,rfid);
