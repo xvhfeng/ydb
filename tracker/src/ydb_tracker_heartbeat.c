@@ -28,7 +28,6 @@
 #include "spx_time.h"
 #include "spx_map.h"
 #include "spx_collection.h"
-#include "spx_ref.h"
 #include "spx_job.h"
 #include "spx_module.h"
 #include "spx_network_module.h"
