@@ -131,7 +131,6 @@ spx_private void ydb_storage_heartbeat_handler(struct ev_loop *loop,\
     struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) \
                                          w->data;
     err_t err = 0;
-
     u64_t disksize = 0;
     u64_t freesize = 0;
     int i = 0;
@@ -284,7 +283,6 @@ spx_private void ydb_storage_heartbeat_nio_body_reader(struct ev_loop *loop,
     if(first_start < g_ydb_storage_runtime->first_statrup_time){
         g_ydb_storage_runtime->first_statrup_time = first_start;
     }
-
 r1:
     spx_job_context_clear(jc);
 }/*}}}*/

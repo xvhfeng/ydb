@@ -104,17 +104,18 @@ string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
         return NULL;
     }
 
+    string_t new = NULL;
     struct ydb_storage_mountpoint *mp = spx_list_get(mps,mpidx);
     if(issinglefile){
         if(SpxStringEndWith(mp->path,SpxPathDlmt)){
-            spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
+            new = spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
                     mp->path,SpxPathDlmtString,
                     p1,SpxPathDlmtString,p2,SpxPathDlmtString,
                     machineid,tidx,createtime,rand,
                     NULL == suffix ? "" : ".",
                     NULL == suffix ? "" : suffix);
         }else{
-            spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
+            new = spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d%s%s",
                     mp->path,SpxPathDlmtString,SpxPathDlmtString,
                     p1,SpxPathDlmtString,p2,SpxPathDlmtString,
                     machineid,tidx,createtime,rand,
@@ -123,18 +124,24 @@ string_t ydb_storage_dio_make_filename(SpxLogDelegate *log,\
         }
     } else {
         if(SpxStringEndWith(mp->path,SpxPathDlmt)){
-            spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d",
+            new = spx_string_cat_printf(err,filename, "%sdata%s%02X%s%02X%s%s_%d_%lld_%d",
                     mp->path,SpxPathDlmtString,
                     p1,SpxPathDlmtString,p2,SpxPathDlmtString,
                     machineid,tidx,createtime,rand);
         }else{
-            spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d",
+            new = spx_string_cat_printf(err,filename,"%s%sdata%s%02X%s%02X%s%s_%d_%lld_%d",
                     mp->path,SpxPathDlmtString,SpxPathDlmtString,
                     p1,SpxPathDlmtString,p2,SpxPathDlmtString,
                     machineid,tidx,createtime,rand);
         }
-
     }
+    if(NULL == new){
+        SpxLog2(log,SpxLogError,*err,
+                "make filename  is fail.");
+        SpxStringFree(filename);
+        return NULL;
+    }
+    filename = new;
     return filename;
 }/*}}}*/
 
@@ -152,13 +159,20 @@ string_t ydb_storage_dio_make_fileid(SpxLogDelegate *log,\
                 "new file is fail.");
         return NULL;
     }
-    spx_string_cat_printf(err,fid,\
+    string_t new = NULL;
+    new = spx_string_cat_printf(err,fid,\
             "%s:%s:%s:%d:%d:%d:%d:%d:%lld:%d:%lld:%lld:%lld:%d:%d:%lld:%s%s%s",
             groupname,machineid,syncgroup,issinglefile,mpidx,p1,p2,
             tidx,fcreatetime,rand,begin,realsize,totalsize,
             ver,opver,lastmodifytime,NULL == hashcode ? "" : hashcode,
             has_suffix ? ":." : "" , has_suffix ? suffix : "");
-
+    if(NULL == new){
+        SpxLog2(log,SpxLogError,*err,
+                "make fileid is fail.");
+        SpxStringFree(fid);
+        return NULL;
+    }
+    fid = new;
     *len = spx_string_len(fid);
     return fid;
 }/*}}}*/
@@ -294,8 +308,8 @@ err_t ydb_storage_dio_parser_fileid(SpxLogDelegate *log,
                 }
             case 17://suffix
                 {
-                    *suffix = spx_string_new(((*(fids + i)) + 1),&(err));//remove suffix sper "."
-                    //                    *suffix = spx_string_dup(((*(fids + i)) + 1),&(*err));//remove suffix sper "."
+                    //remove suffix sper "."
+                    *suffix = spx_string_new(((*(fids + i)) + 1),&(err));
                     if(NULL == *suffix){
                         SpxLog2(log,SpxLogError,err,\
                                 "dup suffix is fail.");
@@ -309,9 +323,12 @@ err_t ydb_storage_dio_parser_fileid(SpxLogDelegate *log,
                     }
         }
     }
-
+    spx_string_free_splitres(fids,count);
     return 0;
 r1:
+    if(NULL != fids){
+        spx_string_free_splitres(fids,count);
+    }
     if(NULL != *groupname){
         SpxStringFree(*groupname);
     }
@@ -335,7 +352,6 @@ struct spx_msg *ydb_storage_dio_make_metadata(SpxLogDelegate *log,
         u64_t totalsize,u64_t realsize,string_t suffix,string_t hashcode,err_t *err){/*{{{*/
 
     struct spx_msg *md = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,err);
-
     if(NULL == md){
         SpxLog2(log,SpxLogError,*err,\
                 "alloc md for chunkfile is fail.");
@@ -565,7 +581,6 @@ u8_t ydb_storage_get_mountpoint_with_master(
     return ydb_storage_get_mountpoint_with_loop(c,rt,false,err);
 }/*}}}*/
 
-
 err_t ydb_storage_upload_check_and_open_chunkfile(
         struct ydb_storage_configurtion *c,\
         struct ydb_storage_dio_context *dc,\
@@ -590,15 +605,14 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
                     cf->chunkfile.rand,\
                     dc->suffix,&err);
 
-            SpxLogFmt1(c->log,SpxLogDebug,"reopen :%s."
-                    ,cf->chunkfile.filename);
-            SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
-
             if(SpxStringIsNullOrEmpty(cf->chunkfile.filename)){
                 SpxLog2(c->log,SpxLogError,err,
                         "alloc chunkfile name is fail.");
                 break;
             }
+            SpxLogFmt1(c->log,SpxLogDebug,"reopen :%s."
+                    ,cf->chunkfile.filename);
+            SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
 
             cf->chunkfile.fd = open(cf->chunkfile.filename,\
                     O_RDWR|O_APPEND|O_CREAT,SpxFileMode);

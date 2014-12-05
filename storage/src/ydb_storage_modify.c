@@ -408,14 +408,16 @@ r1:
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,err,\
+                    "dispatch network module is fail,"
+                    "and push jcontext to pool force.");
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return;
+        }
     }
     jc->writer_header->protocol = YDB_C2S_MODIFY;
     jc->writer_header->bodylen = 0;
@@ -694,14 +696,16 @@ r1:
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,err,\
+                    "dispatch network module is fail,"
+                    "and push jcontext to pool force.");
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return;
+        }
     }
     jc->writer_header->protocol = YDB_C2S_MODIFY;
     jc->writer_header->bodylen = 0;

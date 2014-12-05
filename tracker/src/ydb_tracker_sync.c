@@ -187,10 +187,10 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
     }
 
 r1:
-    spx_string_free(machineid);
-    spx_string_free(groupname);
-    spx_string_free(syncgroup);
-    spx_string_free(buf);
+    SpxStringFree(machineid);
+    SpxStringFree(groupname);
+    SpxStringFree(syncgroup);
+    SpxStringFree(buf);
     return jc->err;
 }/*}}}*/
 
@@ -344,10 +344,10 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
     }
 
 r1:
-    spx_string_free(machineid);
-    spx_string_free(groupname);
-    spx_string_free(syncgroup);
-    spx_string_free(buf);
+    SpxStringFree(machineid);
+    SpxStringFree(groupname);
+    SpxStringFree(syncgroup);
+    SpxStringFree(buf);
     return jc->err;
 }/*}}}*/
 
@@ -483,10 +483,10 @@ err_t ydb_tracker_query_timespan_for_begining_sync(struct ev_loop *loop,\
     }
 
 r1:
-    spx_string_free(machineid);
-    spx_string_free(groupname);
-    spx_string_free(syncgroup);
-    spx_string_free(buf);
+    SpxStringFree(machineid);
+    SpxStringFree(groupname);
+    SpxStringFree(syncgroup);
+    SpxStringFree(buf);
     return jc->err;
 }/*}}}*/
 

@@ -148,7 +148,8 @@ r1:
     return 0;
 }/*}}}*/
 
-spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
+spx_private void ydb_storage_dio_do_find_form_chunkfile(
+        struct ev_loop *loop,ev_async *w,int revents){/*{{{*/
     ev_async_stop(loop,w);
     err_t err = 0;
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
@@ -297,17 +298,18 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(struct ev_loop *loop,ev_
     spx_msg_free(&ioctx);
     goto r2;
 r1:
-
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail."
-                "no notify client and push jc force.");
-        spx_task_pool_push(g_spx_task_pool,tc);
-        ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+        if(NULL == jc->writer_header){
+            SpxLog2(dc->log,SpxLogError,err,\
+                    "new response header is fail."
+                    "no notify client and push jc force.");
+            spx_task_pool_push(g_spx_task_pool,tc);
+            ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return;
+        }
     }
     jc->writer_header->protocol = YDB_C2S_FIND;
     jc->writer_header->bodylen = 0;
@@ -417,16 +419,18 @@ spx_private void ydb_storage_dio_do_find_form_signalfile(struct ev_loop *loop,ev
     }
     goto r2;
 r1:
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail."
-                "no notify client and push jc force.");
-        spx_task_pool_push(g_spx_task_pool,tc);
-        ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+        if(NULL == jc->writer_header){
+            SpxLog2(dc->log,SpxLogError,err,\
+                    "new response header is fail."
+                    "no notify client and push jc force.");
+            spx_task_pool_push(g_spx_task_pool,tc);
+            ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return;
+        }
     }
     jc->writer_header->protocol = YDB_C2S_FIND;
     jc->writer_header->bodylen = 0;

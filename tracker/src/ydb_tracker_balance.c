@@ -58,7 +58,8 @@ spx_private struct ydb_remote_storage *curr_storage = NULL;
 //spx_private size_t ydb_remote_storage_idx = 0;
 spx_private struct spx_map_iter *curr_iter = NULL;
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t groupname,struct spx_job_context *jcontext){/*{{{*/
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(
+        string_t groupname,struct spx_job_context *jcontext){/*{{{*/
     if(NULL == ydb_remote_storages){
         jcontext->err = ENOENT;
         return NULL;
@@ -66,7 +67,8 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t
 
     struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) jcontext->config;
     struct spx_map *map = NULL;
-    jcontext-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
+    jcontext-> err = spx_map_get(ydb_remote_storages,
+            groupname,spx_string_len(groupname),(void **) &map,NULL);
     if(0 != jcontext->err){
         return NULL;
     }
@@ -111,14 +113,16 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(string_t
     return storage;
 }/*}}}*/
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(string_t groupname,struct spx_job_context *jcontext){/*{{{*/
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(
+        string_t groupname,struct spx_job_context *jcontext){/*{{{*/
  if(NULL == ydb_remote_storages){
         jcontext->err = ENOENT;
         return NULL;
     }
 
     struct spx_map *map = NULL;
-    jcontext-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
+    jcontext-> err = spx_map_get(ydb_remote_storages,
+            groupname,spx_string_len(groupname),(void **) &map,NULL);
     if(0 != jcontext->err){
         return NULL;
     }
@@ -164,7 +168,8 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(stri
     return dest;
 }/*}}}*/
 
-spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(string_t groupname,struct spx_job_context *jcontext){/*{{{*/
+spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(
+        string_t groupname,struct spx_job_context *jcontext){/*{{{*/
     if(NULL == curr_storage){
         curr_storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
     }
@@ -276,23 +281,27 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
 
     struct ydb_remote_storage *storage = NULL;
     switch(c->balance){
-        case YDB_TRACKER_BALANCE_LOOP:{
-                                          storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
-                                          break;
-                                      }
+        case YDB_TRACKER_BALANCE_LOOP:
+            {
+                storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
+                break;
+            }
 
-        case YDB_TRACKER_BALANCE_MAXDISK:{
-                                             storage = ydb_tracker_find_storage_by_freedisk(groupname,jcontext);
-                                             break;
-                                         }
-        case YDB_TRACKER_BALANCE_TURN :{
-                                           storage = ydb_tracker_find_storage_by_turn(groupname,jcontext);
-                                           break;
-                                       }
-        case YDB_TRACKER_BALANCE_MASTER :{
-                                             storage = ydb_tracker_find_storage_by_master(groupname,jcontext);
-                                             break;
-                                         }
+        case YDB_TRACKER_BALANCE_MAXDISK:
+            {
+                storage = ydb_tracker_find_storage_by_freedisk(groupname,jcontext);
+                break;
+            }
+        case YDB_TRACKER_BALANCE_TURN :
+            {
+                storage = ydb_tracker_find_storage_by_turn(groupname,jcontext);
+                break;
+            }
+        case YDB_TRACKER_BALANCE_MASTER :
+            {
+                storage = ydb_tracker_find_storage_by_master(groupname,jcontext);
+                break;
+            }
         default:{
                     storage = ydb_tracker_find_storage_by_loop(groupname,jcontext);
                     break;
@@ -333,7 +342,7 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
     spx_msg_pack_u32(response_body_ctx,storage->port);
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
 r1:
-    spx_string_free(groupname);
+    SpxStringFree(groupname);
     return jcontext->err;
 }/*}}}*/
 
@@ -411,9 +420,9 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
     spx_msg_pack_u32(response_body_ctx,storage->port);
 
 r1:
-    spx_string_free(machineid);
-    spx_string_free(groupname);
-    spx_string_free(syncgroup);
+    SpxStringFree(machineid);
+    SpxStringFree(groupname);
+    SpxStringFree(syncgroup);
     return jcontext->err;
 }/*}}}*/
 
@@ -488,11 +497,10 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
     jcontext->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
-
 r1:
-    spx_string_free(machineid);
-    spx_string_free(groupname);
-    spx_string_free(syncgroup);
+    SpxStringFree(machineid);
+    SpxStringFree(groupname);
+    SpxStringFree(syncgroup);
     return jcontext->err;
 }/*}}}*/
 
@@ -567,10 +575,9 @@ err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_cont
     jcontext->writer_body_ctx = response_body_ctx;
     spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
     spx_msg_pack_u32(response_body_ctx,storage->port);
-
 r1:
-    spx_string_free(machineid);
-    spx_string_free(groupname);
-    spx_string_free(syncgroup);
+    SpxStringFree(machineid);
+    SpxStringFree(groupname);
+    SpxStringFree(syncgroup);
     return jcontext->err;
 }/*}}}*/

@@ -44,28 +44,7 @@ spx_private void *ydb_storage_storefile_new(size_t idx,void *arg,err_t *err){
         return NULL;
         }
     f->tidx = idx;
-//    f->chunkfile.proxyfd = open("/dev/null",O_RDWR);
-//    if(0 >= f->chunkfile.proxyfd){
-//        SpxLog2(log,SpxLogError,*err,
-//                "open /dev/null for proxyfd is fail.");
-//        goto r1;
-//    }
-
-//    f->chunkfile.dio_queue =  spx_queue_new(log,
-//             ydb_storage_storefile_free,
-//           err);
-//    if(NULL == f->chunkfile.dio_queue){
-//        SpxLog2(log,SpxLogError,*err,
-//                "init dio queue is fail.");
-//        goto r1;
-//    }
     return f;
-//r1:
-//    if(0 < f->chunkfile.proxyfd){
-//        SpxClose(f->chunkfile.proxyfd);
-//    }
-//    SpxFree(f);
-//    return NULL;
 }
 
 spx_private err_t ydb_storage_storefile_free(void **arg){

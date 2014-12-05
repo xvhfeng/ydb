@@ -51,7 +51,8 @@ struct spx_map *ydb_remote_storages = NULL;
 spx_private err_t  ydb_remote_storage_value_free(void **arg);
 spx_private err_t  ydb_remote_storage_key_free(void **arg);
 spx_private err_t ydb_remote_storage_free(void **arg);
-spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struct spx_task_context *tcontext);
+spx_private err_t ydb_remote_storage_report(
+        struct ev_loop *loop,int proto,struct spx_task_context *tcontext);
 
 spx_private err_t ydb_remote_storage_value_free(void **arg){/*{{{*/
     if(NULL != *arg){
@@ -64,7 +65,7 @@ spx_private err_t ydb_remote_storage_value_free(void **arg){/*{{{*/
 spx_private err_t  ydb_remote_storage_key_free(void **arg){/*{{{*/
     if(NULL != *arg){
         string_t s = (string_t ) *arg;
-        spx_string_free(s);
+        SpxStringFree(s);
     }
     return 0;
 }/*}}}*/
@@ -73,16 +74,16 @@ spx_private err_t ydb_remote_storage_free(void **arg){/*{{{*/
     if(NULL != *arg){
         struct ydb_remote_storage **s = (struct ydb_remote_storage **) arg;
         if(NULL != (*s)->machineid){
-            spx_string_free((*s)->machineid);
+            SpxStringFree((*s)->machineid);
         }
         if(NULL != (*s)->groupname){
-            spx_string_free((*s)->groupname);
+            SpxStringFree((*s)->groupname);
         }
         if(NULL != (*s)->syncgroup){
-            spx_string_free((*s)->syncgroup);
+            SpxStringFree((*s)->syncgroup);
         }
         if(NULL != (*s)->ip){
-            spx_string_free((*s)->ip);
+            SpxStringFree((*s)->ip);
         }
         SpxFree(*s);
     }
@@ -98,7 +99,9 @@ spx_private err_t ydb_remote_storage_free(void **arg){/*{{{*/
  *
  *
  */
-spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struct spx_task_context *tcontext){/*{{{*/
+spx_private err_t ydb_remote_storage_report(
+        struct ev_loop *loop,
+        int proto,struct spx_task_context *tcontext){/*{{{*/
     if(NULL == tcontext){
         return EINVAL;
     }
@@ -161,7 +164,8 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
         if(NULL == map){
             goto r1;
         }
-        jcontext->err = spx_map_insert(ydb_remote_storages,groupname,spx_string_len(groupname),map,sizeof(*map));
+        jcontext->err = spx_map_insert(ydb_remote_storages,
+                groupname,spx_string_len(groupname),map,sizeof(*map));
         if(0 != jcontext->err){
             spx_map_free(&map);
             goto r1;
@@ -194,16 +198,16 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     if(NULL == storage->groupname){
         storage->groupname = groupname;
     } else {
-        spx_string_free(groupname);
+        SpxStringFree(groupname);
     }
     if(NULL == storage->machineid){
         storage->machineid = machineid;
     } else {
-        spx_string_free(machineid);
+        SpxStringFree(machineid);
     }
 
     if(NULL != storage->syncgroup){
-        spx_string_free(storage->syncgroup);
+        SpxStringFree(storage->syncgroup);
     }
     storage->syncgroup = syncgroup;
 
@@ -212,7 +216,7 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     }else {
         string_t oip = storage->ip;
         storage->ip = ip;
-        spx_string_free(oip);
+        SpxStringFree(oip);
     }
     struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
     if(NULL == response_header){
@@ -247,16 +251,16 @@ spx_private err_t ydb_remote_storage_report(struct ev_loop *loop,int proto,struc
     return 0;
 r1:
     if(NULL != groupname){
-        spx_string_free(groupname);
+        SpxStringFree(groupname);
     }
     if(NULL != machineid){
-        spx_string_free(machineid);
+        SpxStringFree(machineid);
     }
     if(NULL != syncgroup){
-        spx_string_free(syncgroup);
+        SpxStringFree(syncgroup);
     }
     if(NULL != ip){
-        spx_string_free(ip);
+        SpxStringFree(ip);
     }
     return jcontext->err;
 }/*}}}*/
