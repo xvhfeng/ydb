@@ -2803,6 +2803,7 @@ spx_private void ydb_storage_sync_do_upload_for_chunkfile(
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
         w->data;
     struct spx_job_context *jc = dc->jc;
+    struct spx_task_context *tc = dc->tc;
     struct ydb_storage_configurtion *c = dc->c;
     struct ydb_storage_storefile *sf = dc->storefile;
 
@@ -2815,30 +2816,30 @@ spx_private void ydb_storage_sync_do_upload_for_chunkfile(
     u64_t begin = unit * c->pagesize;
     u64_t offset = dc->begin - begin;
     u64_t len = offset + dc->totalsize;
-    if(SpxFileExist(dc->filename)){
-        sf->singlefile.fd = SpxFileWritable(dc->filename);
-        if(0 <= sf->singlefile.fd){
+    sf->singlefile.fd = SpxFileWritable(dc->filename);
+    if(0 <= sf->singlefile.fd){
+        err = errno;
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "open file:%s for sync is fail.",
+                dc->filename);
+        goto r1;
+    }
 
-        }
-        sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,begin,len);
-        if(NULL == sf->singlefile.mptr){
-
-        }
-    } else {
-        sf->singlefile.fd = SpxFileWritable(dc->filename);
-        if(0 <= sf->singlefile.fd){
-
-        }
+    if(!SpxFileExist(dc->filename)){
         if(0 != (err = ftruncate(sf->singlefile.fd,c->chunksize))){
             SpxLogFmt2(c->log,SpxLogError,err,\
                     "truncate chunkfile:%s to size:%lld is fail.",
                     sf->singlefile.filename,c->chunksize);
+            goto r1;
         }
-
-        sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,begin,len);
-        if(NULL == sf->singlefile.mptr){
-
-        }
+    }
+    sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,begin,len);
+    if(NULL == sf->singlefile.mptr){
+        err = errno;
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "mmap file:%s is fail.",
+                dc->filename);
+        goto r1;
     }
 
     if(jc->is_lazy_recv){
@@ -2851,7 +2852,6 @@ spx_private void ydb_storage_sync_do_upload_for_chunkfile(
                 jc->reader_header->bodylen - jc->reader_header->offset);
     }
 
-
     ydb_storage_sync_log(dc->machineid,
             dc->createtime,YDB_STORAGE_LOG_UPLOAD,dc->rfid,NULL);
 
@@ -2860,44 +2860,39 @@ spx_private void ydb_storage_sync_do_upload_for_chunkfile(
                 "make the response for uploading is fail.");
         goto r1;
     }
-
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
+    goto r2;
+r1:
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&(jc->err));
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,jc->err,\
+                    "new response header is fail."
+                    "no notify client and push jc force.");
+            spx_task_pool_push(g_spx_task_pool,tc);
+            ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return ;
+        }
+    }
+    jc->writer_header->protocol = YDB_S2S_CSYNC_ADD;;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+r2:
+    spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    struct spx_thread_context *threadcontext =
+        spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    return;
-r1:
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
-    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
+    if(0 != jc->err){
+        SpxLog2(jc->log,SpxLogError,jc->err,\
+                "notify network module is fail.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_C2S_UPLOAD;
-    jc->writer_header->bodylen = 0;
-    jc->writer_header->version = YDB_VERSION;
-    jc->writer_header->err = err;
-
-    jc->moore = SpxNioMooreResponse;
-    size_t i = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext_err =
-        spx_get_thread(g_spx_network_module,i);
-    jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
-    SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 
@@ -2912,6 +2907,7 @@ spx_private void ydb_storage_sync_do_upload_for_singlefile(
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = dc->c;
     struct ydb_storage_storefile *sf = dc->storefile;
+    struct spx_task_context *tc = dc->tc;
 
     dc->filename = ydb_storage_dio_make_filename(dc->log,
             false,c->mountpoints,dc->mp_idx,dc->p1,dc->p2,
@@ -2921,17 +2917,25 @@ spx_private void ydb_storage_sync_do_upload_for_singlefile(
     if(!SpxFileExist(dc->filename)){
         sf->singlefile.fd = SpxFileWritable(dc->filename);
         if(0 <= sf->singlefile.fd){
-
+            err = errno;
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "open file:%s is fail.",
+                    dc->filename);
+            goto r1;
         }
         if(0 != (err = ftruncate(sf->singlefile.fd,dc->totalsize))){
             SpxLogFmt2(c->log,SpxLogError,err,\
                     "truncate chunkfile:%s to size:%lld is fail.",
                     sf->singlefile.filename,c->chunksize);
+            goto r1;
         }
 
         sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,0,dc->totalsize);
         if(NULL == sf->singlefile.mptr){
-
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "mmap file:%s is fail.",
+                    dc->filename);
+            goto r1;
         }
 
         if(jc->is_lazy_recv){
@@ -2952,44 +2956,39 @@ spx_private void ydb_storage_sync_do_upload_for_singlefile(
                 "make the response for uploading is fail.");
         goto r1;
     }
-
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
+    goto r2;
+r1:
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&(jc->err));
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,jc->err,\
+                    "new response header is fail."
+                    "no notify client and push jc force.");
+            spx_task_pool_push(g_spx_task_pool,tc);
+            ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return ;
+        }
+    }
+    jc->writer_header->protocol = YDB_S2S_CSYNC_ADD;;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+r2:
+    spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    struct spx_thread_context *threadcontext =
+        spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    return;
-r1:
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
-    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
+    if(0 != jc->err){
+        SpxLog2(jc->log,SpxLogError,jc->err,\
+                "notify network module is fail.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_C2S_UPLOAD;
-    jc->writer_header->bodylen = 0;
-    jc->writer_header->version = YDB_VERSION;
-    jc->writer_header->err = err;
-
-    jc->moore = SpxNioMooreResponse;
-    size_t i = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext_err =
-        spx_get_thread(g_spx_network_module,i);
-    jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
-    SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 
@@ -3065,7 +3064,7 @@ r1:
         spx_job_pool_push(g_spx_job_pool,jc);
         return err;
     }
-    jc->writer_header->protocol = jc->reader_header->protocol;
+    jc->writer_header->protocol = YDB_S2S_CSYNC_DELETE;
     jc->writer_header->bodylen = 0;
     jc->writer_header->version = YDB_VERSION;
     jc->writer_header->err = err;
@@ -3110,19 +3109,25 @@ spx_private void ydb_storage_sync_delete_form_chunkfile(
     }
     ydb_storage_sync_log(dc->machineid,
             dc->createtime,YDB_STORAGE_LOG_DELETE,dc->rfid,NULL);
-    ydb_storage_sync_after(YDB_S2S_CSYNC_DELETE,dc);
+    if(0 != (err = ydb_storage_sync_after(YDB_S2S_CSYNC_DELETE,dc))){
+        SpxLogFmt2(dc->log,SpxLogError,err,
+                "delete file:%s is fail.",dc->rfid);
+        goto r1;
+    }
     goto r2;
 r1:
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "new response header is fail."
-                "no notify client and push jc force.");
-        spx_task_pool_push(g_spx_task_pool,tc);
-        ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+        if(NULL == jc->writer_header){
+            SpxLog2(dc->log,SpxLogError,err,\
+                    "new response header is fail."
+                    "no notify client and push jc force.");
+            spx_task_pool_push(g_spx_task_pool,tc);
+            ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return;
+        }
     }
     jc->writer_header->protocol = jc->reader_header->protocol;
     jc->writer_header->bodylen = 0;
@@ -3154,7 +3159,7 @@ err_t ydb_storage_sync_modify(struct ev_loop *loop,\
         ){/*{{{*/
     err_t err = 0;
     struct ydb_storage_configurtion *c = dc->jc->config;
-//    struct spx_msg_header *rqh = dc->jc->reader_header;
+    //    struct spx_msg_header *rqh = dc->jc->reader_header;
     struct spx_job_context *jc = dc->jc;
     string_t machineid = NULL;
     bool_t is_has_file = false;
@@ -3173,7 +3178,6 @@ err_t ydb_storage_sync_modify(struct ev_loop *loop,\
     if(!is_has_file){
         ydb_storage_sync_log(machineid,
                 dc->createtime,YDB_STORAGE_LOG_MODIFY,dc->rfid,dc->fid);
-        SpxStringFree(machineid);
         goto r1;
     }
 
@@ -3187,8 +3191,10 @@ err_t ydb_storage_sync_modify(struct ev_loop *loop,\
     }
     ev_async_start(loop,&(dc->async));
     ev_async_send(loop,&(dc->async));
+    SpxStringFree(machineid);
     return err;
 r1:
+    SpxStringFree(machineid);
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
@@ -3229,6 +3235,7 @@ spx_private void ydb_storage_sync_do_modify_to_chunkfile(
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = dc->c;
     struct ydb_storage_storefile *sf = dc->storefile;
+    struct spx_task_context *tc = dc->tc;
 
     dc->filename = ydb_storage_dio_make_filename(dc->log,
             false,c->mountpoints,dc->mp_idx,dc->p1,dc->p2,
@@ -3239,40 +3246,40 @@ spx_private void ydb_storage_sync_do_modify_to_chunkfile(
     u64_t begin = unit * c->pagesize;
     u64_t offset = dc->begin - begin;
     u64_t len = offset + dc->totalsize;
-    if(SpxFileExist(dc->filename)){
-        sf->singlefile.fd = SpxFileWritable(dc->filename);
-        if(0 <= sf->singlefile.fd){
-
-        }
-        sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,begin,len);
-        if(NULL == sf->singlefile.mptr){
-
-        }
-    } else {
-        sf->singlefile.fd = SpxFileWritable(dc->filename);
-        if(0 <= sf->singlefile.fd){
-
-        }
+    sf->singlefile.fd = SpxFileWritable(dc->filename);
+    if(0 <= sf->singlefile.fd){
+        err = errno;
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "open file:%s iafail.",
+                dc->filename);
+        goto r1;
+    }
+    if(!SpxFileExist(dc->filename)){
         if(0 != (err = ftruncate(sf->singlefile.fd,c->chunksize))){
             SpxLogFmt2(c->log,SpxLogError,err,\
                     "truncate chunkfile:%s to size:%lld is fail.",
                     sf->singlefile.filename,c->chunksize);
-        }
-
-        sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,begin,len);
-        if(NULL == sf->singlefile.mptr){
-
+            goto r1;
         }
     }
+    sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,begin,len);
+    if(NULL == sf->singlefile.mptr){
+        err = errno;
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "mmap file:%s iafail.",
+                dc->filename);
+        goto r1;
+    }
+
 
     if(jc->is_lazy_recv){
         spx_lazy_mmap_nb(dc->log,sf->singlefile.mptr,
                 jc->fd,jc->reader_header->bodylen - jc->reader_header->offset,
                 offset);
     }  else {
-            memcpy(sf->singlefile.mptr + offset,
-                    jc->reader_body_ctx->buf + jc->reader_header->offset,
-                    jc->reader_header->bodylen - jc->reader_header->offset);
+        memcpy(sf->singlefile.mptr + offset,
+                jc->reader_body_ctx->buf + jc->reader_header->offset,
+                jc->reader_header->bodylen - jc->reader_header->offset);
     }
 
 
@@ -3284,44 +3291,39 @@ spx_private void ydb_storage_sync_do_modify_to_chunkfile(
                 "make the response for uploading is fail.");
         goto r1;
     }
-
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
+    goto r2;
+r1:
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&(jc->err));
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,jc->err,\
+                    "new response header is fail."
+                    "no notify client and push jc force.");
+            spx_task_pool_push(g_spx_task_pool,tc);
+            ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return ;
+        }
+    }
+    jc->writer_header->protocol = YDB_S2S_CSYNC_MODIFY;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+r2:
+    spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    struct spx_thread_context *threadcontext =
+        spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    return;
-r1:
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
-    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
+    if(0 != jc->err){
+        SpxLog2(jc->log,SpxLogError,jc->err,\
+                "notify network module is fail.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_C2S_UPLOAD;
-    jc->writer_header->bodylen = 0;
-    jc->writer_header->version = YDB_VERSION;
-    jc->writer_header->err = err;
-
-    jc->moore = SpxNioMooreResponse;
-    size_t i = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext_err =
-        spx_get_thread(g_spx_network_module,i);
-    jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
-    SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 
@@ -3334,6 +3336,7 @@ spx_private void ydb_storage_sync_do_modify_to_singlefile(
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
         w->data;
     struct spx_job_context *jc = dc->jc;
+    struct spx_task_context *tc = dc->tc;
     struct ydb_storage_configurtion *c = dc->c;
     struct ydb_storage_storefile *sf = dc->storefile;
 
@@ -3345,17 +3348,26 @@ spx_private void ydb_storage_sync_do_modify_to_singlefile(
     if(!SpxFileExist(dc->filename)){
         sf->singlefile.fd = SpxFileWritable(dc->filename);
         if(0 <= sf->singlefile.fd){
-
+            err = errno;
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "open file:%s is fail.",
+                    dc->filename);
+            goto r1;
         }
         if(0 != (err = ftruncate(sf->singlefile.fd,dc->totalsize))){
             SpxLogFmt2(c->log,SpxLogError,err,\
                     "truncate chunkfile:%s to size:%lld is fail.",
                     sf->singlefile.filename,c->chunksize);
+            goto r1;
         }
 
         sf->singlefile.mptr = SpxMmap(sf->singlefile.fd,0,dc->totalsize);
         if(NULL == sf->singlefile.mptr){
-
+            err = errno;
+            SpxLogFmt2(c->log,SpxLogError,err,
+                    "mmap file:%s is fail.",
+                    dc->filename);
+            goto r1;
         }
 
         if(jc->is_lazy_recv){
@@ -3368,6 +3380,15 @@ spx_private void ydb_storage_sync_do_modify_to_singlefile(
         }
     }
 
+    if(0 != (err = spx_modify_filetime(
+                    dc->filename,
+                    dc->file_createtime))){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "modify file:%s creatime is fail.",
+                dc->filename);
+        goto r1;
+    }
+
     ydb_storage_sync_log(dc->machineid,
             dc->createtime,YDB_STORAGE_LOG_MODIFY,dc->rfid,dc->fid);
 
@@ -3376,44 +3397,39 @@ spx_private void ydb_storage_sync_do_modify_to_singlefile(
                 "make the response for uploading is fail.");
         goto r1;
     }
-
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
+    goto r2;
+r1:
+    if(NULL == jc->writer_header) {
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&(jc->err));
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,jc->err,\
+                    "new response header is fail."
+                    "no notify client and push jc force.");
+            spx_task_pool_push(g_spx_task_pool,tc);
+            ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return ;
+        }
+    }
+    jc->writer_header->protocol = YDB_S2S_CSYNC_MODIFY;
+    jc->writer_header->bodylen = 0;
+    jc->writer_header->version = YDB_VERSION;
+r2:
+    spx_task_pool_push(g_spx_task_pool,tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
     jc->moore = SpxNioMooreResponse;
     size_t idx = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
+    struct spx_thread_context *threadcontext =
+        spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    return;
-r1:
-    spx_task_pool_push(g_spx_task_pool,dc->tc);
-    ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
-
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
-    if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
+    if(0 != jc->err){
+        SpxLog2(jc->log,SpxLogError,jc->err,\
+                "notify network module is fail.");
         spx_job_pool_push(g_spx_job_pool,jc);
         return;
     }
-    jc->writer_header->protocol = YDB_C2S_UPLOAD;
-    jc->writer_header->bodylen = 0;
-    jc->writer_header->version = YDB_VERSION;
-    jc->writer_header->err = err;
-
-    jc->moore = SpxNioMooreResponse;
-    size_t i = spx_network_module_wakeup_idx(jc);
-    struct spx_thread_context *threadcontext_err =
-        spx_get_thread(g_spx_network_module,i);
-    jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
-    SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
 

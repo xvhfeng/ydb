@@ -174,14 +174,16 @@ r1:
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,err,\
+                    "dispatch network module is fail,"
+                    "and push jcontext to pool force.");
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return;
+        }
     }
     jc->writer_header->protocol = YDB_C2S_UPLOAD;
     jc->writer_header->bodylen = 0;
@@ -246,14 +248,16 @@ r1:
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
-    jc->writer_header = (struct spx_msg_header *)
-        spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
     if(NULL == jc->writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
+        jc->writer_header = (struct spx_msg_header *)
+            spx_alloc_alone(sizeof(*(jc->writer_header)),&err);
+        if(NULL == jc->writer_header){
+            SpxLog2(jc->log,SpxLogError,err,\
+                    "dispatch network module is fail,"
+                    "and push jcontext to pool force.");
+            spx_job_pool_push(g_spx_job_pool,jc);
+            return;
+        }
     }
     jc->writer_header->protocol = YDB_C2S_UPLOAD;
     jc->writer_header->bodylen = 0;
@@ -447,6 +451,14 @@ err_t ydb_storage_dio_upload_to_singlefile(
                 jc->reader_header->bodylen - jc->reader_header->offset);
     }
 
+    if(0 != (err = spx_modify_filetime(
+                    sf->singlefile.filename,
+                    sf->singlefile.fcreatetime))){
+        SpxLogFmt2(c->log,SpxLogError,err,
+                "modify file:%s creatime is fail.",
+                sf->singlefile.filename);
+        goto r1;
+    }
 
     dc->begin = 0;
     dc->rand = sf->singlefile.rand;
@@ -458,11 +470,11 @@ err_t ydb_storage_dio_upload_to_singlefile(
     dc->totalsize = dc->realsize;
 
 r1:
-    SpxStringFree(sf->singlefile.filename);
     SpxClose(sf->singlefile.fd);
     if(NULL != sf->singlefile.mptr) {
         munmap(sf->singlefile.mptr,dc->realsize);
     }
+    SpxStringFree(sf->singlefile.filename);
 
     return err;
 }/*}}}*/
