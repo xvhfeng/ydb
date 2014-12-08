@@ -1792,14 +1792,6 @@ err_t ydb_storage_sync_state_writer(
         goto r1;
     }
 
-    struct spx_map_iter *iter = spx_map_iter_new(g_ydb_storage_remote,&(err));
-    if(NULL == iter){
-        SpxLog2(c->log,SpxLogError,err,\
-                "init the trackers iter is fail.");
-        goto r1;
-    }
-
-    struct spx_map_node *n = NULL;
     string_t new_context = NULL;
     new_context = spx_string_cat_printf(&err,context,"%s\n",
             "# machineid:binlog-year:binlog-month:binlog-day:binlog-offset"
@@ -1811,6 +1803,13 @@ err_t ydb_storage_sync_state_writer(
     }
     context = new_context;
 
+    struct spx_map_iter *iter = spx_map_iter_new(g_ydb_storage_remote,&(err));
+    if(NULL == iter){
+        SpxLog2(c->log,SpxLogError,err,\
+                "init the trackers iter is fail.");
+        goto r1;
+    }
+    struct spx_map_node *n = NULL;
     while(NULL != (n = spx_map_iter_next(iter,&err))){
         SpxTypeConvert2(struct ydb_storage_remote,s,n->v);
         new_context = spx_string_cat_printf(&err,context,"%s:%d:%d:%d:%lld:%d:%d:%d:%lld\n",
@@ -1826,6 +1825,7 @@ err_t ydb_storage_sync_state_writer(
             SpxLogFmt2(c->log,SpxLogError,err,
                     "cat and printf context of sync marklog by storage:%s is fail.",
                     s->machineid);
+            spx_map_iter_free(&iter);
             break;
         }
         context = new_context;
@@ -2628,66 +2628,67 @@ r1:
 }/*}}}*/
 
 void ydb_storage_sync_context_free(
-        struct ydb_storage_sync_context **ysdc
+        struct ydb_storage_sync_context **yssc
         ){/*{{{*/
-    if(NULL == ysdc || NULL == *ysdc){
+    if(NULL == yssc || NULL == *yssc){
         return;
     }
-    if(NULL != (*ysdc)->fid){
-        if(NULL != (*ysdc)->fid->syncgroup){
-            SpxStringFree((*ysdc)->fid->syncgroup);
+    if(NULL != (*yssc)->fid){
+        if(NULL != (*yssc)->fid->syncgroup){
+            SpxStringFree((*yssc)->fid->syncgroup);
         }
-        if(NULL != (*ysdc)->fid->suffix){
-            SpxStringFree((*ysdc)->fid->suffix);
+        if(NULL != (*yssc)->fid->suffix){
+            SpxStringFree((*yssc)->fid->suffix);
         }
-        if(NULL != (*ysdc)->fid->machineid){
-            SpxStringFree((*ysdc)->fid->machineid);
+        if(NULL != (*yssc)->fid->machineid){
+            SpxStringFree((*yssc)->fid->machineid);
         }
-        if(NULL != (*ysdc)->fid->groupname){
-            SpxStringFree((*ysdc)->fid->groupname);
+        if(NULL != (*yssc)->fid->groupname){
+            SpxStringFree((*yssc)->fid->groupname);
         }
-        if(NULL != (*ysdc)->fid->hashcode){
-            SpxStringFree((*ysdc)->fid->hashcode);
+        if(NULL != (*yssc)->fid->hashcode){
+            SpxStringFree((*yssc)->fid->hashcode);
         }
-        SpxFree((*ysdc)->fid);
+        SpxFree((*yssc)->fid);
     }
-    if(NULL != (*ysdc)->request){
-        if(NULL != ((*ysdc)->request->body)){
-            spx_msg_free(&((*ysdc)->request->body));
+    if(NULL != (*yssc)->request){
+        if(NULL != ((*yssc)->request->body)){
+            spx_msg_free(&((*yssc)->request->body));
         }
-        if(NULL != ((*ysdc)->request->header)){
-            SpxFree((*ysdc)->request->header);
+        if(NULL != ((*yssc)->request->header)){
+            SpxFree((*yssc)->request->header);
         }
-        SpxFree((*ysdc)->request);
+        SpxFree((*yssc)->request);
     }
-    if(NULL != (*ysdc)->response){
-        if(NULL != ((*ysdc)->response->body)){
-            spx_msg_free(&((*ysdc)->response->body));
+    if(NULL != (*yssc)->response){
+        if(NULL != ((*yssc)->response->body)){
+            spx_msg_free(&((*yssc)->response->body));
         }
-        if(NULL != ((*ysdc)->response->header)){
-            SpxFree((*ysdc)->response->header);
+        if(NULL != ((*yssc)->response->header)){
+            SpxFree((*yssc)->response->header);
         }
-        SpxFree((*ysdc)->response);
+        SpxFree((*yssc)->response);
     }
-    if(NULL != (*ysdc)->md){
-        spx_msg_free(&((*ysdc)->md));
+    if(NULL != (*yssc)->md){
+        spx_msg_free(&((*yssc)->md));
     }
-    if(NULL != (*ysdc)->fname){
-        SpxStringFree((*ysdc)->fname);
+    if(NULL != (*yssc)->fname){
+        SpxStringFree((*yssc)->fname);
     }
-    if(NULL != (*ysdc)->smd){
-        SpxStringFree((*ysdc)->smd);
+    if(NULL != (*yssc)->smd){
+        SpxStringFree((*yssc)->smd);
     }
-    if(NULL != (*ysdc)->ptr){
-        munmap((*ysdc)->ptr,(*ysdc)->len);
-        (*ysdc)->ptr = NULL;
+    if(NULL != (*yssc)->ptr){
+        munmap((*yssc)->ptr,(*yssc)->len);
+        (*yssc)->ptr = NULL;
     }
-    if(0 != (*ysdc)->fd){
-        SpxClose((*ysdc)->fd);
+    if(0 != (*yssc)->fd){
+        SpxClose((*yssc)->fd);
     }
-    if(0 != (*ysdc)->sock){
-        SpxClose((*ysdc)->sock);
+    if(0 != (*yssc)->sock){
+        SpxClose((*yssc)->sock);
     }
+    SpxFree(*yssc);
     return;
 }/*}}}*/
 

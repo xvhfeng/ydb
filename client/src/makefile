@@ -4,9 +4,9 @@
 #if type is so means the .so file
 #if type is exe means the execute file
 TYPE=exe
-SPX_SRC_PATH = /opt/src/spx/src/
-SPX_HEADER_PATH = /opt/src/spx/src/include/
-YDB_COMMON_HEADER_PATH = /opt/src/ydb/common/src/
+SPX_SRC_PATH = ../../../spx/src/
+SPX_HEADER_PATH = ../../../spx/src/include/
+YDB_COMMON_HEADER_PATH = ../../common/src/
 NAME = ydbclient
 TARGET_PATH = /usr/local/lib/
 HEADER_TARGET_PATH = /usr/local/include/
