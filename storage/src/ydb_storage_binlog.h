@@ -50,7 +50,6 @@ extern "C" {
         string_t machineid;
         string_t filename;
         struct spx_date d;
-        size_t maxsize;
         SpxLogDelegate *log;
         pthread_mutex_t *mlock;
     };

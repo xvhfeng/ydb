@@ -312,6 +312,10 @@ err_t ydb_storage_dsync_startup(struct ydb_storage_configurtion *c,
                     break;
                 }
                 spx_date_add(&(dsrt->sync_date_curr),1);
+
+                if(0 < c->sync_wait) {
+                    spx_periodic_sleep(c->sync_wait,0);
+                }
             }
             dsrt->step = YDB_STORAGE_DSYNC_DATA;
         }/*}}}*/
@@ -406,6 +410,7 @@ err_t ydb_storage_dsync_startup(struct ydb_storage_configurtion *c,
                     break;
                 }
                 spx_date_add(&(dsrt->sync_date_curr),1);
+
             }
         }/*}}}*/
 
@@ -914,7 +919,7 @@ spx_private err_t ydb_storage_dsync_sync_synclogs(
             SpxTypeConvert2(struct ydb_storage_remote,s,n->v);
             string_t synclog_filename =
                 ydb_storage_synclog_make_filename(c->log,
-                        c->basepath,s->machineid,
+                        c->dologpath,s->machineid,
                         dt_sync_curr->year,
                         dt_sync_curr->month,
                         dt_sync_curr->day,
@@ -1232,7 +1237,7 @@ spx_private err_t ydb_storage_dsync_synclog_data(
             SpxTypeConvert2(struct ydb_storage_remote,s,n->v);
             string_t synclog_filename =
                 ydb_storage_synclog_make_filename(c->log,
-                        c->basepath,s->machineid,
+                        c->dologpath,s->machineid,
                         dsrt->sync_date_curr.year,
                         dsrt->sync_date_curr.month,
                         dsrt->sync_date_curr.day,
@@ -1316,81 +1321,107 @@ spx_private err_t ydb_storage_dsync_from_remote_storage(
             continue;
         }
         switch (**strs){
-            case (YDB_STORAGE_LOG_UPLOAD) : {
-                                         err = ydb_storage_dsync_upload_request(c,s,(*strs + 1));
-                                         if(0 != err ) {
-                                             if(NULL == base){
-                                                 SpxLogFmt2(c->log,SpxLogError,err,
-                                                         "upload of dsync file:%s "
-                                                         "in the file:%s from remote:%s is fail,"
-                                                         "and base storage:%s is not support.",
-                                                         line,logfname,s->machineid,base->machineid);
-                                             } else {
-                                                 SpxLogFmt2(c->log,SpxLogError,err,
-                                                         "upload of dsync file:%s "
-                                                         "in the file:%s from remote:%s is fail,"
-                                                         "and try base storage:%s again.",
-                                                         line,logfname,s->machineid,base->machineid);
-                                                 err = ydb_storage_dsync_upload_request(c,
-                                                         base,(*strs + 1));
-                                                 if(0 != err){
-                                                     SpxLogFmt2(c->log,SpxLogError,err,
-                                                             "upload of dsync file:%s "
-                                                             "in the file:%s "
-                                                             "from base storage:%s is fail,",
-                                                             line,logfname,base->machineid);
-                                                 }
-                                             }
-                                         }
-                                         break;
-                                     }
-            case (YDB_STORAGE_LOG_MODIFY) : {
-                                            err = ydb_storage_dsync_modify_request(c,
-                                                    s,(*strs + 1),(*strs + 2));
-                                            if(0 != err ) {
-                                                if(NULL == base){
-                                                    SpxLogFmt2(c->log,SpxLogError,err,
-                                                            "modify of dsync file:%s "
-                                                            "in the file:%s from remote:%s is fail,"
-                                                            "and base storage:%s is not support.",
-                                                            line,logfname,s->machineid,base->machineid);
-                                                } else {
-                                                    SpxLogFmt2(c->log,SpxLogError,err,
-                                                            "modify of dsync file:%s "
-                                                            "in the file:%s from remote:%s is fail,"
-                                                            "and try base storage:%s again.",
-                                                            line,logfname,s->machineid,base->machineid);
-                                                    err = ydb_storage_dsync_modify_request(c,
-                                                            base,(*strs + 1),(*strs + 2));
-                                                    if(0 != err){
-                                                        SpxLogFmt2(c->log,SpxLogError,err,
-                                                                "modify of dsync file:%s "
-                                                                "in the file:%s "
-                                                                "from base storage:%s is fail,",
-                                                                line,logfname,base->machineid);
-                                                    }
-                                                }
-                                            }
-                                            break;
-                                        }
-            case (YDB_STORAGE_LOG_DELETE):{
-                                          err = ydb_storage_dsync_delete_request(c,(*strs + 1));
-                                          if(0 != err){
-                                              SpxLogFmt2(c->log,SpxLogError,err,
-                                                      "delete of dsync file:%s in the file:%s is fail,"
-                                                      "and delete in the local,so not base storage.",
-                                                      line,logfname);
-                                          }
-                                          break;
-                                      }
+            case (YDB_STORAGE_LOG_UPLOAD) :
+                {
+                    err = ydb_storage_dsync_upload_request(c,s,(*strs + 1));
+                    if(0 != err ) {
+                        if(NULL == base){
+                            SpxLogFmt2(c->log,SpxLogError,err,
+                                    "upload of dsync file:%s "
+                                    "in the file:%s from remote:%s is fail,"
+                                    "and base storage:%s is not support.",
+                                    line,
+                                    logfname,
+                                    s->machineid,
+                                    base->machineid);
+                        } else {
+                            SpxLogFmt2(c->log,SpxLogError,err,
+                                    "upload of dsync file:%s "
+                                    "in the file:%s from remote:%s is fail,"
+                                    "and try base storage:%s again.",
+                                    line,
+                                    logfname,
+                                    s->machineid,
+                                    base->machineid);
+                            err = ydb_storage_dsync_upload_request(c,
+                                    base,(*strs + 1));
+                            if(0 != err){
+                                SpxLogFmt2(c->log,SpxLogError,err,
+                                        "upload of dsync file:%s "
+                                        "in the file:%s "
+                                        "from base storage:%s is fail,",
+                                        line,
+                                        logfname,
+                                        s->machineid,
+                                        base->machineid);
+                            }
+                        }
+                    }
+                    break;
+                }
+            case (YDB_STORAGE_LOG_MODIFY) :
+                {
+                    err = ydb_storage_dsync_modify_request(c,
+                            s,(*strs + 1),(*strs + 2));
+                    if(0 != err ) {
+                        if(NULL == base){
+                            SpxLogFmt2(c->log,SpxLogError,err,
+                                    "modify of dsync file:%s "
+                                    "in the file:%s from remote:%s is fail,"
+                                    "and base storage:%s is not support.",
+                                    line,
+                                    logfname,
+                                    s->machineid,
+                                    base->machineid);
+                        } else {
+                            SpxLogFmt2(c->log,SpxLogError,err,
+                                    "modify of dsync file:%s "
+                                    "in the file:%s from remote:%s is fail,"
+                                    "and try base storage:%s again.",
+                                    line,
+                                    logfname,
+                                    s->machineid,
+                                    base->machineid);
+                            err = ydb_storage_dsync_modify_request(c,
+                                    base,(*strs + 1),(*strs + 2));
+                            if(0 != err){
+                                SpxLogFmt2(c->log,SpxLogError,err,
+                                        "modify of dsync file:%s "
+                                        "in the file:%s "
+                                        "from base storage:%s is fail,",
+                                        line,
+                                        logfname,
+                                        s->machineid,
+                                        base->machineid);
+                            }
+                        }
+                    }
+                    break;
+                }
+            case (YDB_STORAGE_LOG_DELETE):
+                {
+                    err = ydb_storage_dsync_delete_request(c,(*strs + 1));
+                    if(0 != err){
+                        SpxLogFmt2(c->log,SpxLogError,err,
+                                "delete of dsync file:%s in the file:%s is fail,"
+                                "and delete in the local,so not base storage.",
+                                line,logfname);
+                    }
+                    break;
+                }
             default:{
                         SpxLogFmt1(c->log,SpxLogError,
                                 "no the operator:%c in  the ydb.",
                                 **strs);
                         break;
                     }
+
         }
         spx_string_free_splitres(strs,count);
+        if(0 < c->sync_wait) {
+            spx_periodic_sleep(c->sync_wait,0);
+        }
+
     }
 r1:
     if(NULL != fp){
@@ -2246,7 +2277,7 @@ spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
         struct ydb_storage_configurtion *c,
         err_t *err
         ){/*{{{*/
-    struct ydb_storage_dsync_runtime  *dsrt;
+    struct ydb_storage_dsync_runtime  *dsrt = NULL;
     FILE *fp = NULL;
     string_t line = NULL;
     string_t fname = ydb_storage_dsync_make_runtime_filename(c,err);
@@ -2258,14 +2289,14 @@ spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
 
     if(!SpxFileExist(fname)){
         *err = ENOENT;
-        goto r1;
+        goto r2;
     }
 
     dsrt = spx_alloc_alone(sizeof(*dsrt),err);
     if(NULL == dsrt){
         SpxLog2(c->log,SpxLogError,*err,
                 "new dsync runtime is fail.");
-        goto r1;
+        goto r2;
     }
 
     line = spx_string_newlen(NULL,SpxStringRealSize(SpxLineSize),err);
@@ -2338,6 +2369,7 @@ spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
                         break;
                     }
         }
+        spx_string_clear(line);
     }
     goto r2;
 r1:

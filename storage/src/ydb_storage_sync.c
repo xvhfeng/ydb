@@ -1287,6 +1287,9 @@ spx_private err_t ydb_storage_sync_doing(
             }
             spx_string_free_splitres(strs,count);
             spx_string_clear(line);
+            if(0 < c->sync_wait) {
+                spx_periodic_sleep(c->sync_wait,0);
+            }
         }
 
         if (spx_date_is_before(&(s->read_binlog.date))){
@@ -1563,22 +1566,6 @@ r2:
     }
     return jc->err;
 }/*}}}*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /*
  * fileline context format:
@@ -1881,14 +1868,14 @@ spx_private string_t ydb_storage_sync_make_marklog_filename(
     }
 
     string_t new_fname = NULL;
-    if(SpxStringEndWith(c->basepath,SpxLineEndDlmt)){
+    if(SpxStringEndWith(c->basepath,SpxPathDlmt)){
         new_fname = spx_string_cat_printf(err,fname,
                 "%s.%s-remote-storage.marklog",
                 c->basepath,c->machineid);
     } else {
         new_fname = spx_string_cat_printf(err,fname,
                 "%s%c.%s-remote-storage.marklog",
-                c->basepath,SpxLineEndDlmt,c->machineid);
+                c->basepath,SpxPathDlmt,c->machineid);
     }
 
     if(NULL == new_fname){

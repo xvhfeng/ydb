@@ -53,9 +53,9 @@
 #include "ydb_storage_sync.h"
 
 
-spx_private void ydb_storage_regedit_signal(struct ev_loop *loop);
-spx_private void ydb_storage_sig_empty (struct ev_loop *loop, ev_signal *w, int revents);
-spx_private void ydb_storage_sig_abort (struct ev_loop *loop, ev_signal *w, int revents);
+spx_private void ydb_storage_regedit_signal();
+spx_private void ydb_storage_sigaction_mark(int sig);
+spx_private void ydb_storage_sigaction_exit(int sig);
 
 int main(int argc,char **argv){
     umask(0);
@@ -137,7 +137,7 @@ int main(int argc,char **argv){
         abort();
     }
 
-    g_ydb_storage_binlog = ydb_storage_binlog_new(log,c->basepath,
+    g_ydb_storage_binlog = ydb_storage_binlog_new(log,c->dologpath,
             c->machineid,&err);
     if(NULL == g_ydb_storage_binlog || 0 != err){
         SpxLog2(log,SpxLogError,err,
@@ -250,68 +250,24 @@ int main(int argc,char **argv){
     return 0;
 }
 
-spx_private void ydb_storage_regedit_signal(struct ev_loop *loop){
-    ev_signal siguser1;
-    ev_signal_init (&siguser1,ydb_storage_sig_empty , SIGUSR1);
-    ev_signal_start (loop, &siguser1);
-
-    ev_signal sighup;
-    ev_signal_init(&sighup,ydb_storage_sig_empty,SIGHUP);
-    ev_signal_start(loop,&sighup);
-
-    ev_signal sigpipe;
-    ev_signal_init(&sigpipe,ydb_storage_sig_abort,SIGPIPE);
-    ev_signal_start(loop,&sigpipe);
-
-    ev_signal sigint;
-    ev_signal_init(&sigint,ydb_storage_sig_abort,SIGINT);
-    ev_signal_start(loop,&sigint);
+spx_private void ydb_storage_regedit_signal(){
+    spx_env_sigaction(SIGUSR1,NULL);
+    spx_env_sigaction(SIGHUP,ydb_storage_sigaction_mark);
+    spx_env_sigaction(SIGPIPE,ydb_storage_sigaction_mark);
+    spx_env_sigaction(SIGINT,ydb_storage_sigaction_exit);
 }
 
-spx_private void ydb_storage_sig_empty (struct ev_loop *loop, ev_signal *w, int revents){
+spx_private void ydb_storage_sigaction_mark(int sig){
     SpxLogDelegate *log = spx_log;
-    switch(w->signum){
-        case SIGUSR1:{
-                         SpxLog1(log,SpxLogWarn,"catch the sigusr1 and ignore it.");
-                         break;
-                     }
-        case SIGHUP:{
-                        SpxLog1(log,SpxLogWarn,"catch the sighup and ignore it.");
-                        break;
-                    }
-        default:{
-                    SpxLogFmt1(log,SpxLogError,"catch the sig:%d,and ignore it,but no regedit the sig handler.",w->signum);
-                    break;
-                }
-    }
+    SpxLogFmt1(log,SpxLogMark,
+            "emerge sig:%d,info:%s.",
+            sig,strsignal(sig));
 }
 
-spx_private void ydb_storage_sig_abort (struct ev_loop *loop, ev_signal *w, int revents){
+spx_private void ydb_storage_sigaction_exit(int sig){
     SpxLogDelegate *log = spx_log;
-    int numb = w->signum;
-    switch(numb){
-        case SIGPIPE:{
-                         SpxLog1(log,SpxLogError,
-                                 "catch the sigpipe and abort the process.");
-                         exit(numb);
-                         break;
-                     }
-        case SIGINT:{
-                        SpxLog1(log,SpxLogError,
-                                "catch the sigint and abort the process.");
-                         exit(numb);
-                        break;
-                    }
-        default:{
-                    SpxLogFmt1(log,SpxLogError,
-                            "catch the sig:%d and abort it,"
-                            "but no regedit the sig handler.",
-                            w->signum);
-                        exit(numb);
-                    break;
-                }
-    }
+    SpxLogFmt1(log,SpxLogMark,
+            "emerge sig:%d,info:%s.",
+            sig,strsignal(sig));
+    exit(0);
 }
-
-
-

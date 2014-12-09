@@ -109,8 +109,8 @@ struct ydb_tracker{
         string_t dologpath;
         u64_t logsize;
         i8_t loglevel;
-        u64_t binlog_size;
-        u32_t runtime_flush_timespan;
+//        u64_t binlog_size;
+//        u32_t runtime_flush_timespan;
         i8_t balance;
         u8_t master;
         u32_t heartbeat;
@@ -151,7 +151,6 @@ struct ydb_tracker{
         struct spx_time sync_end;
         u32_t disksync_timespan;
         u64_t disksync_busysize;
-        time_t start_timespan;
     };
 
     void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err);

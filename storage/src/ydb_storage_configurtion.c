@@ -162,8 +162,8 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->lazyrecv = true;
     c->lazysize = 1 * SpxMB;
     c->sendfile = true;
-    c->binlog_size =(u64_t) 2 * SpxGB;
-    c->runtime_flush_timespan = 60;
+//    c->binlog_size =(u64_t) 2 * SpxGB;
+//    c->runtime_flush_timespan = 60;
     c->pagesize = getpagesize();
     c->query_sync_timespan = 30;
     c->sync = YDB_STORAGE_SYNC_REALTIME;
@@ -176,7 +176,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->sync_end.sec = 0;
     c->disksync_timespan = SpxDayTick;
     c->disksync_busysize = 512 * SpxMB;
-    c->start_timespan = spx_now();
+//    c->start_timespan = spx_now();
     c->sync_threads_count = 3;
 
     return c;
@@ -337,6 +337,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //runtime flush timespan
+    /*
     if(0 == spx_string_casecmp(*kv,"runtime_flush_timespan")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,"use default runtime flush timespan:%d.",c->timeout);
@@ -349,7 +350,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
             c->runtime_flush_timespan = timeout;
         }
         goto r1;
-    }
+    }  */
 
 
 
@@ -574,6 +575,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //binlog size
+    /*
     if(0 == spx_string_casecmp(*kv,"binlog_size")){
         if(1 == count){
             SpxLogFmt1(c->log,SpxLogWarn,\
@@ -588,7 +590,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
             c->binlog_size = size;
         }
         goto r1;
-    }
+    }  */
 
     //balance
     if(0 == spx_string_casecmp(*kv,"balance")){
