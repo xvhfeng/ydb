@@ -67,6 +67,7 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
         SpxLog2(jc->log,SpxLogError,err,"create heartbeat socket fd is fail.");
         return err;
     }
+    jc->fd = fd;
     if(0 != (err = spx_set_nb(fd))){
         SpxLog2(jc->log,SpxLogError,err,"set socket nonblacking is fail.");
         goto r1;
@@ -117,11 +118,11 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
     spx_msg_pack_u64(ctx,freesize);
     spx_msg_pack_i32(ctx,status);
 
-    jc->fd = fd;
     jc->lifecycle = SpxNioLifeCycleHeader;
     spx_nio_writer_faster(loop,fd,jc);
     return err;
 r1:
+    spx_job_context_clear(jc);
     SpxClose(fd);
     return err;
 }/*}}}*/
