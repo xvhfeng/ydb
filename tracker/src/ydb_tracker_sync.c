@@ -62,6 +62,10 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
         goto r1;
     }
 
+    SpxLogFmt1(jc->log,SpxLogInfo,
+            "accept query sync storage from storage:%s in the group:%s with syncgroup:%s.",
+            machineid,groupname,syncgroup);
+
     if(NULL == ydb_remote_storages){
         SpxLogFmt1(jc->log,SpxLogError,\
                 "the storages of group:%s syncgroup:%s. is not exist",
@@ -149,6 +153,9 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
         }
     }
     spx_map_iter_free(&iter);
+    if(0 != jc->err){
+        goto r1;
+    }
 
     struct spx_msg_header *response_header =
         spx_alloc_alone(sizeof(*response_header),&(jc->err));
@@ -165,13 +172,13 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
     } else {
         response_header->bodylen = spx_string_len(buf);
     }
-    jc->writer_header_ctx = spx_header_to_msg(response_header,\
-            SpxMsgHeaderSize,&(jc->err));
-    if(NULL == jc->writer_header_ctx){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "convert response header to msg ctx is fail.");
-        goto r1;
-    }
+//    jc->writer_header_ctx = spx_header_to_msg(response_header,
+//            SpxMsgHeaderSize,&(jc->err));
+//    if(NULL == jc->writer_header_ctx){
+//        SpxLog2(tcontext->log,SpxLogError,jc->err,
+//                "convert response header to msg ctx is fail.");
+//        goto r1;
+//    }
     if(0 != response_header->bodylen) {
         struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,\
                 &(jc->err));
@@ -235,6 +242,10 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
                 groupname);
         goto r1;
     }
+
+    SpxLogFmt1(jc->log,SpxLogInfo,
+            "accept query base storage from storage:%s in the group:%s with syncgroup:%s.",
+            machineid,groupname,syncgroup);
 
     if(NULL == ydb_remote_storages){
         SpxLogFmt1(jc->log,SpxLogError,\
@@ -322,13 +333,13 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
     response_header->version = YDB_VERSION;
     response_header->bodylen = YDB_MACHINEID_LEN;
 
-    jc->writer_header_ctx = spx_header_to_msg(response_header,\
-            SpxMsgHeaderSize,&(jc->err));
-    if(NULL == jc->writer_header_ctx){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "convert response header to msg ctx is fail.");
-        goto r1;
-    }
+//    jc->writer_header_ctx = spx_header_to_msg(response_header,
+//            SpxMsgHeaderSize,&(jc->err));
+//    if(NULL == jc->writer_header_ctx){
+//        SpxLog2(tcontext->log,SpxLogError,jc->err,
+//                "convert response header to msg ctx is fail.");
+//        goto r1;
+//    }
     if(0 != response_header->bodylen) {
         struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,\
                 &(jc->err));
@@ -390,6 +401,10 @@ err_t ydb_tracker_query_timespan_for_begining_sync(struct ev_loop *loop,\
                 groupname);
         goto r1;
     }
+
+    SpxLogFmt1(jc->log,SpxLogInfo,
+            "accept query sync beginning timespan from storage:%s in the group:%s with syncgroup:%s.",
+            machineid,groupname,syncgroup);
 
     if(NULL == ydb_remote_storages){
         SpxLogFmt1(jc->log,SpxLogError,\
@@ -461,13 +476,13 @@ err_t ydb_tracker_query_timespan_for_begining_sync(struct ev_loop *loop,\
     response_header->protocol = YDB_S2T_QUERY_SYNC_BEGIN_TIMESPAN;
     response_header->version = YDB_VERSION;
     response_header->bodylen = sizeof(u64_t);
-    jc->writer_header_ctx = spx_header_to_msg(response_header,\
-            SpxMsgHeaderSize,&(jc->err));
-    if(NULL == jc->writer_header_ctx){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "convert response header to msg ctx is fail.");
-        goto r1;
-    }
+//    jc->writer_header_ctx = spx_header_to_msg(response_header,
+//            SpxMsgHeaderSize,&(jc->err));
+//    if(NULL == jc->writer_header_ctx){
+//        SpxLog2(tcontext->log,SpxLogError,jc->err,
+//                "convert response header to msg ctx is fail.");
+//        goto r1;
+//    }
     if(0 != response_header->bodylen) {
         struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,\
                 &(jc->err));

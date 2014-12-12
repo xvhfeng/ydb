@@ -211,7 +211,8 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
     }
 
     struct spx_map *map = NULL;
-    jcontext-> err = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,NULL);
+    jcontext-> err = spx_map_get(ydb_remote_storages,
+            groupname,spx_string_len(groupname),(void **) &map,NULL);
     if(0 != jcontext->err){
         return NULL;
     }
@@ -277,6 +278,10 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
         return jcontext->err;
     }
 
+    SpxLogFmt1(jcontext->log,SpxLogInfo,
+            "accept query upload storage from client:%s in the group:%s.",
+            jcontext->client_ip,groupname);
+
     struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jcontext->config);
 
     struct ydb_remote_storage *storage = NULL;
@@ -324,12 +329,12 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
     response_header->protocol = YDB_C2T_QUERY_UPLOAD_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
-    if(NULL == jcontext->writer_header_ctx){
-        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
-                "header of query storage to msg ctx is fail.");
-        goto r1;
-    }
+//    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+//    if(NULL == jcontext->writer_header_ctx){
+//        SpxLog2(tcontext->log,SpxLogError,jcontext->err,
+//                "header of query storage to msg ctx is fail.");
+//        goto r1;
+//    }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
         SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
@@ -383,6 +388,10 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
         goto r1;
     }
 
+    SpxLogFmt1(jcontext->log,SpxLogInfo,
+            "accept query modify storage:%s from client:%s in the group:%s with syncgroup:%s.",
+            machineid,jcontext->client_ip,groupname,syncgroup);
+
     struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
             groupname,machineid,syncgroup,jcontext,true,false);
     if(NULL == storage){
@@ -401,12 +410,12 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
     response_header->protocol = YDB_C2T_QUERY_MODIFY_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
-    if(NULL == jcontext->writer_header_ctx){
-        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
-                "convert response header to msg ctx is fail.");
-        goto r1;
-    }
+//    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+//    if(NULL == jcontext->writer_header_ctx){
+//        SpxLog2(tcontext->log,SpxLogError,jcontext->err,
+//                "convert response header to msg ctx is fail.");
+//        goto r1;
+//    }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
         SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
@@ -462,6 +471,11 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
                 groupname);
         goto r1;
     }
+
+    SpxLogFmt1(jcontext->log,SpxLogInfo,
+            "accept query delete storage:%s from client:%s in the group:%s with syncgroup:%s.",
+            machineid,jcontext->client_ip,groupname,syncgroup);
+
     struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
             groupname,machineid,syncgroup,jcontext,false,false);
     if(NULL == storage){
@@ -480,12 +494,12 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
     response_header->protocol = YDB_C2T_QUERY_DELETE_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
-    if(NULL == jcontext->writer_header_ctx){
-        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
-                "convert response header to msg ctx is fail.");
-        goto r1;
-    }
+//    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+//    if(NULL == jcontext->writer_header_ctx){
+//        SpxLog2(tcontext->log,SpxLogError,jcontext->err,
+//                "convert response header to msg ctx is fail.");
+//        goto r1;
+//    }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
         SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\
@@ -540,8 +554,14 @@ err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_cont
                 groupname);
         goto r1;
     }
+
+    SpxLogFmt1(jcontext->log,SpxLogInfo,
+            "accept query find storage:%s from client:%s in the group:%s with syncgroup:%s.",
+            machineid,jcontext->client_ip,groupname,syncgroup);
+
     struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
             groupname,machineid,syncgroup,jcontext,false,false);
+
     if(NULL == storage){
         jcontext->err = 0 == jcontext->err ? ENOENT : jcontext->err;
         SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
@@ -558,12 +578,12 @@ err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_cont
     response_header->protocol = YDB_C2T_QUERY_SELECT_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
-    if(NULL == jcontext->writer_header_ctx){
-        SpxLog2(tcontext->log,SpxLogError,jcontext->err,\
-                "convert response header to msg ctx is fail.");
-        goto r1;
-    }
+//    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+//    if(NULL == jcontext->writer_header_ctx){
+//        SpxLog2(tcontext->log,SpxLogError,jcontext->err,
+//                "convert response header to msg ctx is fail.");
+//        goto r1;
+//    }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
         SpxLogFmt2(tcontext->log,SpxLogError,jcontext->err,\

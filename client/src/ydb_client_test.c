@@ -34,7 +34,8 @@ err_t ydb_client_upload_test(
         char *local_suffix,
         char *local_fname,
         char *write_fpath,
-        u32_t timeout
+        u32_t timeout,
+        bool_t isprintf
         ){/*{{{*/
     size_t local_fsize = 0;
     err_t err = 0;
@@ -49,6 +50,14 @@ err_t ydb_client_upload_test(
         return err;
     }
     fid = ydb_client_upload(groupname,tracker,buff,local_fsize,local_suffix,timeout,&err);
+    if(0 != err){
+        printf("uplaod file:%s is fail.",
+                local_fname);
+        goto r1;
+    }
+    if(isprintf){
+        printf("fid= %s \n",fid);
+    }
     size_t ffsize = 0;
     fbuff = ydb_client_find(tracker,fid,&ffsize,timeout,&err);
     if(NULL == fbuff){
@@ -73,7 +82,8 @@ err_t ydb_client_delete_test(
         char *tracker,
         char *local_suffix,
         char *local_fname,
-        u32_t timeout
+        u32_t timeout,
+        bool_t isprintf
         ){/*{{{*/
     size_t local_fsize = 0;
     err_t err = 0;
@@ -87,6 +97,14 @@ err_t ydb_client_delete_test(
         return err;
     }
     fid = ydb_client_upload(groupname,tracker,buff,local_fsize,local_suffix,timeout,&err);
+    if(0 != err){
+        printf("uplaod file:%s is fail.",
+                local_fname);
+        goto r1;
+    }
+    if(isprintf){
+        printf("fid= %s \n",fid);
+    }
     if(0 != (err = ydb_client_delete(tracker,fid,timeout))){
         printf("delete file:%s from remote is fail.",
                 fid);
@@ -107,7 +125,8 @@ err_t ydb_client_modify_c2c_test(
         char *modify_suffix,
         char *modify_local_fname,
         char *modify_write_fpath,
-        u32_t timeout
+        u32_t timeout,
+        bool_t isprintf
         ){/*{{{*/
     size_t local_fsize = 0;
     err_t err = 0;
@@ -126,6 +145,14 @@ err_t ydb_client_modify_c2c_test(
         return err;
     }
     fid = ydb_client_upload(groupname,tracker,buff,local_fsize,local_suffix,timeout,&err);
+    if(0 != err) {
+        printf("uplaod file:%s is fail.",
+                local_fname);
+        goto r1;
+    }
+    if(isprintf){
+        printf("fid= %s \n",fid);
+    }
     size_t ffsize = 0;
     fbuff = ydb_client_find(tracker,fid,&ffsize,timeout,&err);
     if(NULL == fbuff){
@@ -152,6 +179,9 @@ err_t ydb_client_modify_c2c_test(
         printf("modify file:%s is fail.",
                 fid);
         goto r1;
+    }
+    if(isprintf){
+        printf("mfid= %s \n",mfid);
     }
     mfbuff = ydb_client_find(tracker,mfid,&mffsize,timeout,&err);
     if(NULL == mfbuff){

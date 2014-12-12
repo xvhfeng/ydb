@@ -138,6 +138,10 @@ spx_private err_t ydb_remote_storage_report(
         goto r1;
     }
 
+    SpxLogFmt1(jcontext->log,SpxLogDebug,
+            "accept heartbeat from storage:%s in the group:%s with syncgroup:%s.",
+            machineid,groupname,syncgroup);
+
     if(NULL == ydb_remote_storages){
         ydb_remote_storages = spx_map_new(jcontext->log,
                 spx_pjw,
@@ -228,11 +232,11 @@ spx_private err_t ydb_remote_storage_report(
     response_header->version = YDB_VERSION;
     response_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN \
                                + YDB_SYNCGROUP_LEN + SpxIpv4Size \
-                               + 3 * sizeof(u64_t) + 2 * sizeof(u32_t);
-    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
-    if(NULL == jcontext->writer_header_ctx){
-        return jcontext->err;
-    }
+                               + 4 * sizeof(u64_t) + 2 * sizeof(u32_t);
+//    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
+//    if(NULL == jcontext->writer_header_ctx){
+//        return jcontext->err;
+//    }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
         return jcontext->err;
@@ -273,6 +277,9 @@ err_t ydb_tracker_regedit_from_storage(struct ev_loop *loop,struct spx_task_cont
     if(NULL == jcontext){
         return EINVAL;
     }
+    SpxLogFmt1(jcontext->log,SpxLogInfo,
+            "regedit storage from ip:%s.",
+            jcontext->client_ip);
     return  ydb_remote_storage_report(loop,YDB_S2T_REGEDIT,tcontext);
 }/*}}}*/
 
@@ -284,6 +291,9 @@ err_t ydb_tracker_heartbeat_from_storage(struct ev_loop *loop,struct spx_task_co
     if(NULL == jcontext){
         return EINVAL;
     }
+    SpxLogFmt1(jcontext->log,SpxLogInfo,
+            "report storage from ip:%s.",
+            jcontext->client_ip);
     return  ydb_remote_storage_report(loop,YDB_S2T_HEARTBEAT,tcontext);
 }/*}}}*/
 
@@ -295,5 +305,9 @@ err_t ydb_tracker_shutdown_from_storage(struct ev_loop *loop,struct spx_task_con
     if(NULL == jcontext){
         return EINVAL;
     }
+    SpxLogFmt1(jcontext->log,SpxLogInfo,
+            "shutdown storage from ip:%s.",
+            jcontext->client_ip);
+
     return  ydb_remote_storage_report(loop,YDB_S2T_SHUTDOWN,tcontext);
 }/*}}}*/

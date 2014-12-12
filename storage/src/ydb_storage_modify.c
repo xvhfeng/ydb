@@ -207,7 +207,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                         YDB_CHUNKFILE_MEMADATA_SIZE))){
             SpxLog2(dc->log,SpxLogError,err,\
                     "pack io ctx is fail.");
-            spx_msg_free(&ioctx);
+            SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
             goto r1;
@@ -231,7 +231,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
         if(0 != err){
             SpxLog2(dc->log,SpxLogError,err,\
                     "unpack io ctx is fail.");
-            spx_msg_free(&ioctx);
+            SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
             if(NULL != io_suffix){
@@ -296,7 +296,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                                 "writedbytes:%lld,total size:%lld.",
                                 recvbytes,unitlen,writebytes,dc->realsize);
 
-                        spx_msg_free(&ioctx);
+                        SpxMsgFree(ioctx);
                         SpxClose(fd);
                         munmap(mptr,len);
                         if(NULL != io_suffix){
@@ -330,7 +330,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
             dc->mp_idx = o_mpidx;
             dc->file_createtime = o_fcreatetime;
 
-            spx_msg_free(&ioctx);
+            SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
             if(NULL != io_suffix){
@@ -598,7 +598,7 @@ spx_private void ydb_storage_do_modify_to_singlefile(
                         YDB_CHUNKFILE_MEMADATA_SIZE))){
             SpxLog2(dc->log,SpxLogError,err,\
                     "pack io ctx is fail.");
-            spx_msg_free(&ioctx);
+            SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
             goto r2;
@@ -622,7 +622,7 @@ spx_private void ydb_storage_do_modify_to_singlefile(
         if(0 != err){
             SpxLog2(dc->log,SpxLogError,err,\
                     "unpack io ctx is fail.");
-            spx_msg_free(&ioctx);
+            SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
             if(NULL != io_suffix){
@@ -640,7 +640,7 @@ spx_private void ydb_storage_do_modify_to_singlefile(
                 || o_realsize != io_realsize){
             SpxLog2(dc->log,SpxLogError,err,\
                     "the file is not same as want to delete-file.");
-            spx_msg_free(&ioctx);
+            SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
             if(NULL != io_suffix){
@@ -662,7 +662,7 @@ spx_private void ydb_storage_do_modify_to_singlefile(
 
         memcpy(mptr + offset,
                 ioctx->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
-        spx_msg_free(&ioctx);
+        SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
         if(NULL != io_suffix){

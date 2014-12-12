@@ -87,14 +87,7 @@ int main(int argc,char **argv){
         spx_env_daemon();
     }
 
-    struct ev_loop *mainloop = NULL;
-    mainloop = ev_loop_new(0);
-    if(NULL == mainloop){
-        SpxLog1(log,SpxLogError,\
-                "create main loop is fail.");
-        abort();
-    }
-    ydb_storage_regedit_signal(mainloop);
+    ydb_storage_regedit_signal();
 
     if(0 != ( err = spx_log_new(\
                     log,\
@@ -206,9 +199,7 @@ int main(int argc,char **argv){
         abort();
     }
 
-
-
-    pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,mainloop,c->timeout,c,&err);
+    pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,c->timeout,c,&err);
     if(0 == heartbeat_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new heartbeat thread is fail.");
@@ -225,12 +216,13 @@ int main(int argc,char **argv){
     err = ydb_storage_sync_restore(c);
 
     struct spx_periodic *pdQueryRemoteStorages =  spx_periodic_exec_and_async_run(c->log,
-            c->waitting,0,
+            c->query_sync_timespan,0,
             ydb_storage_sync_query_remote_storages,
             (void *) c,
             c->stacksize,
             &err);
 
+    /*
     err =  ydb_storage_dsync_startup(c,g_ydb_storage_runtime);
 
     g_sync_threadpool = spx_threadpool_new(c->log,c->sync_threads_count,
@@ -245,8 +237,9 @@ int main(int argc,char **argv){
     struct spx_periodic *pdRuntimeFlush = spx_periodic_exec_and_async_run(c->log,
             c->refreshtime,0,ydb_storage_startup_runtime_flush,
             g_ydb_storage_runtime,c->stacksize,&err);
+            */
 
-    ev_run(mainloop,0);
+    pthread_join(socket->tid,NULL);
     return 0;
 }
 

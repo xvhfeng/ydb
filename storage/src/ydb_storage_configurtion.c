@@ -129,7 +129,6 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->log = log;
     c->port = 8175;
     c->timeout = 5;
-    c->waitting = 30;
     c->logsize = 10 * SpxMB;
     c->loglevel = SpxLogInfo;
     c->balance = YDB_STORAGE_MOUNTPOINT_LOOP;
@@ -168,6 +167,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->query_sync_timespan = 30;
     c->sync = YDB_STORAGE_SYNC_REALTIME;
     c->sync_wait = 1;
+    c->query_basestorage_timespan = 30;
     c->sync_begin.hour =4;
     c->sync_begin.min = 0;
     c->sync_begin.sec = 0;
@@ -320,18 +320,20 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
 
-    //waitting
-    if(0 == spx_string_casecmp(*kv,"waitting")){
+    //query_basestorage_timespan
+    if(0 == spx_string_casecmp(*kv,"query_basestorage_timespan")){
         if(1 == count){
-            SpxLogFmt1(c->log,SpxLogWarn,"use default waitting:%d.",c->waitting);
+            SpxLogFmt1(c->log,SpxLogWarn,
+                    "use default query_basestorage_timespan:%d.",
+                    c->query_basestorage_timespan);
         } else {
-            u32_t waitting = ydb_storage_configurtion_timespan_convert(c->log,*(kv + 1),
+            u32_t query_basestorage_timespan = ydb_storage_configurtion_timespan_convert(c->log,*(kv + 1),
                     SpxSecondTick,
-                "bad the configurtion item of waitting.",err);
+                "bad the configurtion item of query_basestorage_timespan.",err);
             if(0 != *err) {
                 goto r1;
             }
-            c->waitting = waitting;
+            c->query_basestorage_timespan = query_basestorage_timespan;
         }
         goto r1;
     }

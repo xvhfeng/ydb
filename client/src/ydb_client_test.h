@@ -27,7 +27,8 @@ err_t ydb_client_upload_test(
         char *local_suffix,
         char *local_fname,
         char *write_fpath,
-        u32_t timeout
+        u32_t timeout,
+        bool_t isprintf
         );
 
 err_t ydb_client_delete_test(
@@ -35,7 +36,8 @@ err_t ydb_client_delete_test(
         char *tracker,
         char *local_suffix,
         char *local_fname,
-        u32_t timeout
+        u32_t timeout,
+        bool_t isprintf
         );
 
 err_t ydb_client_modify_c2c_test(
@@ -47,7 +49,8 @@ err_t ydb_client_modify_c2c_test(
         char *modify_suffix,
         char *modify_local_fname,
         char *modify_write_fpath,
-        u32_t timeout
+        u32_t timeout,
+        bool_t isprintf
         );
 
 

@@ -169,6 +169,8 @@ void *ydb_storage_sync_query_remote_storages(void *arg){/*{{{*/
     }
     err_t err = 0;
     SpxTypeConvert2(struct ydb_storage_configurtion,c,arg);
+    SpxLog1(c->log,SpxLogInfo,
+            "query remote in the same syncgroup for sync.");
     struct spx_vector_iter *iter = spx_vector_iter_new(c->trackers ,&err);
     if(NULL == iter){
         SpxLog2(c->log,SpxLogError,err,\
@@ -206,35 +208,6 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
     } else {
         ystc = t->ystc;
     }
-    if(0 == ystc->fd) {
-        ystc->fd  = spx_socket_new(&err);
-        if(0 >= ystc->fd){
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "new socket to tracker %s:%d is fail.",
-                    t->host.ip,t->host.port);
-            goto r1;
-        }
-
-        if(0 != (err = spx_socket_set(ystc->fd,SpxKeepAlive,SpxAliveTimeout,\
-                        SpxDetectTimes,SpxDetectTimeout,\
-                        SpxLinger,SpxLingerTimeout,\
-                        SpxNodelay,\
-                        true,timeout))){
-            SpxClose(ystc->fd);
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "set socket to tracker %s:%d is fail.",
-                    t->host.ip,t->host.port);
-            goto r1;
-        }
-        if(0 != (err = spx_socket_connect_nb(ystc->fd,
-                        t->host.ip,t->host.port,timeout))){
-            SpxClose(ystc->fd);
-            SpxLogFmt2(c->log,SpxLogError,err,
-                    "connect to tracker %s:%d is fail.",
-                    t->host.ip,t->host.port);
-            goto r1;
-        }
-    }
 
     if(NULL == ystc->request){
         ystc->request = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
@@ -267,12 +240,55 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
                     "new body of request for query sync storage is fail.");
             goto r1;
         }
+        ystc->request->body = body;
         spx_msg_pack_fixed_string(body,
                 c->groupname,YDB_GROUPNAME_LEN);
         spx_msg_pack_fixed_string(body,
                 c->machineid,YDB_MACHINEID_LEN);
         spx_msg_pack_fixed_string(body,
                 c->syncgroup,YDB_SYNCGROUP_LEN);
+    }
+
+    while(true) {
+        if(0 != ystc->fd){
+            if(spx_socket_test(ystc->fd)){
+                break;
+            }
+            SpxLogFmt1(c->log,SpxLogWarn,
+                    "connection to tracker %s:%d is fail.retry...",
+                    t->host.ip,t->host.port);
+            SpxClose(ystc->fd);
+        }
+
+        if(0 == ystc->fd) {
+            ystc->fd  = spx_socket_new(&err);
+            if(0 >= ystc->fd){
+                SpxLogFmt2(c->log,SpxLogError,err,
+                        "new socket to tracker %s:%d is fail.",
+                        t->host.ip,t->host.port);
+                goto r1;
+            }
+
+            if(0 != (err = spx_socket_set(ystc->fd,SpxKeepAlive,SpxAliveTimeout,\
+                            SpxDetectTimes,SpxDetectTimeout,\
+                            SpxLinger,SpxLingerTimeout,\
+                            SpxNodelay,\
+                            true,timeout))){
+                SpxClose(ystc->fd);
+                SpxLogFmt2(c->log,SpxLogError,err,
+                        "set socket to tracker %s:%d is fail.",
+                        t->host.ip,t->host.port);
+                goto r1;
+            }
+            if(0 != (err = spx_socket_connect_nb(ystc->fd,
+                            t->host.ip,t->host.port,timeout))){
+                SpxClose(ystc->fd);
+                SpxLogFmt2(c->log,SpxLogError,err,
+                        "connect to tracker %s:%d is fail.",
+                        t->host.ip,t->host.port);
+                goto r1;
+            }
+        }
     }
 
     err = spx_write_context_nb(c->log,ystc->fd,ystc->request);
@@ -296,6 +312,15 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
         goto r1;
     }
 
+    if(NULL == ystc->response){
+        ystc->response = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
+        if(NULL == ystc->response){
+            SpxLog2(c->log,SpxLogError,err,
+                    "new response for query sync storage is fail.");
+            goto r1;
+        }
+    }
+
     ystc->response->header =  spx_read_header_nb(c->log,ystc->fd,&err);
     if(NULL == ystc->response->header){
         SpxLogFmt2(c->log,SpxLogError,err,
@@ -307,6 +332,11 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
         goto r1;
     }
 
+    if(0 == ystc->response->header->bodylen) {
+        SpxLog1(c->log,SpxLogWarn,
+                "no the remote storage in the same syncgroup.");
+        goto r1;
+    }
     ystc->response->body = spx_read_body_nb(c->log,
             ystc->fd,ystc->response->header->bodylen,&err);
     if(NULL == ystc->response->body){
@@ -383,7 +413,6 @@ r1:
         if(NULL != ystc->response->body){
             SpxMsgFree(ystc->response->body);
         }
-        SpxFree(ystc->response);
     }
     return err;
 }/*}}}*/
@@ -591,6 +620,15 @@ spx_private err_t ydb_storage_sync_query_sync_beginpoint(
                 "for query sync beginpoint is timeout.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
+    }
+
+    if(NULL == ystc->response){
+        ystc->response = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
+        if(NULL == ystc->response){
+            SpxLog2(c->log,SpxLogError,err,
+                    "new response for query sync beginpoint is fail.");
+            goto r1;
+        }
     }
 
     ystc->response->header =  spx_read_header_nb(c->log,ystc->fd,&err);
@@ -883,6 +921,15 @@ spx_private err_t ydb_storage_sync_send_begin(
                 "for query sync beginpoint is timeout.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
+    }
+
+    if(NULL == ystc->response){
+        ystc->response = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
+        if(NULL == ystc->response){
+            SpxLog2(c->log,SpxLogError,err,
+                    "new response for query sync beginpoint is fail.");
+            goto r1;
+        }
     }
 
     ystc->response->header =  spx_read_header_nb(c->log,ystc->fd,&err);
@@ -1425,6 +1472,15 @@ spx_private err_t ydb_storage_sync_send_consistency(
                 "for over sync of restoring is timeout.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
+    }
+
+    if(NULL == ystc->response){
+        ystc->response = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
+        if(NULL == ystc->response){
+            SpxLog2(c->log,SpxLogError,err,
+                    "new response for over sync of restoring is fail.");
+            goto r1;
+        }
     }
 
     ystc->response->header =  spx_read_header_nb(c->log,ystc->fd,&err);
@@ -2141,6 +2197,7 @@ spx_private err_t ydb_storage_sync_upload_request(
         }
         yssc->request->sendfile_begin = fidbuf->begin;
     }
+    yssc->request->body = body;
 
     err = spx_write_context_nb(c->log,yssc->sock,yssc->request);
     if(0 != err){
@@ -2444,6 +2501,7 @@ spx_private err_t ydb_storage_sync_modify_request(
         }
         yssc->request->sendfile_begin = fidbuf->begin;
     }
+    yssc->request->body = body;
 
     err = spx_write_context_nb(c->log,yssc->sock,yssc->request);
     if(0 != err){
@@ -2573,6 +2631,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     spx_msg_pack_u64(body,spx_zero(dt_binlog));
     spx_msg_pack_fixed_string(body,c->machineid,YDB_MACHINEID_LEN);
     spx_msg_pack_string(body,ofid);
+    yssc->request->body = body;
 
     err = spx_write_context_nb(c->log,yssc->sock,yssc->request);
     if(0 != err){
@@ -2640,7 +2699,7 @@ void ydb_storage_sync_context_free(
     }
     if(NULL != (*yssc)->request){
         if(NULL != ((*yssc)->request->body)){
-            spx_msg_free(&((*yssc)->request->body));
+            SpxMsgFree((*yssc)->request->body);
         }
         if(NULL != ((*yssc)->request->header)){
             SpxFree((*yssc)->request->header);
@@ -2649,7 +2708,7 @@ void ydb_storage_sync_context_free(
     }
     if(NULL != (*yssc)->response){
         if(NULL != ((*yssc)->response->body)){
-            spx_msg_free(&((*yssc)->response->body));
+            SpxMsgFree((*yssc)->response->body);
         }
         if(NULL != ((*yssc)->response->header)){
             SpxFree((*yssc)->response->header);
@@ -2657,7 +2716,7 @@ void ydb_storage_sync_context_free(
         SpxFree((*yssc)->response);
     }
     if(NULL != (*yssc)->md){
-        spx_msg_free(&((*yssc)->md));
+        SpxMsgFree((*yssc)->md);
     }
     if(NULL != (*yssc)->fname){
         SpxStringFree((*yssc)->fname);

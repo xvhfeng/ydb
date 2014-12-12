@@ -41,12 +41,11 @@ extern "C" {
 
 pthread_t ydb_storage_heartbeat_service_init(
         SpxLogDelegate *log,
-        struct ev_loop *loop,
         u32_t timeout,
         struct ydb_storage_configurtion *config,\
         err_t *err);
 
-void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
+void ydb_storage_shutdown(struct ydb_tracker *tracker,\
         string_t groupname,string_t machineid,\
         string_t syncgroup, string_t ip,int port,\
         u64_t first_start,u64_t disksize,u64_t freesize,

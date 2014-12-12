@@ -43,9 +43,9 @@
 #include "ydb_tracker_network_module.h"
 #include "ydb_tracker_task_module.h"
 
-spx_private void ydb_tracker_regedit_signal(struct ev_loop *loop);
-spx_private void ydb_tracker_sig_empty (struct ev_loop *loop, ev_signal *w, int revents);
-spx_private void ydb_tracker_sig_abort (struct ev_loop *loop, ev_signal *w, int revents);
+spx_private void ydb_tracker_regedit_signal();
+spx_private void ydb_tracker_sigaction_mark(int sig);
+spx_private void ydb_tracker_sigaction_exit(int sig);
 
 int main(int argc,char **argv){
     umask(0);
@@ -88,15 +88,7 @@ int main(int argc,char **argv){
         abort();
     }
 
-    struct ev_loop *mainloop = NULL;
-    mainloop = ev_loop_new(0);
-    if(NULL == mainloop){
-        SpxLog1(log,SpxLogError,\
-                "create main loop is fail.");
-        abort();
-    }
-    ydb_tracker_regedit_signal(mainloop);
-    ev_run(mainloop,EVRUN_NOWAIT);
+    ydb_tracker_regedit_signal();
 
     g_spx_job_pool = spx_job_pool_new(log,\
                      c,c->context_size,c->timeout,\
@@ -108,8 +100,6 @@ int main(int argc,char **argv){
             ydb_tracker_network_module_request_body_handler,\
             ydb_tracker_network_module_response_body_handler,\
             &err);
-
-
     if(NULL == g_spx_job_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc job pool is fail.");
@@ -129,7 +119,6 @@ int main(int argc,char **argv){
     g_spx_notifier_module = spx_module_new(log,\
             c->notifier_module_thread_size,\
             c->stacksize,\
-//            spx_notifier_module_wakeup_handler,
             spx_notifier_module_receive_handler,\
             &err);
     if(NULL == g_spx_notifier_module){
@@ -141,7 +130,6 @@ int main(int argc,char **argv){
     g_spx_network_module = spx_module_new(log,\
             c->network_module_thread_size,\
             c->stacksize,\
-//            spx_network_module_wakeup_handler,
             spx_network_module_receive_handler,\
             &err);
     if(NULL == g_spx_network_module){
@@ -153,7 +141,6 @@ int main(int argc,char **argv){
     g_spx_task_module = spx_module_new(log,\
             c->task_module_thread_size,\
             c->stacksize,\
-//            spx_task_module_wakeup_handler,
             spx_task_module_receive_handler,\
             &err);
     if(NULL == g_spx_task_module){
@@ -169,64 +156,39 @@ int main(int argc,char **argv){
         abort();
     }
 
+    SpxLogFmt1(log,SpxLogMark,
+            "tracker start over."
+            "ip:%s,port:%d",
+            c->ip,c->port);
+
     //if have maneger code please input here
 
-    sleep(10);
+//    sleep(10);
     pthread_join(tid,NULL);
 
     return 0;
 }
 
-spx_private void ydb_tracker_regedit_signal(struct ev_loop *loop){
-    ev_signal siguser1;
-    ev_signal_init (&siguser1,ydb_tracker_sig_empty , SIGUSR1);
-    ev_signal_start (loop, &siguser1);
-
-    ev_signal sighup;
-    ev_signal_init(&sighup,ydb_tracker_sig_empty,SIGHUP);
-    ev_signal_start(loop,&sighup);
-
-    ev_signal sigpipe;
-    ev_signal_init(&sigpipe,ydb_tracker_sig_abort,SIGPIPE);
-    ev_signal_start(loop,&sigpipe);
-
-    ev_signal sigint;
-    ev_signal_init(&sigint,ydb_tracker_sig_abort,SIGINT);
-    ev_signal_start(loop,&sigint);
+spx_private void ydb_tracker_regedit_signal(){
+    spx_env_sigaction(SIGUSR1,NULL);
+    spx_env_sigaction(SIGHUP,ydb_tracker_sigaction_mark);
+    spx_env_sigaction(SIGPIPE,ydb_tracker_sigaction_mark);
+    spx_env_sigaction(SIGINT,ydb_tracker_sigaction_exit);
 }
 
-spx_private void ydb_tracker_sig_empty (struct ev_loop *loop, ev_signal *w, int revents){
+spx_private void ydb_tracker_sigaction_mark(int sig){
     SpxLogDelegate *log = spx_log;
-    switch(w->signum){
-        case SIGUSR1:{
-                         SpxLog1(log,SpxLogWarn,"catch the sigusr1 and ignore it.");
-                         break;
-                     }
-        case SIGHUP:{
-                        SpxLog1(log,SpxLogWarn,"catch the sighup and ignore it.");
-                        break;
-                    }
-        default:{
-                    SpxLogFmt1(log,SpxLogError,"catch the sig:%d,and ignore it,but no regedit the sig handler.",w->signum);
-                    break;
-                }
-    }
+    SpxLogFmt1(log,SpxLogMark,
+            "emerge sig:%d,info:%s.",
+            sig,strsignal(sig));
 }
 
-spx_private void ydb_tracker_sig_abort (struct ev_loop *loop, ev_signal *w, int revents){
+spx_private void ydb_tracker_sigaction_exit(int sig){
     SpxLogDelegate *log = spx_log;
-    switch(w->signum){
-        case SIGPIPE:{
-                         SpxLog1(log,SpxLogError,"catch the sigpipe and abort the process.");
-                         break;
-                     }
-        case SIGINT:{
-                        SpxLog1(log,SpxLogError,"catch the sigint and abort the process.");
-                        break;
-                    }
-        default:{
-                    SpxLogFmt1(log,SpxLogError,"catch the sig:%d and abort it,but no regedit the sig handler.",w->signum);
-                    break;
-                }
-    }
+    SpxLogFmt1(log,SpxLogMark,
+            "emerge sig:%d,info:%s.",
+            sig,strsignal(sig));
+    exit(0);
 }
+
+

@@ -199,7 +199,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
                     YDB_CHUNKFILE_MEMADATA_SIZE))){
         SpxLog2(dc->log,SpxLogError,err,\
                 "pack io ctx is fail.");
-        spx_msg_free(&ioctx);
+        SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
         goto r1;
@@ -223,7 +223,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
     if(0 != err){
         SpxLog2(dc->log,SpxLogError,err,\
                 "unpack io ctx is fail.");
-        spx_msg_free(&ioctx);
+        SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
         goto r1;
@@ -235,7 +235,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
                 "begin is %lld totalsize:%lld is deleted.",
                 dc->buf,dc->begin,dc->totalsize);
         err = ENOENT;
-        spx_msg_free(&ioctx);
+        SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
         goto r1;
@@ -247,7 +247,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
         SpxLog2(dc->log,SpxLogError,err,\
                 "the file is not same as want to delete-file.");
         err = ENOENT;
-        spx_msg_free(&ioctx);
+        SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
         goto r1;
@@ -258,7 +258,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
     if(NULL == wh){
         SpxLog2(dc->log,SpxLogError,err,
                 "alloc write header for find buffer in chunkfile is fail.");
-        spx_msg_free(&ioctx);
+        SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
         goto r1;
@@ -282,7 +282,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
         if(NULL == ctx){
             SpxLog2(dc->log,SpxLogError,err,\
                     "alloc buffer ctx for finding writer is fail.");
-            spx_msg_free(&ioctx);
+            SpxMsgFree(ioctx);
             munmap(mptr,len);
             SpxClose(fd);
             goto r1;
@@ -295,7 +295,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
     }
 
     munmap(mptr,len);
-    spx_msg_free(&ioctx);
+    SpxMsgFree(ioctx);
     goto r2;
 r1:
     if(NULL == jc->writer_header) {

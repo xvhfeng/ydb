@@ -97,9 +97,10 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
     jc->writer_header = writer_header;
     writer_header->version = YDB_VERSION;
     writer_header->protocol = protocol;
-    writer_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN \
-                             + YDB_SYNCGROUP_LEN + SpxIpv4Size + sizeof(i32_t) \
-                             + sizeof(u64_t) + sizeof(u64_t) + sizeof(i64_t) + sizeof(int);
+    writer_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN
+                             + YDB_SYNCGROUP_LEN + SpxIpv4Size + sizeof(i32_t)
+                             + sizeof(u64_t) + sizeof(u64_t) + sizeof(u64_t)
+                             + sizeof(i64_t) + sizeof(int);
     struct spx_msg *ctx = spx_msg_new(writer_header->bodylen,&err);
     if(NULL == ctx){
         SpxLog2(jc->log,SpxLogError,err,\
@@ -239,7 +240,7 @@ spx_private void *ydb_storage_report(void *arg){/*{{{*/
     return NULL;
 }/*}}}*/
 
-void ydb_storage_shutdown(struct ev_loop *loop,struct ydb_tracker *tracker,\
+void ydb_storage_shutdown(struct ydb_tracker *tracker,\
         string_t groupname,string_t machineid,\
         string_t syncgroup, string_t ip,int port,\
         u64_t first_start,u64_t this_startup_time,
@@ -284,6 +285,7 @@ spx_private void ydb_storage_heartbeat_nio_body_reader(struct ev_loop *loop,
     if(first_start < g_ydb_storage_runtime->first_statrup_time){
         g_ydb_storage_runtime->first_statrup_time = first_start;
     }
+
 r1:
     spx_job_context_clear(jc);
 }/*}}}*/
@@ -291,7 +293,6 @@ r1:
 
 pthread_t ydb_storage_heartbeat_service_init(
         SpxLogDelegate *log,
-        struct ev_loop *loop,
         u32_t timeout,
         struct ydb_storage_configurtion *config,\
         err_t *err){/*{{{*/

@@ -333,7 +333,7 @@ err_t ydb_storage_dio_delete_context_from_chunkfile(
 
 r1:
     if(NULL != ioctx){
-        spx_msg_free(&ioctx);
+        SpxMsgFree(ioctx);
     }
     if(NULL != mptr){
         munmap(mptr,len);

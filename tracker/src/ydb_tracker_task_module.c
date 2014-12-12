@@ -40,8 +40,8 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
     //because the deal process handler is not noblacking
     //so we can deal the error in the end of the function
     err_t err = 0;
-    struct spx_job_context *jcontext = tcontext->jcontext;
-    switch (jcontext->reader_header->protocol){
+    struct spx_job_context *jc = tcontext->jcontext;
+    switch (jc->reader_header->protocol){
         case YDB_S2T_REGEDIT :
             {
                 err = ydb_tracker_regedit_from_storage(loop,tcontext);
@@ -102,44 +102,46 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
     spx_task_pool_push(g_spx_task_pool,tcontext);
     if(0 != err){
         struct spx_msg_header *response_header = NULL;
-        if(NULL == jcontext->writer_header){
-            response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
+        if(NULL == jc->writer_header){
+            response_header = spx_alloc_alone(sizeof(*response_header),&(jc->err));
             if(NULL == response_header){
-                SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
+                SpxLog2(jc->log,SpxLogError,jc->err,\
                         "alloc the response header for error is fail."\
                         "then forced pushing the job context to pool.");
-                spx_job_pool_push(g_spx_job_pool,jcontext);
+                spx_job_pool_push(g_spx_job_pool,jc);
                 return err;
             }
-            jcontext->writer_header = response_header;
-            response_header->protocol = jcontext->reader_header->protocol;
-            response_header->version = YDB_VERSION;
-            response_header->bodylen = 0;
-            response_header->err = err;
-            response_header->offset = 0;
+            jc->writer_header = response_header;
+        } else {
+            response_header = jc->writer_header;
         }
-
-        jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
-        if(NULL == jcontext->writer_header_ctx){
-            SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
-                    "response header to msg ctx for error is fail."\
-                    "then forced pushing the job context to pool.");
-            spx_job_pool_push(g_spx_job_pool,jcontext);
-            return err;
-        }
+        response_header->protocol = jc->reader_header->protocol;
+        response_header->version = YDB_VERSION;
+        response_header->bodylen = 0;
+        response_header->err = err;
+        response_header->offset = 0;
     }
 
-    jcontext->moore = SpxNioMooreResponse;
-    size_t i = jcontext->idx % g_spx_network_module->threadpool->size;
+    jc->writer_header_ctx = spx_header_to_msg(jc->writer_header,SpxMsgHeaderSize,&(jc->err));
+    if(NULL == jc->writer_header_ctx){
+        SpxLog2(jc->log,SpxLogError,jc->err,\
+                "response header to msg ctx for error is fail."\
+                "then forced pushing the job context to pool.");
+        spx_job_pool_push(g_spx_job_pool,jc);
+        return err;
+    }
+
+    jc->moore = SpxNioMooreResponse;
+    size_t i = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *tc = spx_get_thread(g_spx_network_module,i);
-    jcontext->tc = tc;
-    //    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jcontext);
-    SpxModuleDispatch(spx_network_module_wakeup_handler,jcontext);
+    jc->tc = tc;
+    //    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jc);
+    SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     if(0 != err){
-        SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
+        SpxLog2(jc->log,SpxLogError,jc->err,\
                 "dispath network module from task module is fail."\
                 "then forced pushing the job context to pool.");
-        spx_job_pool_push(g_spx_job_pool,jcontext);
+        spx_job_pool_push(g_spx_job_pool,jc);
     }
     return err;
 }

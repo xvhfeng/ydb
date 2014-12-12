@@ -102,7 +102,6 @@ struct ydb_tracker{
         string_t ip;
         i32_t port;
         u32_t timeout;
-        u32_t waitting;
         string_t basepath;
         string_t logpath;
         string_t logprefix;
@@ -144,6 +143,7 @@ struct ydb_tracker{
         size_t pagesize;
         u8_t sync;
         u32_t query_sync_timespan;
+        u32_t query_basestorage_timespan;
         string_t syncgroup;
         u32_t sync_threads_count;
         u32_t sync_wait;

@@ -52,25 +52,35 @@
 int main(int argc,char **argv){
     err_t err = 0;
 
+    char *png = "png";
     char *jpg = "jpg";
-    char *png = "png"
+    char *jpg105 = "105.jpg";
+    char *png200 = "200.png";
+    char *jpg216 = "216.jpg";
+    char *jpg250 = "250.jpg";
+    char *jpg254 = "254.jpg";
+    char *jpg44 = "44.jpg";
+    char *wfpath = "img/";
+
     char *groupname = "g001";
     char *tracker = "10.97.19.31:4150";
     u32_t timeout = 300;
 
-err_t ydb_client_upload_test(
-        char *groupname,
-        char *tracker,
-        char *local_suffix,
-        char *local_fname,
-        char *write_fpath,
-        u32_t timeout
-        );
+    ydb_client_upload_test(
+            groupname,
+            tracker,
+            jpg,
+            jpg44,
+            wfpath,
+            timeout,true);
 
-
-
-
-
-
+    ydb_client_upload_test(
+            groupname,
+            tracker,
+            jpg,
+            jpg254,
+            wfpath,
+            timeout,true);
+    return 0;
 }
 
