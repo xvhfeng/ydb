@@ -253,11 +253,12 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
         if(0 != ystc->fd){
             if(spx_socket_test(ystc->fd)){
                 break;
+            } else {
+                SpxClose(ystc->fd);
+                SpxLogFmt1(c->log,SpxLogWarn,
+                        "connection to tracker %s:%d is fail.retry...",
+                        t->host.ip,t->host.port);
             }
-            SpxLogFmt1(c->log,SpxLogWarn,
-                    "connection to tracker %s:%d is fail.retry...",
-                    t->host.ip,t->host.port);
-            SpxClose(ystc->fd);
         }
 
         if(0 == ystc->fd) {
@@ -289,6 +290,9 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
                 goto r1;
             }
         }
+    }
+    if(0 == ystc->fd){
+        goto r1;
     }
 
     err = spx_write_context_nb(c->log,ystc->fd,ystc->request);
@@ -1656,7 +1660,7 @@ err_t ydb_storage_sync_restore(
         goto r2;
     }
     if(!SpxFileExist(fname)){
-        SpxLog2(c->log,SpxLogError,err,
+        SpxLog1(c->log,SpxLogError,
                 "the sync marklog filename is not exist.");
         goto r2;
     }

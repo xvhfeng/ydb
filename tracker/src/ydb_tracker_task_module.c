@@ -137,13 +137,7 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
     jc->tc = tc;
     //    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "dispath network module from task module is fail."\
-                "then forced pushing the job context to pool.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-    }
-    return err;
+    return 0;
 }
 
 

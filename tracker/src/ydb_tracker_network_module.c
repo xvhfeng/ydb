@@ -78,6 +78,7 @@ void ydb_tracker_network_module_response_body_handler(
                 jcontext->client_ip,jcontext->fd,idx);
         struct spx_thread_context *tc = spx_get_thread(g_spx_network_module,idx);
         jcontext->tc = tc;
+        jcontext->moore = SpxNioMooreRequest;
         SpxModuleDispatch(spx_network_module_wakeup_handler,jcontext);
     } else {
         spx_job_pool_push(g_spx_job_pool,jcontext);
