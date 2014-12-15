@@ -23,9 +23,9 @@ extern "C" {
 
 #define YDB_VERSION 1
 
-//protocol
+    //protocol
 
-//client to tracker
+    //client to tracker
 #define YDB_C2T_QUERY_UPLOAD_STORAGE 1
 #define YDB_C2T_QUERY_SELECT_STORAGE 2
 #define YDB_C2T_QUERY_DELETE_STORAGE 3
@@ -39,7 +39,7 @@ extern "C" {
 #define YDB_C2S_SYNC_DELETE 133
 #define YDB_C2S_SYNC_FILE 134
 
-//storage to tracker
+    //storage to tracker
 #define YDB_S2T_REGEDIT 257
 #define YDB_S2T_HEARTBEAT 258
 #define YDB_S2T_SHUTDOWN 259
@@ -47,7 +47,7 @@ extern "C" {
 #define YDB_S2T_QUERY_BASE_STORAGE 261
 #define YDB_S2T_QUERY_SYNC_BEGIN_TIMESPAN 262
 
-//storage to storage
+    //storage to storage
 #define YDB_S2S_SYNC_LOGFILE 386
 #define YDB_S2S_DSYNC 387
 #define YDB_S2S_CSYNC_ADD 388
@@ -58,7 +58,7 @@ extern "C" {
 #define YDB_S2S_RESTORE_CSYNC_OVER 343
 #define YDB_S2S_QUERY_CSYNC_BEGINPOINT 344
 
-//storage status code
+    //storage status code
 #define YDB_STORAGE_NORMAL 0
 #define YDB_STORAGE_INITING 1
 #define YDB_STORAGE_ACCEPTING 2
@@ -74,19 +74,19 @@ extern "C" {
 #define YDB_STORAGE_LOG_MODIFY 'M'
 #define YDB_STORAGE_LOG_DELETE 'D'
 
-//const use in bosh tracker and storage
+    //const use in bosh tracker and storage
 #define YDB_GROUPNAME_LEN 7
 #define YDB_MACHINEID_LEN 7
 #define YDB_SYNCGROUP_LEN 7
 #define YDB_FILENAME_SUFFIX_SIZE 7
 #define YDB_HASHCODE_SIZE 64
-//reserve zone and for funtrue
+    //reserve zone and for funtrue
 #define YDB_RESERVEZONE_SIZE (4 * sizeof(u64_t))
 
 #define YDB_CHUNKFILE_MEMADATA_SIZE \
     sizeof(char) + sizeof(u32_t) + sizeof(u64_t) + sizeof(u64_t) \
     + sizeof(u32_t) + sizeof(u64_t) + sizeof(u64_t) \
-     + YDB_FILENAME_SUFFIX_SIZE + YDB_HASHCODE_SIZE \
+    + YDB_FILENAME_SUFFIX_SIZE + YDB_HASHCODE_SIZE \
     + YDB_RESERVEZONE_SIZE
 
 #define YDB_CHUNKFILE_OFFSET_ISDELETE 0
@@ -142,6 +142,17 @@ extern "C" {
     ? YDB_TRANSPORT_UPLOAD_OFFSET_SUFFIX + YDB_TRANSPORT_UPLOAD_SIZE_SUFFIX \
     YDB_TRANSPORT_UPLOAD_OFFSET_HASSUFFIX + YDB_TRANSPORT_UPLOAD_SIZE_HASSUFFIX
 
+    spx_private const char *ydb_state_desc[] = {
+        "normal",
+        "initing",
+        "accepting",
+        "dsyncing",
+        "dsynced",
+        "csyncing",
+        "running",
+        "closing",
+        "closed"
+    };
 
 
 #ifdef __cplusplus

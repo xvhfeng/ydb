@@ -62,6 +62,10 @@ void *ydb_storage_startup_runtime_flush(
             srt->status = YDB_STORAGE_RUNNING;
         }
     }
+    SpxLogFmt1(c->log,SpxLogMark,
+            "now storage state:%s.",
+            ydb_state_desc[srt->status]);
+
     ydb_storage_runtime_flush(srt);
     ydb_storage_mprtf_writer(c);
     ydb_storage_sync_state_writer(c);

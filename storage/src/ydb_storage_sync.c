@@ -590,7 +590,7 @@ spx_private err_t ydb_storage_sync_query_sync_beginpoint(
     header->bodylen = YDB_MACHINEID_LEN;
     header->is_keepalive = false;//persistent connection
 
-    struct spx_msg *body = spx_msg_new(ystc->request->header->bodylen,&err);
+    struct spx_msg *body = spx_msg_new(header->bodylen,&err);
     if(NULL == body){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request body to remote storage:%s host:%s:%d "
