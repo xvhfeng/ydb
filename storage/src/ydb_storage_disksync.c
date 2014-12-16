@@ -2788,7 +2788,7 @@ spx_private void ydb_storage_dsync_data_from_chunkfile(
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "the file in the chunkfile:%s "
                 "begin is %lld totalsize:%lld is deleted.",
-                dc->buf,dc->begin,dc->totalsize);
+                dc->filename,dc->begin,dc->totalsize);
         err = ENOENT;
         SpxMsgFree(ioctx);
         SpxClose(fd);
@@ -2904,18 +2904,18 @@ spx_private void ydb_storage_dsync_data_from_singlefile(
 
     struct stat buf;
     memset(&buf,0,sizeof(buf));
-    if(0 != lstat (dc->buf,&buf)){
+    if(0 != lstat (dc->filename,&buf)){
         err = errno;
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "get signalfile:%s stat is fail.",
-                dc->buf);
+                dc->filename);
         goto r1;
     }
 
     if((u64_t) buf.st_size != dc->realsize){
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "file:%s file size is %lld,and request size is %lld.",
-                dc->buf,buf.st_size,dc->realsize);
+                dc->filename,buf.st_size,dc->realsize);
         goto r1;
     }
 
@@ -2934,13 +2934,13 @@ spx_private void ydb_storage_dsync_data_from_singlefile(
     wh->offset = 0;
     wh->bodylen = dc->realsize;
 
-    int fd = open(dc->buf,\
+    int fd = open(dc->filename,\
             O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
     if(0 == fd){
         err = errno;
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "open chunkfile:%s is fail.",
-                dc->buf);
+                dc->filename);
         goto r1;
     }
 
@@ -2967,7 +2967,7 @@ spx_private void ydb_storage_dsync_data_from_singlefile(
             SpxClose(fd);
             SpxLogFmt2(dc->log,SpxLogError,err,\
                     "mmap chunkfile:%s is fail.",
-                    dc->buf);
+                    dc->filename);
             goto r1;
         }
         spx_msg_pack_ubytes(ctx,(ubyte_t *)mptr,dc->realsize);
@@ -3114,7 +3114,7 @@ spx_private void ydb_storage_dsync_logfile_context(
         err = errno;
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "get signalfile:%s stat is fail.",
-                dc->buf);
+                dc->filename);
         goto r1;
     }
 

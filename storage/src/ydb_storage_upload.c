@@ -327,6 +327,16 @@ err_t ydb_storage_dio_upload_to_chunkfile(
             dc->metadata->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
     off += YDB_CHUNKFILE_MEMADATA_SIZE;
     if(jc->is_lazy_recv){
+        if(NULL == dc->buf){
+            dc->buf = spx_alloc_alone(YdbBufferSizeForLazyRecv,&err);
+            if(NULL == dc->buf){
+                SpxLogFmt2(dc->log,SpxLogError,err,
+                        "new lazy-recv buffer is fail."
+                        "size:%lld.",YdbBufferSizeForLazyRecv);
+                return err;
+            }
+        }
+
         while(true){
             recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
                         ? YdbBufferSizeForLazyRecv \
@@ -425,6 +435,14 @@ err_t ydb_storage_dio_upload_to_singlefile(
     size_t writebytes = 0;
     size_t len = 0;
     if(jc->is_lazy_recv){
+        dc->buf = spx_alloc_alone(YdbBufferSizeForLazyRecv,&err);
+        if(NULL == dc->buf){
+            SpxLogFmt2(dc->log,SpxLogError,err,
+                    "new lazy-recv buffer is fail."
+                    "size:%lld.",YdbBufferSizeForLazyRecv);
+            goto r1;
+        }
+
         while(true){
             recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
                         ? YdbBufferSizeForLazyRecv \

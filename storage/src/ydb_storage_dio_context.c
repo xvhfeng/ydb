@@ -148,7 +148,7 @@ err_t ydb_storage_dio_pool_push(\
     dc->storefile = NULL;
 
     if(NULL != dc->buf){
-        SpxStringFree(dc->buf);
+        SpxFree(dc->buf);
     }
     if(NULL != dc->filename){
         SpxStringFree(dc->filename);

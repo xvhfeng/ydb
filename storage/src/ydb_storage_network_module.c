@@ -69,7 +69,7 @@ void ydb_storage_network_module_request_body_handler(
 //    spx_task_module_wakeup_handler(EV_WRITE,tcontext);
 //    spx_module_dispatch(tc,spx_task_module_wakeup_handler,tcontext);
 //    spx_module_dispatch(g_spx_task_module,idx,tcontext);
-    SpxModuleDispatch(spx_task_module_wakeup_handler,jcontext);
+    SpxModuleDispatch(spx_task_module_wakeup_handler,tcontext);
     return;
 }
 

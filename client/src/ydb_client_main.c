@@ -66,6 +66,7 @@ int main(int argc,char **argv){
     char *tracker = "10.97.19.31:4150";
     u32_t timeout = 300;
 
+    /*
     ydb_client_upload_test(
             groupname,
             tracker,
@@ -73,6 +74,7 @@ int main(int argc,char **argv){
             jpg44,
             wfpath,
             timeout,true);
+            */
 
     ydb_client_upload_test(
             groupname,

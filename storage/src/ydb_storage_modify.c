@@ -284,6 +284,23 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                     ioctx->buf,YDB_CHUNKFILE_MEMADATA_SIZE);
             off += YDB_CHUNKFILE_MEMADATA_SIZE;
             if(jc->is_lazy_recv){
+                dc->buf = spx_alloc_alone(YdbBufferSizeForLazyRecv,&err);
+                if(NULL == dc->buf){
+                    SpxLogFmt2(dc->log,SpxLogError,err,
+                            "new lazy-recv buffer is fail."
+                            "size:%lld.",YdbBufferSizeForLazyRecv);
+                    SpxMsgFree(ioctx);
+                    SpxClose(fd);
+                    munmap(mptr,len);
+                    if(NULL != io_suffix){
+                        SpxStringFree(io_suffix);
+                    }
+                    if(NULL != io_hashcode){
+                        SpxStringFree(io_hashcode);
+                    }
+                    goto r1;
+                }
+
                 do{
                     recvbytes = dc->realsize - writebytes > YdbBufferSizeForLazyRecv \
                                 ? YdbBufferSizeForLazyRecv \
@@ -717,8 +734,8 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-//    err = spx_module_dispatch(threadcontext_err,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext_err,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r2:
@@ -749,8 +766,8 @@ r2:
     size_t idx = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
 
     return;
@@ -761,7 +778,7 @@ spx_private err_t ydb_storage_modify_after(
     err_t err = 0;
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
-//    struct ydb_storage_storefile *cf = dc->storefile;
+    //    struct ydb_storage_storefile *cf = dc->storefile;
 
     size_t len = 0;
 
