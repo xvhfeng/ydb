@@ -76,10 +76,11 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(
 
     while(NULL != fgets(line,SpxLineSize,fp)){
         spx_string_updatelen(line);
+        spx_string_strip_linefeed(line);
         spx_string_trim(line," ");
         if(!SpxStringBeginWith(line,'#')){
             ydb_storage_runtime_line_parser(line,rt,err);
-            if(0 != err){
+            if(0 != *err){
                 goto r1;
             }
         }
@@ -118,20 +119,6 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
     if(2 == count){
         spx_string_trim(*(kv + 1)," ");
     }
-
-//    if(0 == spx_string_casecmp(*kv,"first_start_time")){
-//        if(2 != count){
-//            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of first_start_time.");
-//            goto r1;
-//        }
-//        u64_t v = strtoul(*(kv + 1),NULL,10);
-//        if(ERANGE == v) {
-//            SpxLog1(rt->log,SpxLogError,"bad the runtime item of first_start_time.");
-//            goto r1;
-//        }
-//        rt->first_start_time = v;
-//        goto r1;
-//    }
 
     if(0 == spx_string_casecmp(*kv,"first_startup_time")){
         if(2 != count){
@@ -224,35 +211,6 @@ spx_private void ydb_storage_runtime_line_parser(string_t line,\
         rt->total_freesize = v;
         goto r1;
     }
-    /*
-    if(0 == spx_string_casecmp(*kv,"sync_binlog_date")){
-        if(2 != count){
-            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of sync_binlog_date.");
-            goto r1;
-        }
-        u64_t v = strtoul(*(kv + 1),NULL,10);
-        if(ERANGE == v) {
-            SpxLog1(rt->log,SpxLogError,"bad the runtime item of sync_binlog_date.");
-            goto r1;
-        }
-        spx_get_date((time_t *) &v,&(rt->sync_binlog_date));
-        goto r1;
-    }
-    if(0 == spx_string_casecmp(*kv,"sync_binlog_offset")){
-
-        if(2 != count){
-            SpxLog1(rt->log,SpxLogError,"no the value for the runtime item of sync_binlog_offset.");
-            goto r1;
-        }
-        u64_t v = strtoul(*(kv + 1),NULL,10);
-        if(ERANGE == v) {
-            SpxLog1(rt->log,SpxLogError,"bad the runtime item of sync_binlog_offset.");
-            goto r1;
-        }
-        rt->sync_binlog_offset = v;
-        goto r1;
-    }
-    */
 r1:
     spx_string_free_splitres(kv,count);
 }/*}}}*/
@@ -270,23 +228,19 @@ void ydb_storage_runtime_flush(
         return;
     }
 
-    string_t newbuf = spx_string_cat_printf(&err,buf,\
-            "first_startup_time = %ulld \n" \
-            "mpidx = %d \n" \
-            "p1 = %d \n" \
-            "p2 = %d \n" \
-            "storecount = %ud \n" \
-            "total_disksize = %ulld \n" \
-            "total_freesize = %ulld \n" ,
-//            "sync_binlog_date = %ud \n"
-//            "sync_binlog_offset = %ulld ",
+    string_t newbuf = spx_string_cat_printf(&err,buf,
+            "first_startup_time = %lld \n"
+            "mpidx = %d \n"
+            "p1 = %d \n"
+            "p2 = %d \n"
+            "storecount = %u \n"
+            "total_disksize = %lld \n"
+            "total_freesize = %lld \n" ,
             srt->first_statrup_time,
-            srt->mpidx,srt->p1,srt->p2,\
-            srt->storecount,\
-            srt->total_disksize,\
+            srt->mpidx,srt->p1,srt->p2,
+            srt->storecount,
+            srt->total_disksize,
             srt->total_freesize);
-//            spx_zero(&(srt->sync_binlog_date)),
-//            srt->sync_binlog_offset);
     if(NULL == newbuf){
         SpxLog2(srt->log,SpxLogError,err,
                 "cat line context of runtime is fail.");
@@ -299,7 +253,7 @@ void ydb_storage_runtime_flush(
         SpxLog2(c->log,SpxLogError,err,"get storage mid filename is fail.");
         goto r1;
     }
-    FILE *fp = fopen(filename,"w+");
+    FILE *fp = SpxFWriteOpen(filename,true);
     if(NULL == fp) {
         err = errno;
         SpxLogFmt2(srt->log,SpxLogError,err,

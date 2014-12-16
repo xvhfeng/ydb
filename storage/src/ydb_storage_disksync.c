@@ -189,6 +189,12 @@ err_t ydb_storage_dsync_startup(struct ydb_storage_configurtion *c,
         dsrt = ydb_storage_dsync_runtime_reader(c,&err);
         if(NULL == dsrt){
             dsrt = spx_alloc_alone(sizeof(*dsrt),&err);
+            if(NULL == dsrt){
+                SpxLog2(c->log,SpxLogError,err,
+                        "new disksync runtime is fail.");
+                return err;
+            }
+            dsrt->c = c;
             is_need_dsync = ydb_storage_dsync_confim(c,dsrt);
             if(!is_need_dsync){
                 SpxFree(dsrt);
@@ -2337,6 +2343,7 @@ spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
                 "new dsync runtime is fail.");
         goto r2;
     }
+    dsrt->c = c;
 
     line = spx_string_newlen(NULL,SpxStringRealSize(SpxLineSize),err);
     if(NULL == line){

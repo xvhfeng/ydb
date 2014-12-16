@@ -162,7 +162,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->lazysize = 1 * SpxMB;
     c->sendfile = true;
 //    c->binlog_size =(u64_t) 2 * SpxGB;
-//    c->runtime_flush_timespan = 60;
+    c->runtime_flush_timespan = 60;
     c->pagesize = getpagesize();
     c->query_sync_timespan = 30;
     c->sync = YDB_STORAGE_SYNC_REALTIME;
@@ -339,10 +339,11 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
     }
 
     //runtime flush timespan
-    /*
     if(0 == spx_string_casecmp(*kv,"runtime_flush_timespan")){
         if(1 == count){
-            SpxLogFmt1(c->log,SpxLogWarn,"use default runtime flush timespan:%d.",c->timeout);
+            SpxLogFmt1(c->log,SpxLogWarn,
+                    "use default runtime flush timespan:%d.",
+                    c->runtime_flush_timespan);
         } else {
             u32_t timeout = ydb_storage_configurtion_timespan_convert(c->log,*(kv + 1),SpxSecondTick,
                     "bad the configurtion item of runtime flush timespan.",err);
@@ -352,8 +353,7 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
             c->runtime_flush_timespan = timeout;
         }
         goto r1;
-    }  */
-
+    }
 
 
     //daemon

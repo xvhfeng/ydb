@@ -234,7 +234,7 @@ int main(int argc,char **argv){
             g_ydb_storage_runtime,c->stacksize,&err);
 
     struct spx_periodic *pdRuntimeFlush = spx_periodic_exec_and_async_run(c->log,
-            c->refreshtime,0,ydb_storage_startup_runtime_flush,
+            c->runtime_flush_timespan,0,ydb_storage_startup_runtime_flush,
             g_ydb_storage_runtime,c->stacksize,&err);
 
     pthread_join(socket->tid,NULL);

@@ -109,7 +109,7 @@ struct ydb_tracker{
         u64_t logsize;
         i8_t loglevel;
 //        u64_t binlog_size;
-//        u32_t runtime_flush_timespan;
+        u32_t runtime_flush_timespan;
         i8_t balance;
         u8_t master;
         u32_t heartbeat;
