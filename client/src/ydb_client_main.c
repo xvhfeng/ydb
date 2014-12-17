@@ -67,22 +67,109 @@ int main(int argc,char **argv){
     u32_t timeout = 300;
 
     /*
-    ydb_client_upload_test(
-            groupname,
-            tracker,
-            jpg,
-            jpg44,
-            wfpath,
-            timeout,true);
-            */
+       ydb_client_upload_test(
+       groupname,
+       tracker,
+       jpg,
+       jpg105,
+       wfpath,
+       timeout,true);
 
-    ydb_client_upload_test(
+       ydb_client_upload_test(
+       groupname,
+       tracker,
+       jpg,
+       jpg254,
+       wfpath,
+       timeout,true);
+
+       ydb_client_delete_test(
+       groupname,
+       tracker,
+       jpg,
+       jpg44,
+       timeout,true);
+
+       ydb_client_delete_test(
+       groupname,
+       tracker,
+       jpg,
+       jpg105,
+       timeout,true);
+       ydb_client_delete_test(
+       groupname,
+       tracker,
+       jpg,
+       jpg254,
+       timeout,true);
+       */
+
+    ydb_client_modify_test(
             groupname,
             tracker,
             jpg,
             jpg254,
             wfpath,
+            jpg,
+            jpg250,
+            wfpath,
             timeout,true);
+
+    ydb_client_modify_test(
+            groupname,
+            tracker,
+            jpg,
+            jpg250,
+            wfpath,
+            jpg,
+            jpg254,
+            wfpath,
+            timeout,true);
+
+    ydb_client_modify_test(
+            groupname,
+            tracker,
+            jpg,
+            jpg44,
+            wfpath,
+            jpg,
+            jpg250,
+            wfpath,
+            timeout,true);
+
+    ydb_client_modify_test(
+            groupname,
+            tracker,
+            jpg,
+            jpg250,
+            wfpath,
+            jpg,
+            jpg44,
+            wfpath,
+            timeout,true);
+
+    ydb_client_modify_test(
+            groupname,
+            tracker,
+            jpg,
+            jpg44,
+            wfpath,
+            jpg,
+            jpg105,
+            wfpath,
+            timeout,true);
+
+    ydb_client_modify_test(
+            groupname,
+            tracker,
+            jpg,
+            jpg105,
+            wfpath,
+            jpg,
+            jpg44,
+            wfpath,
+            timeout,true);
+
     return 0;
 }
 

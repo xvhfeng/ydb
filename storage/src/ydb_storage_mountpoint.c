@@ -259,7 +259,8 @@ spx_private err_t ydb_storage_mprtf_line_parser(struct ydb_storage_configurtion 
                            goto r1;
                        }
                        u64_t op = atoll(*(context + i));
-                       mp->last_modify_time = op;
+                       SpxSSet(mp,last_modify_time,op);
+//                       mp->last_modify_time = op;
                        break;
                    }
             case 4:{
@@ -368,7 +369,7 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
 
     size_t size = spx_string_len(context);
     size_t len = 0;
-    FILE *fp = fopen(initfile,"w");
+    FILE *fp = SpxFWriteOpen(initfile,true);
     if(NULL == fp){
         err = 0 == errno ? EACCES : errno;
         SpxLogFmt2(c->log,SpxLogError,err,

@@ -21,6 +21,8 @@
 extern "C" {
 #endif
 
+#include "spx_defs.h"
+
 #define YDB_VERSION 1
 
     //protocol
@@ -142,7 +144,7 @@ extern "C" {
     ? YDB_TRANSPORT_UPLOAD_OFFSET_SUFFIX + YDB_TRANSPORT_UPLOAD_SIZE_SUFFIX \
     YDB_TRANSPORT_UPLOAD_OFFSET_HASSUFFIX + YDB_TRANSPORT_UPLOAD_SIZE_HASSUFFIX
 
-    spx_private const char *ydb_state_desc[] = {
+    spx_private char *ydb_state_desc[] = {
         "normal",
         "initing",
         "accepting",

@@ -15,6 +15,8 @@
 
 #include "ydb_client.h"
 
+spx_private int idx = 0;
+
 spx_private byte_t * ydb_client_read_local(
         char *fname,
         size_t *len,
@@ -89,6 +91,7 @@ err_t ydb_client_delete_test(
     err_t err = 0;
     byte_t *buff = NULL;
     string_t fid = NULL;
+    byte_t *fbuff = NULL;
 
     buff = ydb_client_read_local(local_fname,&local_fsize,&err);
     if(NULL == buff){
@@ -110,13 +113,21 @@ err_t ydb_client_delete_test(
                 fid);
         goto r1;
     }
+    size_t ffsize = 0;
+    fbuff = ydb_client_find(tracker,fid,&ffsize,timeout,&err);
+    if(NULL == fbuff){
+        printf("no found file:%s."
+                "and delete is success.",
+                fid);
+        goto r1;
+    }
 r1:
     SpxFree(buff);
     SpxStringFree(fid);
     return err;
 }/*}}}*/
 
-err_t ydb_client_modify_c2c_test(
+err_t ydb_client_modify_test(
         char *groupname,
         char *tracker,
         char *local_suffix,
@@ -146,7 +157,7 @@ err_t ydb_client_modify_c2c_test(
     }
     fid = ydb_client_upload(groupname,tracker,buff,local_fsize,local_suffix,timeout,&err);
     if(0 != err) {
-        printf("uplaod file:%s is fail.",
+        printf("uplaod file:%s is fail.\n",
                 local_fname);
         goto r1;
     }
@@ -156,12 +167,12 @@ err_t ydb_client_modify_c2c_test(
     size_t ffsize = 0;
     fbuff = ydb_client_find(tracker,fid,&ffsize,timeout,&err);
     if(NULL == fbuff){
-        printf("find file:%s from remote is fail.",
+        printf("find file:%s from remote is fail.\n",
                 fid);
         goto r1;
     }
     if(0 != (err = ydb_client_write_local(fbuff,ffsize,write_fpath,local_suffix))){
-        printf("fid:%s write  to local is fail.",
+        printf("fid:%s write  to local is fail.\n",
                 fid);
         goto r1;
     }
@@ -170,13 +181,13 @@ err_t ydb_client_modify_c2c_test(
     size_t mffsize = 0;
     mbuff = ydb_client_read_local(modify_local_fname,&mfsize,&err);
     if(NULL == mbuff){
-        printf("read modify file:%s is fail.",
+        printf("read modify file:%s is fail.\n",
                 modify_local_fname);
         goto r1;
     }
     mfid = ydb_client_modify(tracker,fid,mbuff,mfsize,modify_suffix,timeout,&err);
     if(NULL == mfid){
-        printf("modify file:%s is fail.",
+        printf("modify file:%s is fail.\n",
                 fid);
         goto r1;
     }
@@ -185,14 +196,14 @@ err_t ydb_client_modify_c2c_test(
     }
     mfbuff = ydb_client_find(tracker,mfid,&mffsize,timeout,&err);
     if(NULL == mfbuff){
-        printf("find file:%s from remote is fail.",
+        printf("find file:%s from remote is fail.\n",
                 mfid);
         goto r1;
     }
 
     if(0 != (err = ydb_client_write_local(mfbuff,mffsize,
                     modify_write_fpath,modify_suffix))){
-        printf("write modify file:%s to local is fail.",
+        printf("write modify file:%s to local is fail.\n",
                 mfid);
         goto r1;
     }
@@ -259,9 +270,9 @@ spx_private err_t ydb_client_write_local(
     char fname[1024] = {0};
     time_t now = spx_now();
     if(NULL == suffix) {
-        snprintf(fname,1023,"%s/%ld",fpath,now);
+        snprintf(fname,1023,"%s/%ld_%d",fpath,now,idx++);
     } else {
-        snprintf(fname,1023,"%s/%ld.%s",fpath,now,suffix);
+        snprintf(fname,1023,"%s/%ld_%d.%s",fpath,now,idx++,suffix);
     }
     int fd = open(fname,O_RDWR|O_CREAT);
     if(0 > fd){

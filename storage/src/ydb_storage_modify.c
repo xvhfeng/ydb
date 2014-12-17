@@ -452,6 +452,8 @@ r1:
     return;
 r2:
     YdbStorageBinlogModifyWriter(dc->fid,dc->rfid);
+    struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints, dc->mp_idx);
+    mp->last_modify_time = spx_now();
     if(NULL != o_groupname){
         SpxStringFree(o_groupname);
     }
@@ -566,10 +568,11 @@ spx_private void ydb_storage_do_modify_to_singlefile(
     if(o_issinglefile){
         if(is_ofile_exist
                 && (0 != remove(o_fname))){
+            err = errno;
             SpxLogFmt2(dc->log,SpxLogError,err,
                     "delete single file:%s is fail.",o_fname);
-            goto r2;
         }
+        goto r2;
     }else {
         if(!is_ofile_exist){
             goto r2;//no file no modify metadata
@@ -740,6 +743,8 @@ r1:
     return;
 r2:
     YdbStorageBinlogModifyWriter(dc->fid,dc->rfid);
+    struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints, dc->mp_idx);
+    mp->last_modify_time = spx_now();
     if(NULL != o_groupname){
         SpxStringFree(o_groupname);
     }

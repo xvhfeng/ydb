@@ -110,6 +110,10 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
         }
 
         YdbStorageBinlogDeleteWriter(dc->rfid);
+
+        struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints, dc->mp_idx);
+        mp->last_modify_time = spx_now();
+
         goto r1;
     } else {
         spx_dio_regedit_async(&(dc->async),
@@ -174,6 +178,9 @@ void ydb_storage_dio_do_delete_form_chunkfile(
     }
 
     YdbStorageBinlogDeleteWriter(dc->rfid);
+    struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints, dc->mp_idx);
+    mp->last_modify_time = spx_now();
+
     struct spx_msg_header *wh = (struct spx_msg_header *) \
                                 spx_alloc_alone(sizeof(*wh),&err);
     if(NULL == wh){

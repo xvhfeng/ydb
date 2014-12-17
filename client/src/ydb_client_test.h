@@ -40,7 +40,7 @@ err_t ydb_client_delete_test(
         bool_t isprintf
         );
 
-err_t ydb_client_modify_c2c_test(
+err_t ydb_client_modify_test(
         char *groupname,
         char *tracker,
         char *local_suffix,

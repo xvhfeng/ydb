@@ -129,8 +129,8 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-//    err = spx_module_dispatch(threadcontext_err,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext_err,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return err;
 
@@ -143,6 +143,7 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
         w->data;
     struct spx_job_context *jc = dc->jc;
+    SpxTypeConvert2(struct ydb_storage_configurtion,c,dc->c);
 
     if(0 != (err = ydb_storage_dio_upload_to_chunkfile(dc))){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -150,6 +151,7 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(
         goto r1;
 
     }
+
 
     if(0 != (err = ydb_storage_upload_after(dc))){
         SpxLog2(dc->log,SpxLogError,err,\
@@ -159,6 +161,9 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(
 
     YdbStorageBinlogUploadWriter(dc->fid);
 
+    struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints, dc->mp_idx);
+    mp->last_modify_time = spx_now();
+
     spx_task_pool_push(g_spx_task_pool,dc->tc);
     ydb_storage_dio_pool_push(g_ydb_storage_dio_pool,dc);
 
@@ -166,8 +171,8 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(
     size_t idx = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r1:
@@ -195,8 +200,8 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-//    err = spx_module_dispatch(threadcontext_err,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext_err,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
@@ -207,6 +212,7 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(
     struct ydb_storage_dio_context *dc = (struct ydb_storage_dio_context *)
         w->data;
     struct spx_job_context *jc = dc->jc;
+    SpxTypeConvert2(struct ydb_storage_configurtion,c,dc->c);
     err_t err = 0;
 
     if(0 != (err = ydb_storage_dio_upload_to_singlefile(dc))){
@@ -216,10 +222,10 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(
     }
 
     /*
-    YdbStorageBinlog(YDB_BINLOG_ADD,dc->issignalfile,dc->ver,dc->opver,cf->machineid,\
-            dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
-            cf->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
-*/
+       YdbStorageBinlog(YDB_BINLOG_ADD,dc->issignalfile,dc->ver,dc->opver,cf->machineid,\
+       dc->file_createtime,dc->createtime,dc->lastmodifytime,dc->mp_idx,dc->p1,dc->p2,\
+       cf->tidx,dc->rand,dc->begin,dc->totalsize,dc->realsize,dc->suffix);
+       */
 
 
     if(0 != (err = ydb_storage_upload_after(dc))){
@@ -229,6 +235,9 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(
     }
 
     YdbStorageBinlogUploadWriter(dc->fid);
+
+    struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints, dc->mp_idx);
+    mp->last_modify_time = spx_now();
 
     SpxAtomicVIncr(g_ydb_storage_runtime->storecount);
 
@@ -240,8 +249,8 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-//    err = spx_module_dispatch(threadcontext,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r1:
@@ -269,8 +278,8 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-//    err = spx_module_dispatch(threadcontext_err,
-//            spx_network_module_wakeup_handler,jc);
+    //    err = spx_module_dispatch(threadcontext_err,
+    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
@@ -506,14 +515,14 @@ spx_private err_t ydb_storage_upload_after(
 
     size_t len = 0;
 
-   dc->fid =  ydb_storage_dio_make_fileid(c->log,
-                c->groupname,c->machineid,c->syncgroup,
-                dc->issinglefile,dc->mp_idx,dc->p1,dc->p2,
-                cf->tidx,dc->file_createtime,dc->rand,
-                dc->begin,dc->realsize,dc->totalsize,
-                dc->ver,dc->opver,dc->lastmodifytime,
-                dc->hashcode,dc->has_suffix,dc->suffix,
-                &len,&err);
+    dc->fid =  ydb_storage_dio_make_fileid(c->log,
+            c->groupname,c->machineid,c->syncgroup,
+            dc->issinglefile,dc->mp_idx,dc->p1,dc->p2,
+            cf->tidx,dc->file_createtime,dc->rand,
+            dc->begin,dc->realsize,dc->totalsize,
+            dc->ver,dc->opver,dc->lastmodifytime,
+            dc->hashcode,dc->has_suffix,dc->suffix,
+            &len,&err);
 
     if(NULL == dc->fid){
         SpxLog2(dc->log,SpxLogError,err,\
