@@ -363,12 +363,13 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
                 t->host.ip,t->host.port);
         goto r1;
     }
+    u64_t secs = spx_now();
     u32_t i = 0;
     for( ; i < count ; i++){
         string_t machineid = spx_msg_unpack_string(body,YDB_MACHINEID_LEN,&err);
         string_t ip = spx_msg_unpack_string(body,SpxIpv4Size,&err);
         i32_t port = spx_msg_unpack_i32(body);
-        u32_t state = spx_msg_unpack_u32(body);
+        u32_t state = spx_msg_unpack_i32(body);
         struct ydb_storage_remote *remote_storage = NULL;
         err = spx_map_get(g_ydb_storage_remote,machineid,spx_string_len(machineid),
                 (void **) &remote_storage,NULL);
@@ -384,7 +385,7 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
             if(port != remote_storage->host.port){
                 remote_storage->host.port = port;
             }
-            remote_storage->update_timespan = spx_now();
+            remote_storage->update_timespan = secs;
         } else {
             remote_storage = (struct ydb_storage_remote *)
                 spx_alloc_alone(sizeof(struct ydb_storage_remote),&err);
@@ -399,6 +400,7 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
             remote_storage->runtime_state = state;
             remote_storage->host.ip = ip;
             remote_storage->host.port = port;
+            remote_storage->update_timespan = secs;
             if(0 != (err = spx_map_insert(g_ydb_storage_remote,
                             machineid,spx_string_len(machineid),
                             remote_storage,sizeof(remote_storage)))){

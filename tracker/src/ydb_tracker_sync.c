@@ -172,13 +172,6 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
     } else {
         response_header->bodylen = spx_string_len(buf);
     }
-//    jc->writer_header_ctx = spx_header_to_msg(response_header,
-//            SpxMsgHeaderSize,&(jc->err));
-//    if(NULL == jc->writer_header_ctx){
-//        SpxLog2(tcontext->log,SpxLogError,jc->err,
-//                "convert response header to msg ctx is fail.");
-//        goto r1;
-//    }
     if(0 != response_header->bodylen) {
         struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,\
                 &(jc->err));
@@ -303,7 +296,7 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
             if(NULL == base){
                 base = s;
             } else {
-                if(base->this_startup_time > s->this_startup_time){
+                if(base->first_startup_time > s->first_startup_time){
                     base = s;
                 }
             }
@@ -333,13 +326,6 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
     response_header->version = YDB_VERSION;
     response_header->bodylen = YDB_MACHINEID_LEN;
 
-//    jc->writer_header_ctx = spx_header_to_msg(response_header,
-//            SpxMsgHeaderSize,&(jc->err));
-//    if(NULL == jc->writer_header_ctx){
-//        SpxLog2(tcontext->log,SpxLogError,jc->err,
-//                "convert response header to msg ctx is fail.");
-//        goto r1;
-//    }
     if(0 != response_header->bodylen) {
         struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,\
                 &(jc->err));
@@ -351,7 +337,8 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
             goto r1;
         }
         jc->writer_body_ctx = response_body_ctx;
-        spx_msg_pack_fixed_string(response_body_ctx,s->machineid,YDB_MACHINEID_LEN);
+        spx_msg_pack_fixed_string(response_body_ctx,
+                base->machineid,YDB_MACHINEID_LEN);
     }
 
 r1:
