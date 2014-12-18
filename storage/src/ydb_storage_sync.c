@@ -450,7 +450,6 @@ void *ydb_storage_sync_heartbeat(void *arg){/*{{{*/
                 ydb_storage_sync_begin(s);
             }
         }
-
     }
     spx_map_iter_free(&iter);
     return NULL;
@@ -822,12 +821,6 @@ r2:
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != jc->err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return jc->err;
-    }
     return jc->err;
 }/*}}}*/
 
@@ -1126,12 +1119,6 @@ r2:
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != jc->err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return jc->err;
-    }
     return jc->err;
 }/*}}}*/
 
@@ -1620,12 +1607,6 @@ r2:
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != jc->err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return jc->err;
-    }
     return jc->err;
 }/*}}}*/
 
@@ -2839,8 +2820,6 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return err;
 
@@ -2939,12 +2918,6 @@ r2:
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != jc->err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
     return;
 }/*}}}*/
 
@@ -3035,12 +3008,6 @@ r2:
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != jc->err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
     return;
 }/*}}}*/
 
@@ -3127,16 +3094,7 @@ r1:
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-
-    if(0 != err){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "dispatch network module is fail,"
-                "and push jcontext to pool force.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-    }
     return 0;
 }/*}}}*/
 
@@ -3194,15 +3152,7 @@ r2:
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != err){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
     return;
 }/*}}}*/
 
@@ -3269,8 +3219,6 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return err;
 
@@ -3370,12 +3318,6 @@ r2:
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != jc->err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
     return;
 }/*}}}*/
 
@@ -3476,12 +3418,6 @@ r2:
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
-    if(0 != jc->err){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "notify network module is fail.");
-        spx_job_pool_push(g_spx_job_pool,jc);
-        return;
-    }
     return;
 }/*}}}*/
 

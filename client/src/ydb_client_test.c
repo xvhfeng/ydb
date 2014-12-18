@@ -162,7 +162,7 @@ err_t ydb_client_modify_test(
         goto r1;
     }
     if(isprintf){
-        printf("fid= %s \n",fid);
+        printf("1 fid= %s \n",fid);
     }
     size_t ffsize = 0;
     fbuff = ydb_client_find(tracker,fid,&ffsize,timeout,&err);
@@ -172,7 +172,7 @@ err_t ydb_client_modify_test(
         goto r1;
     }
     if(0 != (err = ydb_client_write_local(fbuff,ffsize,write_fpath,local_suffix))){
-        printf("fid:%s write  to local is fail.\n",
+        printf("2 fid:%s write  to local is fail.\n",
                 fid);
         goto r1;
     }
@@ -192,7 +192,7 @@ err_t ydb_client_modify_test(
         goto r1;
     }
     if(isprintf){
-        printf("mfid= %s \n",mfid);
+        printf("3 mfid= %s \n",mfid);
     }
     mfbuff = ydb_client_find(tracker,mfid,&mffsize,timeout,&err);
     if(NULL == mfbuff){

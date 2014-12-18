@@ -90,11 +90,6 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
 
     struct spx_host *s = NULL;
 
-    s = spx_alloc_alone(sizeof(*s),err);
-    s->port = 8175;
-    s->ip = spx_string_new("10.97.19.31",err);
-    return s;
-
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
     if(NULL == qctx || 0 != *err){
         return NULL;
@@ -105,7 +100,6 @@ spx_private struct spx_host *ydb_client_query_storage_for_upload(
         goto r1;
     }
     qctx->header = qheader;
-//    qheader->protocol = YDB_TRACKER_QUERY_UPLOAD_STORAGE;
     qheader->protocol = YDB_C2T_QUERY_UPLOAD_STORAGE;
     qheader->version = YDB_CLIENT_VERSION;
     qheader->bodylen = YDB_GROUPNAME_LEN;
@@ -224,10 +218,6 @@ spx_private struct spx_host *ydb_client_query_storage_for_operator(
     }
 
     struct spx_host *s = NULL;
-    s = spx_alloc_alone(sizeof(*s),err);
-    s->port = 8175;
-    s->ip = spx_string_new("10.97.19.31",err);
-    return s;
 
     struct spx_msg_context *qctx = spx_alloc_alone(sizeof(*qctx),err);
     if(NULL == qctx || 0 != *err){
@@ -500,12 +490,6 @@ string_t ydb_client_upload(char *groupname,char *hosts,
         goto r1;
     }
 
-    /*
-    s = spx_alloc_alone(sizeof(*s),err);
-    s->ip = spx_string_new("10.97.19.31",err);
-    s->port = 8175;
-    */
-
     fileid = ydb_client_upload_do(s,buff,len,suffix,timeout,err);
     if(NULL == fileid){
         goto r1;
@@ -555,7 +539,6 @@ spx_private string_t ydb_client_upload_do(struct spx_host *s,
     }
     qctx->body = qbody;
 
-//    qheader->protocol = YDB_STORAGE_UPLOAD;
     qheader->protocol = YDB_C2S_UPLOAD;
     qheader->version = YDB_CLIENT_VERSION;
     if(NULL == suffix || 0 == strlen(suffix)){
@@ -655,11 +638,7 @@ byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,u32_t timeout,err_t
         goto r1;
     }
 
-//    s = spx_alloc_alone(sizeof(*s),err);
-//    s->ip = spx_string_new("10.97.19.31",err);
-//    s->port = 8175;
     s = ydb_client_query_storage_for_operator(
-//            YDB_TRACKER_QUERY_SELECT_STORAGE,
             YDB_C2T_QUERY_SELECT_STORAGE,
             groupname,machineid,syncgroup,
             trackers,timeout,err);
@@ -667,11 +646,6 @@ byte_t *ydb_client_find(char *hosts,char *fileid,size_t *len,u32_t timeout,err_t
         goto r1;
     }
 
-    /*
-    s = spx_alloc_alone(sizeof(*s),err);
-    s->ip = spx_string_new("10.97.19.31",err);
-    s->port = 8175;
-    */
 
     buff = ydb_client_find_do(s,fileid,len,timeout,err);
 r1:
@@ -720,7 +694,6 @@ spx_private byte_t *ydb_client_find_do(struct spx_host *s,
     }
     qctx->body = qbody;
 
-//    qheader->protocol = YDB_STORAGE_FIND;
     qheader->protocol = YDB_C2S_FIND;
     qheader->version = YDB_CLIENT_VERSION;
     qheader->bodylen = spx_string_len(fileid);
@@ -815,23 +788,13 @@ err_t ydb_client_delete(char *hosts,char *fileid,u32_t timeout){/*{{{*/
         goto r1;
     }
 
-//    s = spx_alloc_alone(sizeof(*s),err);
-//    s->ip = spx_string_new("10.97.19.31",err);
-//    s->port = 8175;
     s = ydb_client_query_storage_for_operator(
-//            YDB_TRACKER_QUERY_DELETE_STORAGE,
             YDB_C2T_QUERY_DELETE_STORAGE,
             groupname,machineid,syncgroup,
             trackers,timeout,&err);
     if(NULL == s){
         goto r1;
     }
-
-    /*
-    s = spx_alloc_alone(sizeof(*s),err);
-    s->ip = spx_string_new("10.97.19.31",err);
-    s->port = 8175;
-    */
 
     err = ydb_client_delete_do(s,fileid,timeout);
 r1:
@@ -880,7 +843,6 @@ spx_private err_t ydb_client_delete_do(struct spx_host *s,
     }
     qctx->body = qbody;
 
-//    qheader->protocol = YDB_STORAGE_DELETE;
     qheader->protocol = YDB_C2S_DELETE;
     qheader->version = YDB_CLIENT_VERSION;
     qheader->bodylen = spx_string_len(fileid);
@@ -971,23 +933,13 @@ string_t ydb_client_modify(char *hosts,char *ofid,
         goto r1;
     }
 
-//    s = spx_alloc_alone(sizeof(*s),err);
-//    s->ip = spx_string_new("10.97.19.31",err);
-//    s->port = 8175;
     s = ydb_client_query_storage_for_operator(
-//            YDB_TRACKER_QUERY_SELECT_STORAGE,
             YDB_C2T_QUERY_SELECT_STORAGE,
             groupname,machineid,syncgroup,
             trackers,timeout,err);
     if(NULL == s){
         goto r1;
     }
-
-    /*
-    s = spx_alloc_alone(sizeof(*s),err);
-    s->ip = spx_string_new("10.97.19.31",err);
-    s->port = 8175;
-    */
 
     fid = ydb_client_modify_do(s,ofid,buff,len,suffix,timeout,err);
 r1:
@@ -1048,7 +1000,6 @@ spx_private string_t ydb_client_modify_do(struct spx_host *s,
     }
     qctx->body = qbody;
 
-//    qheader->protocol = YDB_STORAGE_MODIFY;
     qheader->protocol = YDB_C2S_MODIFY;
     spx_msg_pack_u32(qbody,spx_string_len(ofid));
     spx_msg_pack_string(qbody,ofid);

@@ -289,8 +289,7 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
 
         if((0 == spx_string_casecmp_string(s->syncgroup,syncgroup))
                 && (0 != spx_string_casecmp_string(s->machineid,machineid))
-                && s->status != YDB_STORAGE_CLOSED
-                && s->status != YDB_STORAGE_INITING
+                && s->status == YDB_STORAGE_RUNNING
                 && (s->last_heartbeat + c->heartbeat > (u64_t) now)
                 ){
             if(NULL == base){
@@ -463,13 +462,7 @@ err_t ydb_tracker_query_timespan_for_begining_sync(struct ev_loop *loop,\
     response_header->protocol = YDB_S2T_QUERY_SYNC_BEGIN_TIMESPAN;
     response_header->version = YDB_VERSION;
     response_header->bodylen = sizeof(u64_t);
-//    jc->writer_header_ctx = spx_header_to_msg(response_header,
-//            SpxMsgHeaderSize,&(jc->err));
-//    if(NULL == jc->writer_header_ctx){
-//        SpxLog2(tcontext->log,SpxLogError,jc->err,
-//                "convert response header to msg ctx is fail.");
-//        goto r1;
-//    }
+
     if(0 != response_header->bodylen) {
         struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,\
                 &(jc->err));

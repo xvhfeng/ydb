@@ -129,8 +129,6 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return err;
 
@@ -171,8 +169,6 @@ spx_private void ydb_storage_dio_do_upload_for_chunkfile(
     size_t idx = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *threadcontext = spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r1:
@@ -200,8 +196,6 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
@@ -249,8 +243,6 @@ spx_private void ydb_storage_dio_do_upload_for_singlefile(
     struct spx_thread_context *threadcontext =
         spx_get_thread(g_spx_network_module,idx);
     jc->tc = threadcontext;
-    //    err = spx_module_dispatch(threadcontext,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 r1:
@@ -278,8 +270,6 @@ r1:
     struct spx_thread_context *threadcontext_err =
         spx_get_thread(g_spx_network_module,i);
     jc->tc = threadcontext_err;
-    //    err = spx_module_dispatch(threadcontext_err,
-    //            spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/

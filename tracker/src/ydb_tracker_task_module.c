@@ -37,6 +37,7 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
         return EINVAL;
     }
 
+//    ev_io_stop(loop,&(tcontext->watcher));
     //because the deal process handler is not noblacking
     //so we can deal the error in the end of the function
     err_t err = 0;

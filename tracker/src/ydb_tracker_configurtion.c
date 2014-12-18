@@ -41,7 +41,7 @@ void *ydb_tracker_config_before_handle(SpxLogDelegate *log,err_t *err){
     config->logsize = 10 * SpxMB;
     config->loglevel = SpxLogInfo;
     config->balance = YDB_TRACKER_BALANCE_LOOP;
-    config->heartbeat = 30;
+    config->heartbeat = 35;
     config->daemon = true;
     config->stacksize = 128 * SpxKB;
     config->network_module_thread_size = 8;

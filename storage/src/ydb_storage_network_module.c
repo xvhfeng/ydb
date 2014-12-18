@@ -55,7 +55,6 @@ void ydb_storage_network_module_request_body_handler(
         return;
     }
 
-//    size_t idx = 0;
     struct spx_task_context *tcontext = spx_task_pool_pop(g_spx_task_pool,&(jcontext->err));
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
@@ -66,9 +65,6 @@ void ydb_storage_network_module_request_body_handler(
     int idx= spx_task_module_wakeup_idx(tcontext);
     struct spx_thread_context *tc = spx_get_thread(g_spx_task_module,idx);
     jcontext->tc = tc;
-//    spx_task_module_wakeup_handler(EV_WRITE,tcontext);
-//    spx_module_dispatch(tc,spx_task_module_wakeup_handler,tcontext);
-//    spx_module_dispatch(g_spx_task_module,idx,tcontext);
     SpxModuleDispatch(spx_task_module_wakeup_handler,tcontext);
     return;
 }
@@ -78,13 +74,9 @@ void ydb_storage_network_module_response_body_handler(
     spx_nio_writer_body_handler(loop,fd,jcontext);//send data for explaning the body first
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
-                "send data for body explaning itself first that is fail.");
-        return;
-    }
-    if(0 != jcontext->err){
-        SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "write body buffer is fail.");
     }
+    ev_io_stop(loop,&(jcontext->watcher));
     if(jcontext->reader_header->is_keepalive){//long connetion mode,but not test
         spx_job_context_reset(jcontext);
         size_t idx = spx_network_module_wakeup_idx(jcontext);
@@ -94,8 +86,6 @@ void ydb_storage_network_module_response_body_handler(
                 jcontext->client_ip,jcontext->fd,idx);
         struct spx_thread_context *tc = spx_get_thread(g_spx_network_module,idx);
         jcontext->tc = tc;
-//        spx_module_dispatch(tc,spx_network_module_wakeup_handler,jcontext);
-//        spx_network_module_wakeup_handler(EV_WRITE,jcontext);
         SpxModuleDispatch(spx_network_module_wakeup_handler,jcontext);
     } else {
         spx_job_pool_push(g_spx_job_pool,jcontext);
