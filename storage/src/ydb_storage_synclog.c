@@ -206,6 +206,25 @@ void ydb_storage_synclog_free(struct ydb_storage_synclog **synclog){/*{{{*/
     SpxFree(*synclog);
 }/*}}}*/
 
+
+void ydb_storage_synclog_clear(struct ydb_storage_synclog *synclog){/*{{{*/
+    if(NULL != (synclog)->fp){
+        fflush((synclog)->fp);
+        fclose((synclog)->fp);
+        (synclog)->off = 0;
+    }
+    if(NULL != (synclog)->filename) {
+        SpxStringFree((synclog)->filename);
+    }
+    if(NULL != synclog->path) {
+        SpxStringFree(synclog->path);
+    }
+    if(NULL != synclog->machineid) {
+        SpxStringFree(synclog->machineid);
+    }
+    SpxZero(synclog->d);
+}/*}}}*/
+
 string_t ydb_storage_synclog_make_filename(SpxLogDelegate *log,string_t path,string_t machineid,
         int year,int month,int day,err_t *err){/*{{{*/
     string_t filename = spx_string_newlen(NULL,SpxPathSize,err);

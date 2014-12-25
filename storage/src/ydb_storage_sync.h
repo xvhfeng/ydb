@@ -79,7 +79,7 @@ err_t ydb_storage_sync_reply_sync_beginpoint(struct ev_loop *loop,\
 err_t ydb_storage_sync_reply_begin(struct ev_loop *loop,\
         struct ydb_storage_dio_context *dc);
 
-err_t ydb_storage_ydb_storage_sync_reply_consistency(struct ev_loop *loop,\
+err_t ydb_storage_sync_reply_consistency(struct ev_loop *loop,\
         struct ydb_storage_dio_context *dc);
 
 err_t ydb_storage_sync_restore(

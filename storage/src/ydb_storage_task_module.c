@@ -161,7 +161,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
             }
         case (YDB_S2S_RESTORE_CSYNC_OVER):
             {
-                if(0 != (err = ydb_storage_ydb_storage_sync_reply_consistency(loop,dc))){
+                if(0 != (err = ydb_storage_sync_reply_consistency(loop,dc))){
                     SpxLog2(jc->log,SpxLogError,err,\
                             "restore sync file over is fail.");
                 }

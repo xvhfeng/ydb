@@ -905,14 +905,19 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
                     "oversize use default:%s,and ovvermode use default:%s too",\
                     c->oversize,overmode_desc[c->overmode]);
         } else {
+            u64_t size = 0;
             if(SpxStringEndWith(*(kv + 1),'%')){
                 c->overmode = YDB_STORAGE_OVERMODE_RELATIVE;
+                size = ydb_storage_configurtion_iosize_convert(
+                        c->log,*(kv + 1),1,
+                        "convert oversize is fail.",err);
+
             } else {
                 c->overmode = YDB_STORAGE_OVERMODE_ABSSOLUTE;
+                size = ydb_storage_configurtion_iosize_convert(
+                        c->log,*(kv + 1),SpxKB,
+                        "convert oversize is fail.",err);
             }
-            u64_t size = ydb_storage_configurtion_iosize_convert(
-                    c->log,*(kv + 1),SpxKB,
-                    "convert oversize is fail.",err);
             if(0 != *err){
                 goto r1;
             }

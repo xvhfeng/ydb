@@ -45,7 +45,7 @@ extern "C" {
         time_t last_modify_time;
         time_t init_timespan;
         u64_t last_freesize;
-        bool_t no_dsync_force;
+        bool_t dsync_force;
         bool_t need_dsync;
         bool_t isusing;
     };

@@ -222,7 +222,7 @@ int main(int argc,char **argv){
             c->stacksize,
             &err);
 
-    err =  ydb_storage_dsync_startup(c,g_ydb_storage_runtime);
+//    err =  ydb_storage_dsync_startup(c,g_ydb_storage_runtime);
 
     g_sync_threadpool = spx_threadpool_new(c->log,c->sync_threads_count,
             c->stacksize,&err);
@@ -231,7 +231,7 @@ int main(int argc,char **argv){
 
     struct spx_periodic *pdSyncHeartbeat = spx_periodic_exec_and_async_run(c->log,
             c->query_sync_timespan,0,ydb_storage_sync_heartbeat,
-            g_ydb_storage_runtime,c->stacksize,&err);
+            c,c->stacksize,&err);
 
     struct spx_periodic *pdRuntimeFlush = spx_periodic_exec_and_async_run(c->log,
             c->runtime_flush_timespan,0,ydb_storage_startup_runtime_flush,

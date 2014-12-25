@@ -30,6 +30,7 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
 
     struct spx_job_context *jc = tcontext->jcontext;
     struct spx_msg *ctx = jc->reader_body_ctx;
+    SpxTypeConvert2(struct ydb_tracker_configurtion,c,jc->config);
     if(NULL == ctx){
         SpxLog1(tcontext->log,SpxLogError,\
                 "reader body ctx is null.");
@@ -107,6 +108,7 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
     }
     struct spx_map_node *n = NULL;
     string_t newbuf = NULL;
+    time_t now = spx_now();
     while(NULL != (n = spx_map_iter_next(iter,&(jc->err)))){
         s = (struct ydb_remote_storage *) n->v;
         if(NULL == s){
@@ -114,7 +116,8 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
         }
 
         if((0 == spx_string_casecmp_string(s->syncgroup,syncgroup))
-                && (0 != spx_string_casecmp_string(s->machineid,machineid))){
+                && (0 != spx_string_casecmp_string(s->machineid,machineid))
+                && (s->last_heartbeat + c->heartbeat >(u64_t) now)) {
 
             newbuf =   spx_string_catalign(buf,s->machineid,spx_string_len(s->machineid),
                     YDB_MACHINEID_LEN,&(jc->err));

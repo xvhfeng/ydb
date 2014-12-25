@@ -183,10 +183,10 @@ err_t ydb_storage_dsync_startup(struct ydb_storage_configurtion *c,
     struct spx_date dt_sync_end;
 
     struct ydb_storage_dsync_runtime *dsrt = NULL;
+    dsrt = ydb_storage_dsync_runtime_reader(c,&err);
     bool_t is_send_dsync_over = false;
     while(true){// for fail twice
         bool_t is_need_dsync = false;
-        dsrt = ydb_storage_dsync_runtime_reader(c,&err);
         if(NULL == dsrt){
             dsrt = spx_alloc_alone(sizeof(*dsrt),&err);
             if(NULL == dsrt){
@@ -225,16 +225,18 @@ err_t ydb_storage_dsync_startup(struct ydb_storage_configurtion *c,
         //get base storage
         //and the base is the full data
         //the base storage must be exist
-        base_storage = ydb_storage_dsync_query_base(c,&err);
-        if(NULL == base_storage){
-            SpxLogFmt1(c->log,SpxLogMark,
-                    "no the base storage in the all syncgroup:%s,"
-                    "and then,this storage:%s is upto base storage.",
-                    c->syncgroup,c->machineid);
-            //set all mountpoint is not disksync
-            ydb_storage_dsync_mountpoint_over(dsrt);
-            SpxFree(dsrt);
-            return 0;
+        if(NULL == base_storage) {
+            base_storage = ydb_storage_dsync_query_base(c,&err);
+            if(NULL == base_storage){
+                SpxLogFmt1(c->log,SpxLogMark,
+                        "no the base storage in the all syncgroup:%s,"
+                        "and then,this storage:%s is upto base storage.",
+                        c->syncgroup,c->machineid);
+                //set all mountpoint is not disksync
+                ydb_storage_dsync_mountpoint_over(dsrt);
+                SpxFree(dsrt);
+                return 0;
+            }
         }
 
         //get begin timespan of begining
@@ -451,19 +453,19 @@ spx_private bool_t ydb_storage_dsync_confim(
     for( ; i< YDB_STORAGE_MOUNTPOINT_COUNT; i++){
         struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path) && mp->isusing){
-            if(mp->no_dsync_force){
-                mp->need_dsync = false;
+            if(mp->dsync_force){
+                mp->need_dsync = true;
             } else {
                 if(0 != mp->last_freesize &&
                         (mp->last_freesize + c->disksync_busysize >= mp->freesize)) {
                     mp->need_dsync = false;
                 } else {
-                    struct ydb_storage_dsync_mp *mp = dsrt->ydb_storage_dsync_mps + i;
-                    mp->idx = i;
-                    mp->dsync_fail = false;
-                    mp->dsync_over = false;
-                    mp->begin_dsync = false;
-                    mp->need_dsync = true;
+                    struct ydb_storage_dsync_mp *dmp = dsrt->ydb_storage_dsync_mps + i;
+                    dmp->idx = i;
+                    dmp->dsync_fail = false;
+                    dmp->dsync_over = false;
+                    dmp->begin_dsync = false;
+                    dmp->need_dsync = true;
                     rc = true;
                 }
             }
@@ -2713,7 +2715,7 @@ spx_private void ydb_storage_dsync_data_from_chunkfile(
 
     int fd = open(dc->filename,
             O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
-    if(0 == fd){
+    if(0 >= fd){
         err = errno;
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "open chunkfile:%s is fail.",
@@ -2921,7 +2923,7 @@ spx_private void ydb_storage_dsync_data_from_singlefile(
 
     int fd = open(dc->filename,\
             O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
-    if(0 == fd){
+    if(0 >= fd){
         err = errno;
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "open chunkfile:%s is fail.",
@@ -3099,7 +3101,7 @@ spx_private void ydb_storage_dsync_logfile_context(
 
     int fd = open(dc->filename,
             O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
-    if(0 == fd){
+    if(0 >= fd){
         err = errno;
         SpxLogFmt2(dc->log,SpxLogError,err,\
                 "open logfile:%s is fail.",

@@ -55,8 +55,8 @@ struct ydb_storage_runtime *ydb_storage_runtime_init(
         goto r1;
     }
 
+    rt->this_startup_time = spx_now();
     if(!SpxFileExist(filename)){
-        rt->this_startup_time = spx_now();
         rt->first_statrup_time = rt->this_startup_time;
         spx_string_free(filename);
         return rt;

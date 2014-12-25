@@ -66,8 +66,10 @@ void *ydb_storage_startup_runtime_flush(
             "now storage state:%s.",
             ydb_state_desc[srt->status]);
 
-    ydb_storage_runtime_flush(srt);
-    ydb_storage_mprtf_writer(c);
+    if(YDB_STORAGE_RUNNING == srt->status){
+        ydb_storage_runtime_flush(srt);
+        ydb_storage_mprtf_writer(c);
+    }
     ydb_storage_sync_state_writer(c);
     return NULL;
 }/*}}}*/

@@ -89,7 +89,7 @@ err_t ydb_storage_dio_upload(struct ev_loop *loop,\
     if(c->overload){
         dc->totalsize = YDB_STORAGE_OVERMODE_ABSSOLUTE == c->overmode
             ? dc->realsize + c->oversize \
-            : dc->realsize + dc->realsize * c->oversize / 100;
+            : dc->realsize + (int) (dc->realsize * c->oversize / 100);
     } else {
         dc->totalsize = dc->realsize;
     }

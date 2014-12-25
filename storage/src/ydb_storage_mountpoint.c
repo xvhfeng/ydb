@@ -234,7 +234,7 @@ spx_private err_t ydb_storage_mprtf_line_parser(struct ydb_storage_configurtion 
                        }
                        int op = atoi(*(context + i));
                        if(0 != op){
-                           mp->no_dsync_force = true;
+                           mp->dsync_force = true;
                        }
                        break;
                    }
@@ -345,7 +345,7 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
         goto r1;
     }
 
-    // mpidx:no_disksync_force:init_time:last_modify_time:last_freesize:path
+    // mpidx:disksync_force:init_time:last_modify_time:last_freesize:path
     for( ; i < YDB_STORAGE_MOUNTPOINT_MAXSIZE; i++){
         struct ydb_storage_mountpoint *mp = spx_list_get(c->mountpoints,i);
         if(NULL != mp && !SpxStringIsNullOrEmpty(mp->path)){

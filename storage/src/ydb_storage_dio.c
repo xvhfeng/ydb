@@ -164,8 +164,10 @@ string_t ydb_storage_dio_make_fileid(SpxLogDelegate *log,\
             "%s:%s:%s:%d:%d:%d:%d:%d:%lld:%d:%lld:%lld:%lld:%d:%d:%lld:%s%s%s",
             groupname,machineid,syncgroup,issinglefile,mpidx,p1,p2,
             tidx,fcreatetime,rand,begin,realsize,totalsize,
-            ver,opver,lastmodifytime,NULL == hashcode ? "" : hashcode,
-            has_suffix ? ":." : "" , has_suffix ? suffix : "");
+            ver,opver,lastmodifytime,
+            NULL == hashcode ? "" : hashcode,
+            has_suffix ? ":." : "" ,
+            has_suffix ? suffix : "");
     if(NULL == new){
         SpxLog2(log,SpxLogError,*err,
                 "make fileid is fail.");
