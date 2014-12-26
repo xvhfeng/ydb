@@ -65,17 +65,20 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
             }
         case YDB_C2T_QUERY_MODIFY_STORAGE :
             {
-                err =  ydb_tracker_query_modify_storage(loop,tcontext);
+                err = ydb_tracker_query_operator_storage(loop,tcontext,
+                        YDB_C2T_QUERY_MODIFY_STORAGE);
                 break;
             }
         case YDB_C2T_QUERY_DELETE_STORAGE:
             {
-                err =  ydb_tracker_query_delete_storage(loop,tcontext);
+                err = ydb_tracker_query_operator_storage(loop,tcontext,
+                        YDB_C2T_QUERY_DELETE_STORAGE);
                 break;
             }
         case YDB_C2T_QUERY_SELECT_STORAGE:
             {
-                err =  ydb_tracker_query_select_storage(loop,tcontext);
+                err = ydb_tracker_query_operator_storage(loop,tcontext,
+                        YDB_C2T_QUERY_SELECT_STORAGE);
                 break;
             }
         case YDB_S2T_QUERY_SYNC_STORAGES:

@@ -55,7 +55,6 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
         bool_t check_freedisk,bool_t check_syncgroup);
 
 spx_private struct ydb_remote_storage *curr_storage = NULL;
-//spx_private size_t ydb_remote_storage_idx = 0;
 spx_private struct spx_map_iter *curr_iter = NULL;
 
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(
@@ -111,7 +110,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(
 
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(
         string_t groupname,struct spx_job_context *jc){/*{{{*/
- if(NULL == ydb_remote_storages){
+    if(NULL == ydb_remote_storages){
         jc->err = ENOENT;
         return NULL;
     }
@@ -124,9 +123,9 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(
     }
 
     struct spx_map_iter *iter = spx_map_iter_new(map,&(jc->err));
-        if(NULL == iter){
-            return NULL;
-        }
+    if(NULL == iter){
+        return NULL;
+    }
 
     struct ydb_remote_storage *storage = NULL;
     struct ydb_remote_storage *dest = NULL;
@@ -178,11 +177,11 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_turn(
 spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_master(
         string_t groupname,struct spx_job_context *jc){/*{{{*/
     struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jc->config);
-        if(SpxStringIsNullOrEmpty(c->master)){
-            jc->err = ENOENT;
-            return NULL;
-        }
-        return ydb_tracker_find_storage_for_operator(groupname,c->master,NULL,jc,true,false);
+    if(SpxStringIsNullOrEmpty(c->master)){
+        jc->err = ENOENT;
+        return NULL;
+    }
+    return ydb_tracker_find_storage_for_operator(groupname,c->master,NULL,jc,true,false);
 }/*}}}*/
 
 /*
@@ -209,7 +208,6 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
         jc->err = ENOENT;
         return NULL;
     }
-
 
     time_t now = spx_now();
     struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jc->config);
@@ -264,27 +262,28 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
         return EINVAL;
     }
     struct spx_job_context *jc = tcontext->jcontext;
+    struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jc->config);
 
     struct spx_msg *ctx = jc->reader_body_ctx;
     if(NULL == ctx){
-        SpxLog1(tcontext->log,SpxLogError,\
-                "reader body ctx is null.");
+        SpxLogFmt1(tcontext->log,SpxLogError,\
+                "reader body ctx from client:%s is null.",
+                jc->client_ip);
         return EINVAL;
     }
+
+    SpxLogFmt1(jc->log,SpxLogDebug,
+            "accept query upload storage from client:%s.",
+            jc->client_ip);
 
     string_t groupname = NULL;
     groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jc->err));
     if(NULL == groupname){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "unpack groupname is fail.");
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "unpeck groupname from client:%s is fail.",
+                jc->client_ip);
         return jc->err;
     }
-
-    SpxLogFmt1(jc->log,SpxLogInfo,
-            "accept query upload storage from client:%s in the group:%s.",
-            jc->client_ip,groupname);
-
-    struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jc->config);
 
     struct ydb_remote_storage *storage = NULL;
     switch(c->balance){
@@ -316,33 +315,37 @@ err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_cont
     }
     if(NULL == storage){
         jc->err = 0 == jc->err ? ENOENT : jc->err;
-        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "find storage by %s from group:%s is fail.",\
-                tracker_balance_mode_desc[c->balance],groupname);
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "not found storage by %s from group:%s."
+                "client ip:%s.",
+                tracker_balance_mode_desc[c->balance],groupname,
+                jc->client_ip);
         goto r1;
     }
     struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jc->err));
     if(NULL == response_header){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "alloc reponse for query storage is fail.");
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
+                "new header of reponse for query storage is fail."
+                "query group:%s."
+                "client ip:%s.",
+                groupname,
+                jc->client_ip);
         goto r1;
     }
     jc->writer_header = response_header;
     response_header->protocol = YDB_C2T_QUERY_UPLOAD_STORAGE;
     response_header->version = YDB_VERSION;
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
-//    jc->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jc->err));
-//    if(NULL == jc->writer_header_ctx){
-//        SpxLog2(tcontext->log,SpxLogError,jc->err,
-//                "header of query storage to msg ctx is fail.");
-//        goto r1;
-//    }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jc->err));
     if(NULL == response_body_ctx){
         SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "alloc body buffer of query storage is fail."\
-                "the buffer length is %d.",
-                response_header->bodylen);
+                "new body of reponse for query storage is fail."
+                "body len:%d.",
+                "query group:%s."
+                "client ip:%s.",
+                response_header->bodylen,
+                groupname,
+                jc->client_ip);
         goto r1;
     }
     jc->writer_body_ctx = response_body_ctx;
@@ -359,53 +362,62 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
     }
 
     struct spx_job_context *jc = tcontext->jcontext;
+    struct spx_msg *ctx = jc->reader_body_ctx;
+    if(NULL == ctx){
+        SpxLogFmt1(tcontext->log,SpxLogError,\
+                "reader body ctx from client:%s is null.",
+                jc->client_ip);
+        return EINVAL;
+    }
     string_t groupname = NULL;
     string_t machineid = NULL;
     string_t syncgroup = NULL;
-    struct spx_msg *ctx = jc->reader_body_ctx;
-    if(NULL == ctx){
-        SpxLog1(tcontext->log,SpxLogError,\
-                "reader body ctx is null.");
-        return EINVAL;
-    }
 
     groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jc->err));
     if(NULL == groupname){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "unpack groupname from msg ctx is fail.");
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
+                "unpack groupname from msg ctx is fail."
+                "client ip:%s.",
+                jc->client_ip);
         return jc->err;
     }
     machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jc->err));
     if(NULL == machineid){
         SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack machineid from msg ctx in the group:%s is fail.",\
-                groupname);
+                "unpack machineid from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
     syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jc->err));
     if(NULL == syncgroup){
         SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack syncgroup from msg ctx in the group:%s is fail.",\
-                groupname);
+                "unpack syncgroup from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
 
-    SpxLogFmt1(jc->log,SpxLogInfo,
-            "accept query modify storage:%s from client:%s in the group:%s with syncgroup:%s.",
+    SpxLogFmt1(jc->log,SpxLogDebug,
+            "query modify storage:%s from client:%s in the group:%s with syncgroup:%s.",
             machineid,jc->client_ip,groupname,syncgroup);
 
     struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
             groupname,machineid,syncgroup,jc,true,true);
     if(NULL == storage){
         jc->err = 0 == jc->err ? ENOENT : jc->err;
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "find storage for modify is fail.");
+        SpxLogFmt1(tcontext->log,SpxLogWarn,
+                "not found storage in the group:%s with syncgroup:%s and master storage:%s."
+                "client ip:%s.",
+                groupname,syncgroup,machineid,jc->client_ip);
         goto r1;
     }
+
     struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jc->err));
     if(NULL == response_header){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "alloc reponse header for finding storage to mpdify is fail.");
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "new header for query storage from client:%s"
+                " in the group:%s with syncgroup:%s and master storage:%s.",
+                jc->client_ip,
+                groupname,syncgroup,machineid);
         goto r1;
     }
     jc->writer_header = response_header;
@@ -414,10 +426,12 @@ err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_cont
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jc->err));
     if(NULL == response_body_ctx){
-        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "alloc reponse body buffer is fail."\
-                "body buffer length is %d.",\
-                response_header->bodylen);
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "new body ctx with len:%d for query storage from client:%s"
+                " in the group:%s with syncgroup:%s and master storage:%s.",
+                response_header->bodylen,
+                jc->client_ip,
+                groupname,syncgroup,machineid);
         goto r1;
     }
     jc->writer_body_ctx = response_body_ctx;
@@ -439,51 +453,61 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
     struct spx_job_context *jc = tcontext->jcontext;
     struct spx_msg *ctx = jc->reader_body_ctx;
     if(NULL == ctx){
-        SpxLog1(tcontext->log,SpxLogError,\
-                "reader body ctx is null.");
+        SpxLogFmt1(tcontext->log,SpxLogError,\
+                "reader body ctx from client:%s is null.",
+                jc->client_ip);
         return EINVAL;
     }
 
     string_t groupname = NULL;
     string_t machineid = NULL;
     string_t syncgroup = NULL;
+
     groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jc->err));
     if(NULL == groupname){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "unpack groupname from msg ctx is fail.");
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
+                "unpack groupname from msg ctx is fail."
+                "client ip:%s.",
+                jc->client_ip);
         return jc->err;
     }
     machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jc->err));
     if(NULL == machineid){
         SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack machineid from msg ctx in the group:%s is fail.",\
-                groupname);
+                "unpack machineid from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
     syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jc->err));
     if(NULL == syncgroup){
         SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack syncgroup from msg ctx in the group:%s is fail.",\
-                groupname);
+                "unpack syncgroup from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
 
-    SpxLogFmt1(jc->log,SpxLogInfo,
-            "accept query delete storage:%s from client:%s in the group:%s with syncgroup:%s.",
+    SpxLogFmt1(jc->log,SpxLogDebug,
+            "query delete storage:%s from client:%s in the group:%s with syncgroup:%s.",
             machineid,jc->client_ip,groupname,syncgroup);
 
     struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
             groupname,machineid,syncgroup,jc,false,true);
     if(NULL == storage){
         jc->err = 0 == jc->err ? ENOENT : jc->err;
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "find storage for delete is fail.");
+        SpxLogFmt1(tcontext->log,SpxLogWarn,
+                "not found storage in the group:%s with syncgroup:%s and master storage:%s."
+                "client ip:%s.",
+                groupname,syncgroup,machineid,jc->client_ip);
         goto r1;
     }
     struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jc->err));
     if(NULL == response_header){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "alloc response header for finding storage to deleting is fail.");
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "new header for query storage from client:%s"
+                " in the group:%s with syncgroup:%s and master storage:%s."
+                "client ip:%s.",
+                jc->client_ip,
+                groupname,syncgroup,machineid);
         goto r1;
     }
     jc->writer_header = response_header;
@@ -492,10 +516,12 @@ err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_cont
     response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jc->err));
     if(NULL == response_body_ctx){
-        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "alloc reponse body buffer is fail."\
-                "body buffer length is %d.",\
-                response_header->bodylen);
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "new body ctx with len:%d for query storage from client:%s"
+                " in the group:%s with syncgroup:%s and master storage:%s.",
+                response_header->bodylen,
+                jc->client_ip,
+                groupname,syncgroup,machineid);
         goto r1;
     }
     jc->writer_body_ctx = response_body_ctx;
@@ -509,44 +535,48 @@ r1:
 }/*}}}*/
 
 err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/
-    if(NULL == tcontext ||NULL == tcontext->jcontext){
+    if(NULL == tcontext || NULL == tcontext->jcontext){
         return EINVAL;
     }
 
     struct spx_job_context *jc = tcontext->jcontext;
     struct spx_msg *ctx = jc->reader_body_ctx;
     if(NULL == ctx){
-        SpxLog1(tcontext->log,SpxLogError,\
-                "reader body ctx is null.");
+        SpxLogFmt1(tcontext->log,SpxLogError,\
+                "reader body ctx from client:%s is null.",
+                jc->client_ip);
         return EINVAL;
     }
 
     string_t groupname = NULL;
     string_t machineid = NULL;
     string_t syncgroup = NULL;
+
     groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jc->err));
     if(NULL == groupname){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "unpack groupname from msg ctx is fail.");
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
+                "unpack groupname from msg ctx is fail."
+                "client ip:%s.",
+                jc->client_ip);
         return jc->err;
     }
     machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jc->err));
     if(NULL == machineid){
         SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack machineid from msg ctx in the group:%s is fail.",\
-                groupname);
+                "unpack machineid from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
     syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jc->err));
     if(NULL == syncgroup){
         SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack syncgroup from msg ctx in the group:%s is fail.",\
-                groupname);
+                "unpack syncgroup from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
 
-    SpxLogFmt1(jc->log,SpxLogInfo,
-            "accept query find storage:%s from client:%s in the group:%s with syncgroup:%s.",
+    SpxLogFmt1(jc->log,SpxLogDebug,
+            "query delete storage:%s from client:%s in the group:%s with syncgroup:%s.",
             machineid,jc->client_ip,groupname,syncgroup);
 
     struct ydb_remote_storage *storage = ydb_tracker_find_storage_for_operator(\
@@ -589,3 +619,118 @@ r1:
     SpxStringFree(syncgroup);
     return jc->err;
 }/*}}}*/
+
+
+
+//use the function to replace modify,delete,select functions
+//and delete 3 functions next version
+err_t ydb_tracker_query_operator_storage(struct ev_loop *loop,
+        struct spx_task_context *tc,
+        int proto){
+    if(NULL == tc || NULL == tc->jcontext){
+        return EINVAL;
+    }
+
+    struct spx_job_context *jc = tc->jcontext;
+    struct spx_msg *ctx = jc->reader_body_ctx;
+    if(NULL == ctx){
+        SpxLogFmt1(tc->log,SpxLogError,\
+                "reader body ctx for proto:%d from client:%s is null.",
+                proto,jc->client_ip);
+        return EINVAL;
+    }
+
+    string_t groupname = NULL;
+    string_t machineid = NULL;
+    string_t syncgroup = NULL;
+
+    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jc->err));
+    if(NULL == groupname){
+        SpxLogFmt2(tc->log,SpxLogError,jc->err,\
+                "unpack groupname from msg ctx for proto:%d is fail."
+                "client ip:%s.",
+                proto,jc->client_ip);
+        return jc->err;
+    }
+    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jc->err));
+    if(NULL == machineid){
+        SpxLogFmt2(tc->log,SpxLogError,jc->err,\
+                "unpack machineid from msg ctx for proto:%d from client:%s in the group:%s is fail.",
+                proto,jc->client_ip,groupname);
+        goto r1;
+    }
+    syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jc->err));
+    if(NULL == syncgroup){
+        SpxLogFmt2(tc->log,SpxLogError,jc->err,\
+                "unpack syncgroup from msg ctx for proto:%d from client:%s in the group:%s is fail.",
+                proto,jc->client_ip,groupname);
+        goto r1;
+    }
+
+    SpxLogFmt1(jc->log,SpxLogDebug,
+            "query storage:%s for proto:%d from client:%s in the group:%s with syncgroup:%s.",
+            machineid,proto,jc->client_ip,groupname,syncgroup);
+
+    struct ydb_remote_storage *storage = NULL;
+    switch(proto){
+        case YDB_C2T_QUERY_DELETE_STORAGE:
+            {
+                storage = ydb_tracker_find_storage_for_operator(
+                        groupname,machineid,syncgroup,jc,false,true);
+                break;
+            }
+        case YDB_C2T_QUERY_MODIFY_STORAGE:
+            {
+                storage = ydb_tracker_find_storage_for_operator(\
+                        groupname,machineid,syncgroup,jc,true,true);
+                break;
+            }
+        case YDB_C2T_QUERY_SELECT_STORAGE:
+            {
+                storage = ydb_tracker_find_storage_for_operator(\
+                        groupname,machineid,syncgroup,jc,false,true);
+                break;
+            }
+    }
+    if(NULL == storage){
+        jc->err = 0 == jc->err ? ENOENT : jc->err;
+        SpxLogFmt1(tc->log,SpxLogWarn,
+                "not found storage for proto:%d in the group:%s with syncgroup:%s and master storage:%s."
+                "client ip:%s.",
+                proto,groupname,syncgroup,machineid,jc->client_ip);
+        goto r1;
+    }
+    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jc->err));
+    if(NULL == response_header){
+        SpxLogFmt2(tc->log,SpxLogError,jc->err,
+                "new header for query storage with proto:%d from client:%s"
+                " in the group:%s with syncgroup:%s and master storage:%s."
+                "client ip:%s.",
+                proto,jc->client_ip,
+                groupname,syncgroup,machineid);
+        goto r1;
+    }
+    jc->writer_header = response_header;
+    response_header->protocol = proto;
+    response_header->version = YDB_VERSION;
+    response_header->bodylen = SpxIpv4Size +  sizeof(u32_t);
+    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jc->err));
+    if(NULL == response_body_ctx){
+        SpxLogFmt2(tc->log,SpxLogError,jc->err,
+                "new body ctx with len:%d for query storage with proto:%d from client:%s"
+                " in the group:%s with syncgroup:%s and master storage:%s.",
+                response_header->bodylen,proto,
+                jc->client_ip,
+                groupname,syncgroup,machineid);
+        goto r1;
+    }
+    jc->writer_body_ctx = response_body_ctx;
+    spx_msg_pack_fixed_string(response_body_ctx,storage->ip,SpxIpv4Size);
+    spx_msg_pack_u32(response_body_ctx,storage->port);
+r1:
+    SpxStringFree(machineid);
+    SpxStringFree(groupname);
+    SpxStringFree(syncgroup);
+    return jc->err;
+}
+

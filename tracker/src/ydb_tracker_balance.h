@@ -25,9 +25,9 @@ extern "C" {
 #include "spx_task.h"
 
 err_t ydb_tracker_query_upload_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
-err_t ydb_tracker_query_modify_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
-err_t ydb_tracker_query_delete_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
-err_t ydb_tracker_query_select_storage(struct ev_loop *loop,struct spx_task_context *tcontext);
+err_t ydb_tracker_query_operator_storage(struct ev_loop *loop,
+        struct spx_task_context *tc,
+        int proto);
 
 #ifdef __cplusplus
 }
