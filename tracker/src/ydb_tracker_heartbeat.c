@@ -155,8 +155,7 @@ spx_private err_t ydb_remote_storage_report(
         }
     }
 
-    size_t size = 0;
-    spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),(void **) &map,&size);
+    map = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),NULL);
     if(NULL == map){
         map = spx_map_new(jcontext->log,
                 spx_pjw,
@@ -176,7 +175,7 @@ spx_private err_t ydb_remote_storage_report(
         }
     }
 
-    spx_map_get(map,machineid,spx_string_len(machineid),(void **) &storage,&size);
+    storage = spx_map_get(map,machineid,spx_string_len(machineid),NULL);
     if(NULL == storage){
         storage = spx_alloc_alone(sizeof(*storage),&(jcontext->err));
         if(NULL == storage){
@@ -233,10 +232,6 @@ spx_private err_t ydb_remote_storage_report(
     response_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN \
                                + YDB_SYNCGROUP_LEN + SpxIpv4Size \
                                + 4 * sizeof(u64_t) + 2 * sizeof(u32_t);
-//    jcontext->writer_header_ctx = spx_header_to_msg(response_header,SpxMsgHeaderSize,&(jcontext->err));
-//    if(NULL == jcontext->writer_header_ctx){
-//        return jcontext->err;
-//    }
     struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
     if(NULL == response_body_ctx){
         return jcontext->err;

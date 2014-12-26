@@ -374,8 +374,8 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
         u32_t state = spx_msg_unpack_i32(body);
 
         struct ydb_storage_remote *remote_storage = NULL;
-        err = spx_map_get(g_ydb_storage_remote,machineid,spx_string_len(machineid),
-                (void **) &remote_storage,NULL);
+        remote_storage = spx_map_get(g_ydb_storage_remote,
+                machineid,spx_string_len(machineid),NULL);
         if(NULL != remote_storage){
             SpxStringFree(machineid);//machineid is the same,so not useful
             remote_storage->runtime_state = state;
@@ -740,9 +740,9 @@ err_t ydb_storage_sync_reply_sync_beginpoint(struct ev_loop *loop,\
     }
 
     struct ydb_storage_remote *s = NULL;
-    jc-> err = spx_map_get(g_ydb_storage_remote,machineid,
-            spx_string_len(machineid),(void **) &s,NULL);
-    if(NULL == s || 0 != jc->err){
+    s = spx_map_get(g_ydb_storage_remote,machineid,
+            spx_string_len(machineid),NULL);
+    if(NULL == s ){
         SpxLogFmt2(jc->log,SpxLogError,jc->err,\
                 "find sync beginpoint of storage:%s is fail.",
                 machineid);
@@ -1026,10 +1026,9 @@ err_t ydb_storage_sync_reply_begin(struct ev_loop *loop,\
     }
 
     struct ydb_storage_remote *s = NULL;
-    jc-> err = spx_map_get(g_ydb_storage_remote,machineid,
-            spx_string_len(machineid),(void **) &s,NULL);
-
-    if(NULL == s || 0 != jc->err){
+    s = spx_map_get(g_ydb_storage_remote,machineid,
+            spx_string_len(machineid),NULL);
+    if(NULL == s){
         SpxLogFmt2(jc->log,SpxLogError,jc->err,\
                 "find sync beginpoint of storage:%s is fail.",
                 machineid);
@@ -1608,9 +1607,9 @@ err_t ydb_storage_sync_reply_consistency(struct ev_loop *loop,\
     }
 
     struct ydb_storage_remote *s = NULL;
-    jc-> err = spx_map_get(g_ydb_storage_remote,machineid,
-            spx_string_len(machineid),(void **) &s,NULL);
-    if(NULL == s || 0 != jc->err){
+    s = spx_map_get(g_ydb_storage_remote,machineid,
+            spx_string_len(machineid),NULL);
+    if(NULL == s ){
         SpxLogFmt2(jc->log,SpxLogError,jc->err,\
                 "find sync beginpoint of storage:%s is fail.",
                 machineid);
@@ -2849,9 +2848,9 @@ spx_private err_t ydb_storage_sync_log(string_t machineid,
         ){/*{{{*/
     err_t err = 0;
     struct ydb_storage_remote *s = NULL;
-    err = spx_map_get(g_ydb_storage_remote,machineid,spx_string_len(machineid),
-            (void **) &s,NULL);
-    if(NULL == s || 0 != err){
+    s = spx_map_get(g_ydb_storage_remote,machineid,
+            spx_string_len(machineid),NULL);
+    if(NULL == s ){
         err = 0 == err ? ENOENT : err;
         return err;
     }
