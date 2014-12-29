@@ -65,8 +65,9 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
 
     dc->rfid = spx_msg_unpack_string(ctx,len,&(err));
     if(NULL == dc->rfid){
-        SpxLog2(c->log,SpxLogError,err,\
-                "alloc file id for parser is fail.");
+        SpxLogFmt2(c->log,SpxLogError,err,\
+                "unpack fid from client:%s is fail.",
+                jc->client_ip);
         goto r1;
     }
 
@@ -79,8 +80,9 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
                     &(dc->lastmodifytime),&(dc->hashcode),
                     &(dc->has_suffix),&(dc->suffix)))){
 
-        SpxLog2(dc->log,SpxLogError,err,\
-                "parser fid is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,
+                "parser fid:%s is fail.",
+                dc->rfid);
         goto r1;
     }
 
@@ -90,15 +92,16 @@ err_t ydb_storage_dio_find(struct ev_loop *loop,\
             dc->machineid,dc->tidx,dc->file_createtime,
             dc->rand,dc->suffix,&err);
     if(NULL == dc->filename){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "make filename is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,
+                "make filename with fid:%s is fail.",
+                dc->rfid);
         goto r1;
     }
 
     if(!SpxFileExist(dc->filename)) {
         err = ENOENT;
         SpxLogFmt1(dc->log,SpxLogWarn,\
-                "deleting-file:%s is not exist.",
+                "file:%s is not exist.",
                 dc->filename);
         goto r1;
     }
@@ -180,7 +183,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
     struct spx_msg *ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
     if(NULL == ioctx){
         SpxLog2(dc->log,SpxLogError,err,\
-                "alloc io ctx is fail.");
+                "new metedata ioctx is fail.");
         SpxClose(fd);
         munmap(mptr,len);
         goto r1;
@@ -190,7 +193,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
                     ((ubyte_t *) (mptr+ offset)),
                     YDB_CHUNKFILE_MEMADATA_SIZE))){
         SpxLog2(dc->log,SpxLogError,err,\
-                "pack io ctx is fail.");
+                "pack metedata to ioctx is fail.");
         SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
@@ -214,7 +217,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
             &io_suffix,&io_hashcode);
     if(0 != err){
         SpxLog2(dc->log,SpxLogError,err,\
-                "unpack io ctx is fail.");
+                "parser metedata from ioctx is fail.");
         SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
@@ -236,8 +239,10 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
             || dc->lastmodifytime != io_lastmodifytime
             || dc->totalsize != io_totalsize
             || dc->realsize != io_realsize){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "the file is not same as want to delete-file.");
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "the file in the chunkfile:%s "
+                "begin is %lld totalsize:%lld is not the find file.",
+                dc->filename,dc->begin,dc->totalsize);
         err = ENOENT;
         SpxMsgFree(ioctx);
         SpxClose(fd);
@@ -249,7 +254,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
         spx_alloc_alone(sizeof(*wh),&err);
     if(NULL == wh){
         SpxLog2(dc->log,SpxLogError,err,
-                "alloc write header for find buffer in chunkfile is fail.");
+                "alloc write header for find file in chunkfile is fail.");
         SpxMsgFree(ioctx);
         SpxClose(fd);
         munmap(mptr,len);
@@ -351,7 +356,7 @@ spx_private void ydb_storage_dio_do_find_form_signalfile(
                                 spx_alloc_alone(sizeof(*wh),&err);
     if(NULL == wh){
         SpxLog2(dc->log,SpxLogError,err,\
-                "alloc write header for find buffer in chunkfile is fail.");
+                "alloc write header for find single file is fail.");
         goto r1;
     }
 
@@ -367,7 +372,7 @@ spx_private void ydb_storage_dio_do_find_form_signalfile(
     if(0 == fd){
         err = errno;
         SpxLogFmt2(dc->log,SpxLogError,err,\
-                "open chunkfile:%s is fail.",
+                "open singlefile:%s is fail.",
                 dc->filename);
         goto r1;
     }
@@ -382,7 +387,7 @@ spx_private void ydb_storage_dio_do_find_form_signalfile(
         struct spx_msg *ctx = spx_msg_new(dc->realsize,&err);
         if(NULL == ctx){
             SpxLog2(dc->log,SpxLogError,err,\
-                    "alloc buffer ctx for finding writer is fail.");
+                    "new body of response is fail.");
             SpxClose(fd);
             goto r1;
         }
@@ -394,7 +399,7 @@ spx_private void ydb_storage_dio_do_find_form_signalfile(
             err = errno;
             SpxClose(fd);
             SpxLogFmt2(dc->log,SpxLogError,err,\
-                    "mmap chunkfile:%s is fail.",
+                    "mmap singlefile:%s to memory is fail.",
                     dc->filename);
             goto r1;
         }

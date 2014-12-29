@@ -123,7 +123,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
                                               spx_alloc_alone(sizeof(*c),err);
     if(NULL == c){
         SpxLog2(log,SpxLogError,*err,\
-                "alloc the storage config is fail.");
+                "new the storage config is fail.");
         return NULL;
     }
     c->log = log;
@@ -161,7 +161,6 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->lazyrecv = true;
     c->lazysize = 1 * SpxMB;
     c->sendfile = true;
-//    c->binlog_size =(u64_t) 2 * SpxGB;
     c->runtime_flush_timespan = 60;
     c->pagesize = getpagesize();
     c->query_sync_timespan = 30;
@@ -176,7 +175,6 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->sync_end.sec = 0;
     c->disksync_timespan = SpxDayTick;
     c->disksync_busysize = 512 * SpxMB;
-//    c->start_timespan = spx_now();
     c->sync_threads_count = 3;
 
     return c;
@@ -327,7 +325,8 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
                     "use default query_basestorage_timespan:%d.",
                     c->query_basestorage_timespan);
         } else {
-            u32_t query_basestorage_timespan = ydb_storage_configurtion_timespan_convert(c->log,*(kv + 1),
+            u32_t query_basestorage_timespan =
+                ydb_storage_configurtion_timespan_convert(c->log,*(kv + 1),
                     SpxSecondTick,
                 "bad the configurtion item of query_basestorage_timespan.",err);
             if(0 != *err) {
@@ -345,7 +344,8 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
                     "use default runtime flush timespan:%d.",
                     c->runtime_flush_timespan);
         } else {
-            u32_t timeout = ydb_storage_configurtion_timespan_convert(c->log,*(kv + 1),SpxSecondTick,
+            u32_t timeout = ydb_storage_configurtion_timespan_convert(
+                    c->log,*(kv + 1),SpxSecondTick,
                     "bad the configurtion item of runtime flush timespan.",err);
             if(0 != *err) {
                 goto r1;
@@ -354,7 +354,6 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         }
         goto r1;
     }
-
 
     //daemon
     if(0 == spx_string_casecmp(*kv,"daemon")){

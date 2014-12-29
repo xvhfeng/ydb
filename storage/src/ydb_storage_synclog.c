@@ -147,7 +147,7 @@ err_t ydb_storage_synclog_init(
         if(0 != fseek(synclog->fp,offset,SEEK_SET)){
             err = errno;
             SpxLogFmt2(log,SpxLogError,err,
-                    "seek synclog file pointer to %d is fail."
+                    "seek synclog file pointer to %lld is fail."
                     "reset begining with 0.",
                     offset);
         } else {

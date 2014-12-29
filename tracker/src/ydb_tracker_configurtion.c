@@ -292,7 +292,7 @@ void ydb_tracker_config_line_parser_handle(string_t line,void *config,err_t *err
     //logprefix
     if(0 == spx_string_casecmp(*kv,"logprefix")){
         if(1 == count || SpxStringIsEmpty(*(kv + 1))){
-            c->logprefix = spx_string_new("ydb-storage",err);
+            c->logprefix = spx_string_new("ydb-tracker",err);
             if(NULL == c->logprefix){
                 SpxLog2(c->log,SpxLogError,*err,\
                         "alloc default logprefix is fail.");

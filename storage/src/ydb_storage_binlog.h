@@ -43,7 +43,7 @@ extern "C" {
             YDB_STORAGE_LOG_MODIFY,fid,rfid)
 
     struct ydb_storage_binlog{
-        err_t err;
+//        err_t err;
         FILE *fp;
         off_t off;
         string_t path;

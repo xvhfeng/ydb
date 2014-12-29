@@ -69,7 +69,7 @@ err_t ydb_storage_mountpoint_init(struct ydb_storage_configurtion *c){/*{{{*/
                             out,in);
                     if(NULL == new_path){
                         SpxLogFmt1(c->log,SpxLogError,\
-                                "create new path is fail.path:%02X/&02X",\
+                                "create new path is fail.path:%02X/%02X",\
                                 out,in);
                         continue;
                     }

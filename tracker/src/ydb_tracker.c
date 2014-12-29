@@ -58,8 +58,10 @@ int main(int argc,char **argv){
     err_t err = 0;
     string_t confname = spx_string_new(argv[1],&err);
     if(NULL == confname){
-        SpxLog2(log,SpxLogError,err,"alloc the confname is fail.");
-        abort();
+        SpxLog2(log,SpxLogError,err,
+                "new the confname is fail."
+                "and will exit...");
+        exit(err);
     }
 
     struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) \
@@ -70,8 +72,11 @@ int main(int argc,char **argv){
                                                  ydb_tracker_config_line_parser_handle,\
                                                  &err);
     if(NULL == c){
-        SpxLogFmt2(log,SpxLogError,err,"parser the configurtion is fail.file name:%s.",confname);
-        abort();
+        SpxLogFmt2(log,SpxLogError,err,
+                "parser the configurtion is fail.file name:%s."
+                "and will exit...",
+                confname);
+        exit(err);
     }
 
     if(c->daemon){
@@ -84,58 +89,64 @@ int main(int argc,char **argv){
                     c->logprefix,\
                     c->logsize,\
                     c->loglevel))){
-        SpxLog2(log,SpxLogError,err,"init the logger is fail.");
-        abort();
+        SpxLog2(log,SpxLogError,err,
+                "init the logger is fail."
+                "and will exit...");
+        exit(err);
     }
 
     ydb_tracker_regedit_signal();
 
-    g_spx_job_pool = spx_job_pool_new(log,\
-                     c,c->context_size,c->timeout,\
-                    spx_nio_reader,\
-                    spx_nio_writer,\
-            ydb_tracker_network_module_header_validator_handler,\
-            ydb_tracker_network_module_header_validator_fail_handler,\
-            NULL,\
-            ydb_tracker_network_module_request_body_handler,\
-            ydb_tracker_network_module_response_body_handler,\
+    g_spx_job_pool = spx_job_pool_new(log,
+                     c,c->context_size,c->timeout,
+                    spx_nio_reader,
+                    spx_nio_writer,
+            ydb_tracker_network_module_header_validator_handler,
+            ydb_tracker_network_module_header_validator_fail_handler,
+            NULL,
+            ydb_tracker_network_module_request_body_handler,
+            ydb_tracker_network_module_response_body_handler,
             &err);
     if(NULL == g_spx_job_pool){
-        SpxLog2(log,SpxLogError,err,\
-                "alloc job pool is fail.");
-        abort();
+        SpxLog2(log,SpxLogError,err,
+                "alloc job pool is fail."
+                "and will exit...");
+        exit(err);
     }
 
-    g_spx_task_pool = spx_task_pool_new(log,\
-            c->context_size,\
-            ydb_tracker_task_module_handler,\
+    g_spx_task_pool = spx_task_pool_new(log,
+            c->context_size,
+            ydb_tracker_task_module_handler,
             &err);
     if(NULL == g_spx_task_pool){
-        SpxLog2(log,SpxLogError,err,\
-                "alloc task pool is fail.");
-        abort();
+        SpxLog2(log,SpxLogError,err,
+                "alloc task pool is fail."
+                "and will exit...");
+        exit(err);
     }
 
-    g_spx_notifier_module = spx_module_new(log,\
-            c->notifier_module_thread_size,\
-            c->stacksize,\
-            spx_notifier_module_receive_handler,\
+    g_spx_notifier_module = spx_module_new(log,
+            c->notifier_module_thread_size,
+            c->stacksize,
+            spx_notifier_module_receive_handler,
             &err);
     if(NULL == g_spx_notifier_module){
         SpxLog2(log,SpxLogError,err,\
-                "new notifier module is fail.");
-        abort();
+                "new notifier module is fail."
+                "and will exit...");
+        exit(err);
     }
 
-    g_spx_network_module = spx_module_new(log,\
-            c->network_module_thread_size,\
-            c->stacksize,\
-            spx_network_module_receive_handler,\
+    g_spx_network_module = spx_module_new(log,
+            c->network_module_thread_size,
+            c->stacksize,
+            spx_network_module_receive_handler,
             &err);
     if(NULL == g_spx_network_module){
-        SpxLog2(log,SpxLogError,err,\
-                "new network module is fail.");
-        abort();
+        SpxLog2(log,SpxLogError,err,
+                "new network module is fail."
+                "and will exit...");
+        exit(err);
     }
 
     g_spx_task_module = spx_module_new(log,\
@@ -145,15 +156,18 @@ int main(int argc,char **argv){
             &err);
     if(NULL == g_spx_task_module){
         SpxLog2(log,SpxLogError,err,\
-                "new task module is fail.");
-        abort();
+                "new task module is fail."
+                "and will exit...");
+        exit(err);
     }
 
 
     pthread_t tid =  ydb_tracker_mainsocket_thread_new(log,c,&err);
     if(0 != err){
-        SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
-        abort();
+        SpxLog2(log,SpxLogError,err,
+                "create main socket thread is fail."
+                "and will exit...");
+        exit(err);
     }
 
     SpxLogFmt1(log,SpxLogMark,
@@ -163,8 +177,9 @@ int main(int argc,char **argv){
 
     //if have maneger code please input here
 
-//    sleep(10);
     pthread_join(tid,NULL);
+    //here code is for resource recycling
+    //but now this is backspace
 
     return 0;
 }

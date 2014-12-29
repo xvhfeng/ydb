@@ -105,11 +105,17 @@ spx_private err_t ydb_remote_storage_report(
     if(NULL == tcontext){
         return EINVAL;
     }
-    struct spx_job_context *jcontext = tcontext->jcontext;
-    if(NULL == jcontext){
+    struct spx_job_context *jc = tcontext->jcontext;
+    if(NULL == jc){
         return EINVAL;
     }
-    struct spx_msg *ctx = jcontext->reader_body_ctx;
+    struct spx_msg *ctx = jc->reader_body_ctx;
+    if(NULL == ctx){
+        SpxLogFmt1(tcontext->log,SpxLogError,\
+                "reader body ctx from client:%s is null.",
+                jc->client_ip);
+        return EINVAL;
+    }
 
     string_t groupname = NULL;
     string_t machineid = NULL;
@@ -118,58 +124,88 @@ spx_private err_t ydb_remote_storage_report(
     struct spx_map *map = NULL;
     struct ydb_remote_storage *storage = NULL;
 
-    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jcontext->err));
+    groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jc->err));
     if(NULL == groupname){
-        return jcontext->err;
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
+                "unpack groupname from msg ctx is fail."
+                "client ip:%s.",
+                jc->client_ip);
+        return jc->err;
     }
-
-    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jcontext->err));
+    machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jc->err));
     if(NULL == machineid){
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
+                "unpack machineid from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
-
-    syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jcontext->err));
+    syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jc->err));
     if(NULL == syncgroup){
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
+                "unpack syncgroup from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
 
-    ip = spx_msg_unpack_string(ctx,SpxIpv4Size,&(jcontext->err));
+    SpxLogFmt1(jc->log,SpxLogDebug,
+            "heartbeat storage:%s from client:%s in the group:%s with syncgroup:%s.",
+            machineid,jc->client_ip,groupname,syncgroup);
+
+    ip = spx_msg_unpack_string(ctx,SpxIpv4Size,&(jc->err));
     if(NULL == ip){
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "unpack ip from storage:%s in the group:%s with syncgroup:%s."
+                "client ip:%s.",
+                machineid,groupname,syncgroup,jc->client_ip);
         goto r1;
     }
 
-    SpxLogFmt1(jcontext->log,SpxLogDebug,
+    SpxLogFmt1(jc->log,SpxLogDebug,
             "accept heartbeat from storage:%s in the group:%s with syncgroup:%s.",
             machineid,groupname,syncgroup);
 
     if(NULL == ydb_remote_storages){
-        ydb_remote_storages = spx_map_new(jcontext->log,
+        ydb_remote_storages = spx_map_new(jc->log,
                 spx_pjw,
                 spx_collection_string_default_cmper,
                 NULL,
                 ydb_remote_storage_key_free,
                 ydb_remote_storage_value_free,
-                &(jcontext->err));
+                &(jc->err));
         if(NULL == ydb_remote_storages){
+            SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "new remote storages for heartbeat from storage:%s in the group:%s with syncgroup:%s."
+                "client ip:%s.",
+                machineid,groupname,syncgroup,jc->client_ip);
             goto r1;
         }
     }
 
     map = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),NULL);
     if(NULL == map){
-        map = spx_map_new(jcontext->log,
+        map = spx_map_new(jc->log,
                 spx_pjw,
                 spx_collection_string_default_cmper,
                 NULL,
                 ydb_remote_storage_key_free,
                 ydb_remote_storage_free,
-                &(jcontext->err));
+                &(jc->err));
         if(NULL == map){
+            SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "not found group:%s from remote storages "
+                "for heartbeat from storage:%s with syncgroup:%s."
+                "client ip:%s. and new a map for group is fail.",
+                groupname,machineid,syncgroup,jc->client_ip);
             goto r1;
         }
-        jcontext->err = spx_map_insert(ydb_remote_storages,
+        jc->err = spx_map_insert(ydb_remote_storages,
                 groupname,spx_string_len(groupname),map,sizeof(*map));
-        if(0 != jcontext->err){
+        if(0 != jc->err){
+            SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "not found group:%s from remote storages "
+                "for heartbeat from storage:%s with syncgroup:%s."
+                "client ip:%s. and insert a map named group to remote storages is fail.",
+                groupname,machineid,syncgroup,jc->client_ip);
             spx_map_free(&map);
             goto r1;
         }
@@ -177,12 +213,21 @@ spx_private err_t ydb_remote_storage_report(
 
     storage = spx_map_get(map,machineid,spx_string_len(machineid),NULL);
     if(NULL == storage){
-        storage = spx_alloc_alone(sizeof(*storage),&(jcontext->err));
+        storage = spx_alloc_alone(sizeof(*storage),&(jc->err));
         if(NULL == storage){
+            SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                    "not found storage:%s from group:%s with syncgroup:%s."
+                    "and new a storage is fail.",
+                    machineid,groupname,syncgroup);
             goto r1;
         }
-        jcontext->err = spx_map_insert(map,machineid,spx_string_len(machineid),storage,sizeof(*storage));
-        if(0 != jcontext->err){
+        jc->err = spx_map_insert(map,machineid,spx_string_len(machineid),storage,sizeof(*storage));
+        if(0 != jc->err){
+            SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                    "insert storage:%s to group:%s with syncgroup:%s."
+                    "and new a storage is fail."
+                    "and free storage.",
+                    machineid,groupname,syncgroup);
             SpxFree(storage);
             goto r1;
         }
@@ -221,22 +266,31 @@ spx_private err_t ydb_remote_storage_report(
         storage->ip = ip;
         SpxStringFree(oip);
     }
-    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jcontext->err));
+    struct spx_msg_header *response_header = spx_alloc_alone(sizeof(*response_header),&(jc->err));
     if(NULL == response_header){
-        return jcontext->err;
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "new header for heartbeat from storage:%s "
+                " in the group:%s with syncgroup:%s.",
+                machineid,groupname,syncgroup);
+        return jc->err;
     }
 
-    jcontext->writer_header = response_header;
+    jc->writer_header = response_header;
     response_header->protocol = proto;
     response_header->version = YDB_VERSION;
     response_header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN \
                                + YDB_SYNCGROUP_LEN + SpxIpv4Size \
                                + 4 * sizeof(u64_t) + 2 * sizeof(u32_t);
-    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jcontext->err));
+    struct spx_msg *response_body_ctx  = spx_msg_new(response_header->bodylen,&(jc->err));
     if(NULL == response_body_ctx){
-        return jcontext->err;
+        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
+                "new body ctx with len:%d for heartbeat from storage:%s "
+                " in the group:%s with syncgroup:%s.",
+                response_header->bodylen,
+                machineid,groupname,syncgroup);
+        return jc->err;
     }
-    jcontext->writer_body_ctx = response_body_ctx;
+    jc->writer_body_ctx = response_body_ctx;
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->groupname,YDB_GROUPNAME_LEN);
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->machineid,YDB_MACHINEID_LEN);
     spx_msg_pack_ubytes(response_body_ctx,(ubyte_t *) storage->syncgroup,YDB_SYNCGROUP_LEN);
@@ -261,7 +315,7 @@ r1:
     if(NULL != ip){
         SpxStringFree(ip);
     }
-    return jcontext->err;
+    return jc->err;
 }/*}}}*/
 
 err_t ydb_tracker_regedit_from_storage(struct ev_loop *loop,struct spx_task_context *tcontext){/*{{{*/

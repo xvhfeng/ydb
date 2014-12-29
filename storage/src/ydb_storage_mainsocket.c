@@ -102,6 +102,8 @@ spx_private void *ydb_storage_mainsocket_create(void *arg){
     }
 
     g_ydb_storage_runtime->status = YDB_STORAGE_ACCEPTING;
+    SpxLog1(c->log,SpxLogInfo,
+            "main socket will accepting...");
     spx_socket_accept_nb(c->log,mainsocket->loop,socket);
 r1:
     if(NULL != mainsocket->loop){

@@ -45,7 +45,7 @@ spx_private  void *ydb_storage_dio_context_new(size_t idx,void *arg,err_t *err){
                                          spx_alloc_alone(sizeof(*dc),err);
     if(NULL == dc){
         SpxLog2(dct->log,SpxLogError,*err,\
-                "new storage dio context.");
+                "new storage dio context is fail.");
         return NULL;
     }
     dc->log = dct->log;

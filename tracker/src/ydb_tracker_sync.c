@@ -44,22 +44,24 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
 
     groupname =  spx_msg_unpack_string(ctx,YDB_GROUPNAME_LEN,&(jc->err));
     if(NULL == groupname){
-        SpxLog2(tcontext->log,SpxLogError,jc->err,\
-                "unpack groupname from msg ctx is fail.");
+        SpxLogFmt2(jc->log,SpxLogError,jc->err,\
+                "unpack groupname from msg ctx is fail."
+                "client ip:%s.",
+                jc->client_ip);
         return jc->err;
     }
     machineid = spx_msg_unpack_string(ctx,YDB_MACHINEID_LEN,&(jc->err));
     if(NULL == machineid){
-        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack machineid from msg ctx in the group:%s is fail.",\
-                groupname);
+        SpxLogFmt2(jc->log,SpxLogError,jc->err,\
+                "unpack machineid from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
     syncgroup = spx_msg_unpack_string(ctx,YDB_SYNCGROUP_LEN,&(jc->err));
     if(NULL == syncgroup){
-        SpxLogFmt2(tcontext->log,SpxLogError,jc->err,\
-                "unpack syncgroup from msg ctx in the group:%s is fail.",\
-                groupname);
+        SpxLogFmt2(jc->log,SpxLogError,jc->err,\
+                "unpack syncgroup from msg ctx from client:%s in the group:%s is fail.",
+                jc->client_ip,groupname);
         goto r1;
     }
 

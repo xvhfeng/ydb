@@ -64,12 +64,18 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
     struct spx_job_context *jc = tracker->hjc;
     int fd = spx_socket_new(&err);
     if(0 >= fd){
-        SpxLog2(jc->log,SpxLogError,err,"create heartbeat socket fd is fail.");
+        SpxLogFmt2(jc->log,SpxLogError,err,
+                "create heartbeat socket fd is fail."
+                "tracker ip:%s port:%d.",
+                tracker->host.ip,tracker->host.port);
         return err;
     }
     jc->fd = fd;
     if(0 != (err = spx_set_nb(fd))){
-        SpxLog2(jc->log,SpxLogError,err,"set socket nonblacking is fail.");
+        SpxLogFmt2(jc->log,SpxLogError,err,
+                "set socket fd nonblacking is fail."
+                "tracker ip:%s port:%d.",
+                tracker->host.ip,tracker->host.port);
         goto r1;
     }
     if(0 != (err = spx_socket_set(fd,SpxKeepAlive,SpxAliveTimeout,\
@@ -77,7 +83,10 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
                     SpxLinger,SpxLingerTimeout,\
                     SpxNodelay,\
                     true,timeout))){
-        SpxLog2(jc->log,SpxLogError,err,"set socket operator is fail.");
+        SpxLogFmt2(jc->log,SpxLogError,err,
+                "set socket fd is fail."
+                "tracker ip:%s port:%d.",
+                tracker->host.ip,tracker->host.port);
         goto r1;
     }
     if(0 != (err = spx_socket_connect_nb(fd,tracker->host.ip,tracker->host.port,timeout))){
@@ -90,8 +99,9 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
     struct spx_msg_header *writer_header = NULL;
     writer_header = spx_alloc_alone(sizeof(*writer_header),&err);
     if(NULL == writer_header){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "alloc writer header is fail.");
+        SpxLogFmt2(jc->log,SpxLogError,err,\
+                "alloc writer header  send to tracker ip:%s port:%d is fail.",
+                tracker->host.ip,tracker->host.port);
         goto r1;
     }
     jc->writer_header = writer_header;
@@ -103,8 +113,9 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
                              + sizeof(i64_t) + sizeof(int);
     struct spx_msg *ctx = spx_msg_new(writer_header->bodylen,&err);
     if(NULL == ctx){
-        SpxLog2(jc->log,SpxLogError,err,\
-                "alloc writer body is fail.");
+        SpxLogFmt2(jc->log,SpxLogError,err,\
+                "alloc writer body send to tracker ip:%s port:%d is fail.",
+                tracker->host.ip,tracker->host.port);
         goto r1;
     }
     jc->writer_body_ctx = ctx;

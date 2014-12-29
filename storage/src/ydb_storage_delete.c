@@ -63,8 +63,9 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
 
     dc->rfid = spx_msg_unpack_string(ctx,len,&(err));
     if(NULL == dc->rfid){
-        SpxLog2(c->log,SpxLogError,err,\
-                "alloc file id for parser is fail.");
+        SpxLogFmt2(c->log,SpxLogError,err,\
+                "unpack the fid from client:%s is fail.",
+                jc->client_ip);
         goto r1;
     }
 
@@ -77,8 +78,9 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
         &(dc->lastmodifytime),&(dc->hashcode),
         &(dc->has_suffix),&(dc->suffix)))){
 
-        SpxLog2(dc->log,SpxLogError,err,\
-                "parser fid is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "parser fid:%s from client:%s is fail.",
+                dc->rfid,jc->client_ip);
         goto r1;
     }
 
@@ -89,15 +91,16 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
             dc->machineid,dc->tidx,dc->file_createtime,
             dc->rand,dc->suffix,&err);
     if(NULL == dc->filename){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "make filename is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "make filename with fid:%s from client:%s is fail.",
+                dc->rfid,jc->client_ip);
         goto r1;
     }
 
     if(!SpxFileExist(dc->filename)) {
         SpxLogFmt1(dc->log,SpxLogWarn,\
-                "deleting-file:%s is not exist.",
-                dc->filename);
+                "deleting-file:%s is not exist.request from:%s.",
+                dc->filename,jc->client_ip);
         goto r1;
     }
 
@@ -105,8 +108,8 @@ err_t ydb_storage_dio_delete(struct ev_loop *loop,\
         if(0 != remove(dc->filename)){
             err = errno;
             SpxLogFmt2(dc->log,SpxLogError,err,\
-                    "delete file :%s is fail.",
-                    dc->filename);
+                    "delete file :%s is fail.request from:%s.",
+                    dc->filename,jc->client_ip);
         }
 
         YdbStorageBinlogDeleteWriter(dc->rfid);
@@ -163,8 +166,11 @@ void ydb_storage_dio_do_delete_form_chunkfile(
                     c,dc->filename,dc->begin,dc->totalsize,
                     dc->opver,dc->ver,dc->lastmodifytime,
                     dc->realsize,spx_now()))){
-        SpxLog2(dc->log,SpxLogError,err,
-                "delete context form chunkfile is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,
+                "delete context begin:%lld,realsize:%lld,totalsize:%lld "
+                "form chunkfile:%s is fail.",
+                dc->begin,dc->realsize,dc->totalsize,
+                dc->filename);
         goto r1;
     }
 
@@ -175,8 +181,11 @@ void ydb_storage_dio_do_delete_form_chunkfile(
     struct spx_msg_header *wh = (struct spx_msg_header *) \
                                 spx_alloc_alone(sizeof(*wh),&err);
     if(NULL == wh){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "alloc write header for delete buffer in chunkfile is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,
+                "delete context begin:%lld,realsize:%lld,totalsize:%lld "
+                "form chunkfile:%s is success bug new response header is fail.",
+                dc->begin,dc->realsize,dc->totalsize,
+                dc->filename);
         goto r1;
     }
 
@@ -185,6 +194,7 @@ void ydb_storage_dio_do_delete_form_chunkfile(
     wh->protocol = YDB_C2S_DELETE;
     wh->offset = 0;
     wh->bodylen = 0;
+    err = 0;
     goto r2;
 r1:
     jc->writer_header = (struct spx_msg_header *)
@@ -214,7 +224,6 @@ r2:
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return;
 }/*}}}*/
-
 
 err_t ydb_storage_dio_delete_context_from_chunkfile(
         struct ydb_storage_configurtion *c,
@@ -247,8 +256,7 @@ err_t ydb_storage_dio_delete_context_from_chunkfile(
     u64_t offset = cbegin - begin;
     u64_t len = offset + ctotalsize;
 
-    fd = open(fname,\
-            O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
+    fd = open(fname,O_RDWR,SpxFileMode);
     if(0 == fd){
         err = errno;
         SpxLogFmt2(c->log,SpxLogError,err,\
@@ -263,15 +271,15 @@ err_t ydb_storage_dio_delete_context_from_chunkfile(
     if(MAP_FAILED == mptr){
         err = errno;
         SpxLogFmt2(c->log,SpxLogError,err,\
-                "mmap chunkfile:%s is fail.",
-                fname);
+                "mmap chunkfile:%s with begin:%lld,length:%lld is fail.",
+                fname,begin,len);
         goto r1;
     }
 
     ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
     if(NULL == ioctx){
         SpxLog2(c->log,SpxLogError,err,\
-                "alloc io ctx is fail.");
+                "alloc metedata ioctx is fail.");
         goto r1;
     }
 
@@ -279,7 +287,7 @@ err_t ydb_storage_dio_delete_context_from_chunkfile(
                     ((ubyte_t *) (mptr+ offset)),
                     YDB_CHUNKFILE_MEMADATA_SIZE))){
         SpxLog2(c->log,SpxLogError,err,\
-                "pack io ctx is fail.");
+                "read metedata to ioctx is fail.");
         goto r1;
     }
 
@@ -292,23 +300,27 @@ err_t ydb_storage_dio_delete_context_from_chunkfile(
             &io_suffix,&io_hashcode);
     if(0 != err){
         SpxLog2(c->log,SpxLogError,err,\
-                "unpack io ctx is fail.");
+                "unpack metedate ioctx is fail.");
         goto r1;
     }
 
     if(io_isdelete){
-        SpxLogFmt2(c->log,SpxLogError,err,\
+        SpxLogFmt1(c->log,SpxLogError,
                 "the file in the chunkfile:%s "
-                "begin is %lld totalsize:%lld is deleted.",
+                "with begin:%lld totalsize:%lld is deleted.",
                 fname,cbegin,ctotalsize);
+        err = ENOENT;
         goto r1;
     }
     if(copver != io_opver || cver != io_ver
             || clastmodifytime != io_lastmodifytime
             || ctotalsize != io_totalsize
             || crealsize != io_realsize){
-        SpxLog2(c->log,SpxLogError,err,
-                "the file is not same as want to delete-file.");
+        SpxLogFmt1(c->log,SpxLogError,
+                "the file in the chunkfile:%s "
+                "with begin:%lld totalsize:%lld is not the deleting-file.",
+                fname,cbegin,ctotalsize);
+        err = EPERM;
         goto r1;
     }
 

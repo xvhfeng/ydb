@@ -147,8 +147,9 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                     &(o_lastmodifytime),&(o_hashcode),
                     &(o_has_suffix),&(o_suffix)))){
 
-        SpxLog2(dc->log,SpxLogError,err,\
-                "parser fid is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "parser fid:%s is fail.",
+                dc->rfid);
         goto r1;
     }
 
@@ -158,8 +159,9 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
             o_machineid,o_tidx,o_fcreatetime,
             o_rand,o_suffix,&err);
     if(NULL == o_fname){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "make filename is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "make filename by fid:%s is fail.",
+                dc->rfid);
         goto r1;
     }
 
@@ -173,7 +175,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
         u64_t len = offset + o_totalsize;
 
         int fd = open(o_fname,
-                O_RDWR|O_APPEND|O_CREAT,SpxFileMode);
+                O_RDWR,SpxFileMode);
         if(0 == fd){
             err = errno;
             SpxLogFmt2(dc->log,SpxLogError,err,\
@@ -189,14 +191,14 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
             err = errno;
             SpxClose(fd);
             SpxLogFmt2(dc->log,SpxLogError,err,\
-                    "mmap chunkfile:%s is fail.",
-                    o_fname);
+                    "mmap chunkfile:%s  with bein:%lld len:%lld is fail.",
+                    o_fname,begin,len);
             goto r1;
         }
         struct spx_msg *ioctx = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,&err);
         if(NULL == ioctx){
             SpxLog2(dc->log,SpxLogError,err,\
-                    "alloc io ctx is fail.");
+                    "new metedata io ctx is fail.");
             SpxClose(fd);
             munmap(mptr,len);
             goto r1;
@@ -206,7 +208,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                         ((ubyte_t *) (mptr+ offset)),
                         YDB_CHUNKFILE_MEMADATA_SIZE))){
             SpxLog2(dc->log,SpxLogError,err,\
-                    "pack io ctx is fail.");
+                    "pack metedata from io ctx is fail.");
             SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
@@ -230,7 +232,7 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                 &io_suffix,&io_hashcode);
         if(0 != err){
             SpxLog2(dc->log,SpxLogError,err,\
-                    "unpack io ctx is fail.");
+                    "unpack metedata from io ctx is fail.");
             SpxMsgFree(ioctx);
             SpxClose(fd);
             munmap(mptr,len);
@@ -287,8 +289,8 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
                 dc->buf = spx_alloc_alone(YdbBufferSizeForLazyRecv,&err);
                 if(NULL == dc->buf){
                     SpxLogFmt2(dc->log,SpxLogError,err,
-                            "new lazy-recv buffer is fail."
-                            "size:%lld.",YdbBufferSizeForLazyRecv);
+                            "new lazy-recv buffer for fid:%s is fail."
+                            "size:%lld.",dc->rfid,YdbBufferSizeForLazyRecv);
                     SpxMsgFree(ioctx);
                     SpxClose(fd);
                     munmap(mptr,len);
@@ -370,8 +372,9 @@ spx_private void ydb_storage_do_modify_to_chunkfile(
     //so,we do upload new file and just only check old-file and delete it
 
     if(0 != ( err =  ydb_storage_dio_upload_to_chunkfile(dc))){
-        SpxLog2(dc->log,SpxLogError,err,
-                "modify context convert upload is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,
+                "modify context convert upload with fid:%s is fail.",
+                dc->rfid);
         goto r1;
     }
     if(0 != (err = ydb_storage_modify_after(dc))){
@@ -530,8 +533,9 @@ spx_private void ydb_storage_do_modify_to_singlefile(
                     &(o_lastmodifytime),&(o_hashcode),
                     &(o_has_suffix),&(o_suffix)))){
 
-        SpxLog2(dc->log,SpxLogError,err,\
-                "parser fid is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "parser fid:%s is fail.",
+                dc->rfid);
         goto r1;
     }
 
@@ -541,8 +545,9 @@ spx_private void ydb_storage_do_modify_to_singlefile(
             o_machineid,o_tidx,o_fcreatetime,
             o_rand,o_suffix,&err);
     if(NULL == o_fname){
-        SpxLog2(dc->log,SpxLogError,err,\
-                "make filename is fail.");
+        SpxLogFmt2(dc->log,SpxLogError,err,\
+                "make filename by fid:%s is fail.",
+                dc->rfid);
         goto r1;
     }
 

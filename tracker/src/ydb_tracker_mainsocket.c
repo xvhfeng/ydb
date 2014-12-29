@@ -98,13 +98,13 @@ spx_private void *ydb_tracker_mainsocket_create(void *arg){
                     true,c->timeout,
                     1024))){
         SpxLog2(log,SpxLogError,err,"start main socket is fail.");
-/*
-        spx_log(SpxLogError,((string_t) "File:%s,Line:%d,Func:%s.errno:%d,info:%s.%s."),\
-                __FILE__,__LINE__,__FUNCTION__,err,err >= SpxSuccess ?  spx_strerror(err) : strerror(err)
-        ,"start main socket is fail.");
-        */
         goto r1;
     }
+
+    SpxLogFmt1(log,SpxLogMark,
+            "main socket fd:%d."
+            "and accepting...",
+            mainsocket);
 
     spx_socket_accept_nb(c->log,main_socket_loop,mainsocket);
 r1:

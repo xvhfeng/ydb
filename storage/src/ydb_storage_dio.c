@@ -356,7 +356,7 @@ struct spx_msg *ydb_storage_dio_make_metadata(SpxLogDelegate *log,
     struct spx_msg *md = spx_msg_new(YDB_CHUNKFILE_MEMADATA_SIZE,err);
     if(NULL == md){
         SpxLog2(log,SpxLogError,*err,\
-                "alloc md for chunkfile is fail.");
+                "new metedata for chunkfile is fail.");
         return NULL;
     }
 
@@ -595,21 +595,21 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
                         g_ydb_storage_runtime->chunkfile_count));
             SpxAtomicCas(&(g_ydb_storage_runtime->chunkfile_count),10000,0);
             cf->chunkfile.rand = count;
-            ydb_storage_dio_get_path(c,g_ydb_storage_runtime,\
-                    &(cf->chunkfile.mpidx),\
+            ydb_storage_dio_get_path(c,g_ydb_storage_runtime,
+                    &(cf->chunkfile.mpidx),
                     &(cf->chunkfile.p1),&(cf->chunkfile.p2));
 
-            cf->chunkfile.filename = ydb_storage_dio_make_filename(\
+            cf->chunkfile.filename = ydb_storage_dio_make_filename(
                     dc->log,dc->issinglefile,c->mountpoints,
                     g_ydb_storage_runtime->mpidx,
                     cf->chunkfile.p1,cf->chunkfile.p2,
                     c->machineid,cf->tidx,cf->chunkfile.fcreatetime,
-                    cf->chunkfile.rand,\
+                    cf->chunkfile.rand,
                     dc->suffix,&err);
 
             if(SpxStringIsNullOrEmpty(cf->chunkfile.filename)){
                 SpxLog2(c->log,SpxLogError,err,
-                        "alloc chunkfile name is fail.");
+                        "chunkfile filename is null or empty when open it.");
                 break;
             }
             SpxLogFmt1(c->log,SpxLogDebug,"reopen :%s."
@@ -621,7 +621,7 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
             if(0 >= cf->chunkfile.fd){
                 err = errno;
                 SpxLogFmt2(c->log,SpxLogError,err,\
-                        "open chunkfile is fail.",
+                        "open chunkfile:%s is fail.",
                         cf->chunkfile.filename);
                 SpxStringFree(cf->chunkfile.filename);
                 break;
@@ -652,8 +652,6 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
             SpxLogFmt1(c->log,SpxLogDebug,
                     "total:%lld,chunksize:%lld,offset:%lld.",dc->totalsize,
                     c->chunksize,cf->chunkfile.offset);
-            SpxLogFmt1(c->log,SpxLogDebug,"close the file %s",
-                    cf->chunkfile.filename);
             munmap(cf->chunkfile.mptr,c->chunksize);
             cf->chunkfile.mptr = NULL;
             SpxClose(cf->chunkfile.fd);
@@ -663,7 +661,6 @@ err_t ydb_storage_upload_check_and_open_chunkfile(
         }
         break;
     }
-    SpxLog1(c->log,SpxLogDebug,"return");
     return err;
 }/*}}}*/
 

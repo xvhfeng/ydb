@@ -51,23 +51,24 @@ spx_private err_t ydb_storage_binlog_reopen(struct ydb_storage_binlog *binlog){/
             SpxStringFree(binlog->filename);
         }
     }
+    err_t err = 0;
 
     binlog->filename = ydb_storage_binlog_make_filename(binlog->log,binlog->path,
-            binlog->machineid,binlog->d.year,binlog->d.month,binlog->d.day,&(binlog->err));
+            binlog->machineid,binlog->d.year,binlog->d.month,binlog->d.day,&(err));
     if(NULL == binlog->filename){
-        SpxLog2(binlog->log,SpxLogError,binlog->err,
+        SpxLog2(binlog->log,SpxLogError,err,
                 "make binlog filename is fail.");
-        return binlog->err;
+        return err;
     }
 
     binlog->fp = fopen(binlog->filename,"a+");
     if(NULL == binlog->fp){
-        binlog->err = errno;
-        SpxLogFmt2(binlog->log,SpxLogError,binlog->err,\
+        err = errno;
+        SpxLogFmt2(binlog->log,SpxLogError,err,\
                 "open binlog file:%s is fail.",\
                 binlog->filename);
         SpxStringFree(binlog->filename);
-        return binlog->err;
+        return err;
     }
     setlinebuf(binlog->fp);
     binlog->off = 0;
@@ -77,13 +78,14 @@ spx_private err_t ydb_storage_binlog_reopen(struct ydb_storage_binlog *binlog){/
 spx_private err_t ydb_storage_binlog_open(struct ydb_storage_binlog *binlog){/*{{{*/
     //skip binlog but no flush state into disk
     spx_get_today(&(binlog->d));
+    err_t err= 0;
 
     binlog->filename = ydb_storage_binlog_make_filename(binlog->log,binlog->path,
-            binlog->machineid,binlog->d.year,binlog->d.month,binlog->d.day,&(binlog->err));
+            binlog->machineid,binlog->d.year,binlog->d.month,binlog->d.day,&(err));
     if(NULL == binlog->filename){
-        SpxLog2(binlog->log,SpxLogError,binlog->err,
+        SpxLog2(binlog->log,SpxLogError,err,
                 "make binlog filename is fail.");
-        return binlog->err;
+        return err;
     }
 
     struct stat buf;
@@ -92,27 +94,27 @@ spx_private err_t ydb_storage_binlog_open(struct ydb_storage_binlog *binlog){/*{
         stat(binlog->filename,&buf);
     }
 
-    string_t basepath = spx_basepath(binlog->filename,&(binlog->err));
-    if(NULL == basepath || 0 != binlog->err){
-        SpxLogFmt2(binlog->log,SpxLogError,binlog->err,
+    string_t basepath = spx_basepath(binlog->filename,&(err));
+    if(NULL == basepath || 0 != err){
+        SpxLogFmt2(binlog->log,SpxLogError,err,
                 "get basepath from filename:%s is fail.",
                 binlog->filename);
         SpxStringFree(binlog->filename);
-        return binlog->err;
+        return err;
     }
-    if(!spx_is_dir(basepath,&(binlog->err))){
+    if(!spx_is_dir(basepath,&(err))){
         spx_mkdir(binlog->log,basepath,SpxPathMode);
     }
     SpxStringFree(basepath);
 
     binlog->fp = fopen(binlog->filename,"a+");
     if(NULL == binlog->fp){
-        binlog->err = errno;
-        SpxLogFmt2(binlog->log,SpxLogError,binlog->err,\
+        err = errno;
+        SpxLogFmt2(binlog->log,SpxLogError,err,\
                 "open binlog file:%s is fail.",\
                 binlog->filename);
         SpxStringFree(binlog->filename);
-        return binlog->err;
+        return err;
     }
     if(0 != buf.st_size) {
         fseek(binlog->fp,buf.st_size,SEEK_CUR);
@@ -185,9 +187,9 @@ void ydb_storage_binlog_write(struct ydb_storage_binlog *binlog,\
                 ydb_storage_binlog_reopen(binlog);
             }
             size_t len = 0;
-            binlog->err = spx_fwrite_string(binlog->fp,loginfo,size,&len);
-            if(0 != binlog->err || size != len){
-                SpxLogFmt2(binlog->log,SpxLogError,binlog->err,\
+            err = spx_fwrite_string(binlog->fp,loginfo,size,&len);
+            if(0 != err || size != len){
+                SpxLogFmt2(binlog->log,SpxLogError,err,\
                         "write binlog is fail.loginfo:%s,size:%lld,realsize:%lld.",
                         loginfo,size,len);
                 break;

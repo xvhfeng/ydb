@@ -37,7 +37,6 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
         return EINVAL;
     }
 
-//    ev_io_stop(loop,&(tcontext->watcher));
     //because the deal process handler is not noblacking
     //so we can deal the error in the end of the function
     err_t err = 0;
@@ -109,9 +108,10 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
         if(NULL == jc->writer_header){
             response_header = spx_alloc_alone(sizeof(*response_header),&(jc->err));
             if(NULL == response_header){
-                SpxLog2(jc->log,SpxLogError,jc->err,\
-                        "alloc the response header for error is fail."\
-                        "then forced pushing the job context to pool.");
+                SpxLogFmt2(jc->log,SpxLogError,jc->err,\
+                        "alloc the response header for error to client:%s is fail."\
+                        "then forced pushing the job context to pool.",
+                        jc->client_ip);
                 spx_job_pool_push(g_spx_job_pool,jc);
                 return err;
             }
@@ -128,9 +128,10 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
 
     jc->writer_header_ctx = spx_header_to_msg(jc->writer_header,SpxMsgHeaderSize,&(jc->err));
     if(NULL == jc->writer_header_ctx){
-        SpxLog2(jc->log,SpxLogError,jc->err,\
-                "response header to msg ctx for error is fail."\
-                "then forced pushing the job context to pool.");
+        SpxLogFmt2(jc->log,SpxLogError,jc->err,\
+                "response header to msg ctx for error to client:%s is fail."\
+                "then forced pushing the job context to pool.",
+                jc->client_ip);
         spx_job_pool_push(g_spx_job_pool,jc);
         return err;
     }
@@ -139,7 +140,6 @@ err_t ydb_tracker_task_module_handler(struct ev_loop *loop,
     size_t i = spx_network_module_wakeup_idx(jc);
     struct spx_thread_context *tc = spx_get_thread(g_spx_network_module,i);
     jc->tc = tc;
-    //    err = spx_module_dispatch(tc,spx_network_module_wakeup_handler,jc);
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return 0;
 }

@@ -68,7 +68,7 @@ int main(int argc,char **argv){
     string_t confname = spx_string_new(argv[1],&err);
     if(NULL == confname){
         SpxLog2(log,SpxLogError,err,"alloc the confname is fail.");
-        abort();
+        exit(err);
     }
 
     struct ydb_storage_configurtion *c = (struct ydb_storage_configurtion *) \
@@ -79,8 +79,9 @@ int main(int argc,char **argv){
                                                  ydb_storage_config_line_parser,\
                                                  &err);
     if(NULL == c || 0 != err){
-        SpxLogFmt2(log,SpxLogError,err,"parser the configurtion is fail.file name:%s.",confname);
-        abort();
+        SpxLogFmt2(log,SpxLogError,err,
+                "parser the configurtion is fail.file name:%s.",confname);
+        exit(err);
     }
 
     if(c->daemon){
@@ -96,14 +97,14 @@ int main(int argc,char **argv){
                     c->logsize,\
                     c->loglevel))){
         SpxLog2(log,SpxLogError,err,"init the logger is fail.");
-        abort();
+        exit(err);
     }
 
     g_ydb_storage_runtime = ydb_storage_runtime_init(log,c,&err);
     if(NULL == g_ydb_storage_runtime || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "init storage runtime is fail.");
-        abort();
+        exit(err);
     }
 
     g_ydb_storage_runtime->status = YDB_STORAGE_INITING;
@@ -111,7 +112,7 @@ int main(int argc,char **argv){
     if(0 != (err = ydb_storage_dio_mountpoint_init(c))){
         SpxLog2(log,SpxLogError,err,
                 "init mountpoint store is fail.");
-        abort();
+        exit(err);
     }
 
     g_ydb_storage_storefile_pool =
@@ -119,7 +120,7 @@ int main(int argc,char **argv){
     if(NULL == g_ydb_storage_storefile_pool || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storefile pool is fail,");
-        abort();
+        exit(err);
     }
 
     g_ydb_storage_dio_pool =
@@ -127,7 +128,7 @@ int main(int argc,char **argv){
     if(NULL == g_ydb_storage_dio_pool || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storage dio pool is fail.");
-        abort();
+        exit(err);
     }
 
     g_ydb_storage_binlog = ydb_storage_binlog_new(log,c->dologpath,
@@ -135,7 +136,7 @@ int main(int argc,char **argv){
     if(NULL == g_ydb_storage_binlog || 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new storage binlog is fail.");
-        abort();
+        exit(err);
     }
 
     g_spx_job_pool = spx_job_pool_new(log,\
@@ -153,7 +154,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_job_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc job pool is fail.");
-        abort();
+        exit(err);
     }
 
     g_spx_task_pool = spx_task_pool_new(log,\
@@ -163,7 +164,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_task_pool){
         SpxLog2(log,SpxLogError,err,\
                 "alloc task pool is fail.");
-        abort();
+        exit(err);
     }
 
     g_spx_notifier_module = spx_module_new(log,\
@@ -174,7 +175,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_notifier_module){
         SpxLog2(log,SpxLogError,err,\
                 "new notifier module is fail.");
-        abort();
+        exit(err);
     }
 
     g_spx_network_module = spx_module_new(log,\
@@ -185,7 +186,7 @@ int main(int argc,char **argv){
     if(NULL == g_spx_network_module){
         SpxLog2(log,SpxLogError,err,\
                 "new network module is fail.");
-        abort();
+        exit(err);
     }
 
     g_spx_task_module = spx_module_new(log,\
@@ -196,21 +197,21 @@ int main(int argc,char **argv){
     if(NULL == g_spx_task_module){
         SpxLog2(log,SpxLogError,err,\
                 "new task module is fail.");
-        abort();
+        exit(err);
     }
 
     pthread_t heartbeat_tid = ydb_storage_heartbeat_service_init( log,c->timeout,c,&err);
     if(0 == heartbeat_tid && 0 != err){
         SpxLog2(log,SpxLogError,err,
                 "new heartbeat thread is fail.");
-        abort();
+        exit(err);
     }
 
     struct ydb_storage_mainsocket *socket=
         ydb_storage_mainsocket_thread_new(c,&err);
     if(NULL == socket){
         SpxLog2(log,SpxLogError,err,"create main socket thread is fail.");
-        abort();
+        exit(err);
     }
 
     err = ydb_storage_sync_restore(c);

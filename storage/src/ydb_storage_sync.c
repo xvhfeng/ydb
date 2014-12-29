@@ -612,12 +612,6 @@ spx_private err_t ydb_storage_sync_query_sync_beginpoint(
     }
     ystc->request->body = body;
     spx_msg_pack_string(body,c->machineid);
-    /*
-       spx_msg_pack_u32(body,s->read_binlog.date.year);
-       spx_msg_pack_u32(body,s->read_binlog.date.month);
-       spx_msg_pack_u32(body,s->read_binlog.date.day);
-       spx_msg_pack_u64(body,s->read_binlog.offset);
-       */
 
     err = spx_write_context_nb(c->log,ystc->fd,ystc->request);
     if(0 != err){
@@ -844,7 +838,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     ystc = spx_alloc_alone(sizeof(*ystc),&err);
     if(NULL == ystc){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "new transport for query sync beginpoint to remote storage:%s is fail.",
+                "new transport for send begin to remote storage:%s is fail.",
                 s->machineid);
         return 0;
     }
@@ -852,7 +846,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     if(0 >= ystc->fd){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new socket to remote storage:%s host:%s:%d "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -864,7 +858,7 @@ spx_private err_t ydb_storage_sync_send_begin(
                     true,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "set socket to remote storage:%s host:%s:%d "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -872,7 +866,7 @@ spx_private err_t ydb_storage_sync_send_begin(
                     s->host.ip,s->host.port,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "connect to remote storage:%s host:%s:%d "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -881,7 +875,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     if(NULL == ystc->request){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request to remote storage:%s host:%s:%d "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -890,7 +884,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     if(NULL == header){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request header to remote storage:%s host:%s:%d "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -903,7 +897,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     if(NULL == body){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request body to remote storage:%s host:%s:%d "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -918,7 +912,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     if(0 != err){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "write request to remote storage:%s host:%s:%d "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
 
@@ -928,7 +922,7 @@ spx_private err_t ydb_storage_sync_send_begin(
         //timeout
         SpxLogFmt1(c->log,SpxLogError,
                 "recv response from remote storage:%s host:%s:%d  "
-                "for query sync beginpoint is timeout.",
+                "for begin sync is timeout.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -937,7 +931,7 @@ spx_private err_t ydb_storage_sync_send_begin(
         ystc->response = spx_alloc_alone(sizeof(struct spx_msg_context),&err);
         if(NULL == ystc->response){
             SpxLog2(c->log,SpxLogError,err,
-                    "new response for query sync beginpoint is fail.");
+                    "new response for begin sync is fail.");
             goto r1;
         }
     }
@@ -946,7 +940,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     if(NULL == ystc->response->header){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "recv response header from remote storage:%s host:%s:%d  "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -955,7 +949,7 @@ spx_private err_t ydb_storage_sync_send_begin(
     if(0 != err){
         SpxLogFmt2(c->log,SpxLogWarn,err,
                 "recv response from remote storage:%s host:%s:%d  "
-                "for query sync beginpoint is fail.",
+                "for begin sync is fail.",
                 s->machineid,s->host.ip,s->host.port);
         goto r1;
     }
@@ -1030,7 +1024,7 @@ err_t ydb_storage_sync_reply_begin(struct ev_loop *loop,\
             spx_string_len(machineid),NULL);
     if(NULL == s){
         SpxLogFmt2(jc->log,SpxLogError,jc->err,\
-                "find sync beginpoint of storage:%s is fail.",
+                "find storage:%s from remote storages is fail.",
                 machineid);
         goto r1;
     }
@@ -1052,7 +1046,7 @@ err_t ydb_storage_sync_reply_begin(struct ev_loop *loop,\
         spx_alloc_alone(sizeof(*response_header),&(jc->err));
     if(NULL == response_header){
         SpxLog2(dc->log,SpxLogError,jc->err,\
-                "alloc response header for query sync beginpoint is fail.");
+                "alloc response header for begin sync is fail.");
         goto r1;
     }
 
@@ -1148,7 +1142,7 @@ spx_private err_t ydb_storage_sync_doing(
 
         SpxLogFmt1(c->log,SpxLogWarn,
                 "the day:%d-%d-%d is after today:%d-%d-%d,"
-                "so must return to today.",
+                "so must back to today.",
                 s->read_binlog.date.year,
                 s->read_binlog.date.month,
                 s->read_binlog.date.day,
@@ -1611,7 +1605,7 @@ err_t ydb_storage_sync_reply_consistency(struct ev_loop *loop,\
             spx_string_len(machineid),NULL);
     if(NULL == s ){
         SpxLogFmt2(jc->log,SpxLogError,jc->err,\
-                "find sync beginpoint of storage:%s is fail.",
+                "not found the storage:%s from remote storages.",
                 machineid);
         jc->err = ENOENT;
         goto r1;
@@ -1622,7 +1616,7 @@ err_t ydb_storage_sync_reply_consistency(struct ev_loop *loop,\
         spx_alloc_alone(sizeof(*response_header),&(jc->err));
     if(NULL == response_header){
         SpxLog2(dc->log,SpxLogError,jc->err,\
-                "alloc response header for query sync beginpoint is fail.");
+                "alloc response header for over csync is fail.");
         goto r1;
     }
 
@@ -2002,7 +1996,7 @@ spx_private err_t ydb_storage_sync_upload_request(
     yssc = spx_alloc_alone(sizeof(*yssc),&err);
     if(NULL == yssc){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "alloc dsync remote object is fail.",
+                "new sync object is fail.",
                 "fid:%s.",fid);
         return err;
     }
@@ -2053,7 +2047,7 @@ spx_private err_t ydb_storage_sync_upload_request(
     //check localhost
     if(!SpxFileExist(fname)){
         SpxLogFmt1(c->log,SpxLogDebug,
-                "fname:%s is exist and no do dsync.",
+                "fname:%s is exist and no do sync.",
                 fname);
         is_no_file = true;
         err = ENOENT;
@@ -2119,7 +2113,7 @@ spx_private err_t ydb_storage_sync_upload_request(
             if(io_isdelete
                     || fidbuf->opver < io_opver){
                 SpxLogFmt1(c->log,SpxLogInfo,
-                        "the fid:%s is not last in the fname:%s,so not do dsync.",
+                        "the fid:%s is not last in the fname:%s,so not do sync.",
                         fid,fname);
                 is_no_file = true;
                 err = ENOENT;
@@ -2138,7 +2132,7 @@ spx_private err_t ydb_storage_sync_upload_request(
     if(0 >= yssc->sock){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new socket to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2151,7 +2145,7 @@ spx_private err_t ydb_storage_sync_upload_request(
                     true,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "set socket to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2160,7 +2154,7 @@ spx_private err_t ydb_storage_sync_upload_request(
                     s->host.ip,s->host.port,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "connect to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2170,7 +2164,7 @@ spx_private err_t ydb_storage_sync_upload_request(
     if(NULL == yssc->request){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2180,7 +2174,7 @@ spx_private err_t ydb_storage_sync_upload_request(
     if(NULL == header){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request's header to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2215,7 +2209,7 @@ spx_private err_t ydb_storage_sync_upload_request(
         if(NULL == body){
             SpxLogFmt2(c->log,SpxLogError,err,
                     "new request's body to remote storage:%s,"
-                    "host:%s:%d for dsync file:%s is fail.",
+                    "host:%s:%d for csync file:%s is fail.",
                     s->machineid,s->host.ip,s->host.port,
                     fid);
             goto r1;
@@ -2229,7 +2223,7 @@ spx_private err_t ydb_storage_sync_upload_request(
         if(NULL == body){
             SpxLogFmt2(c->log,SpxLogError,err,
                     "new request's body to remote storage:%s,"
-                    "host:%s:%d for dsync file:%s is fail.",
+                    "host:%s:%d for csync file:%s is fail.",
                     s->machineid,s->host.ip,s->host.port,
                     fid);
             goto r1;
@@ -2254,7 +2248,7 @@ spx_private err_t ydb_storage_sync_upload_request(
     if(0 != err){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "send request to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2264,7 +2258,7 @@ spx_private err_t ydb_storage_sync_upload_request(
         //timeout
         SpxLogFmt1(c->log,SpxLogError,
                 "response it timeout from  remote storage:%s,"
-                "host:%s:%d for dsync file:%s .",
+                "host:%s:%d for csync file:%s .",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2282,7 +2276,7 @@ spx_private err_t ydb_storage_sync_upload_request(
     yssc->response->header =  spx_read_header_nb(c->log,yssc->sock,&err);
     if(NULL == yssc->response->header){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "recving data for dsync fid:%s,"
+                "recving data for csync fid:%s,"
                 "from remote storage:%s,ip:%s,port:%d is fail.",
                 fid,s->machineid,s->host.ip,s->host.port);
         goto r1;
@@ -2312,7 +2306,7 @@ spx_private err_t ydb_storage_sync_modify_request(
     yssc = spx_alloc_alone(sizeof(*yssc),&err);
     if(NULL == yssc){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "alloc dsync remote object is fail.",
+                "alloc csync remote object is fail.",
                 "fid:%s.",fid);
         return err;
     }
@@ -2363,7 +2357,7 @@ spx_private err_t ydb_storage_sync_modify_request(
     //check localhost
     if(!SpxFileExist(fname)){
         SpxLogFmt1(c->log,SpxLogDebug,
-                "fname:%s is exist and no do dsync.",
+                "fname:%s is exist and no do csync.",
                 fname);
         is_no_file = true;
         err = ENOENT;
@@ -2429,7 +2423,7 @@ spx_private err_t ydb_storage_sync_modify_request(
             if(io_isdelete
                    || fidbuf->opver < io_opver){
                 SpxLogFmt1(c->log,SpxLogInfo,
-                        "the fid:%s is not last in the fname:%s,so not do dsync.",
+                        "the fid:%s is not last in the fname:%s,so not do csync.",
                         fid,fname);
                 is_no_file = true;
                 err = ENOENT;
@@ -2448,7 +2442,7 @@ spx_private err_t ydb_storage_sync_modify_request(
     if(0 >= yssc->sock){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new socket to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2461,7 +2455,7 @@ spx_private err_t ydb_storage_sync_modify_request(
                     true,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "set socket to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2470,7 +2464,7 @@ spx_private err_t ydb_storage_sync_modify_request(
                     s->host.ip,s->host.port,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "connect to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2480,7 +2474,7 @@ spx_private err_t ydb_storage_sync_modify_request(
     if(NULL == yssc->request){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2490,7 +2484,7 @@ spx_private err_t ydb_storage_sync_modify_request(
     if(NULL == header){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request's header to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2526,7 +2520,7 @@ spx_private err_t ydb_storage_sync_modify_request(
         if(NULL == body){
             SpxLogFmt2(c->log,SpxLogError,err,
                     "new request's body to remote storage:%s,"
-                    "host:%s:%d for dsync file:%s is fail.",
+                    "host:%s:%d for csync file:%s is fail.",
                     s->machineid,s->host.ip,s->host.port,
                     fid);
             goto r1;
@@ -2543,7 +2537,7 @@ spx_private err_t ydb_storage_sync_modify_request(
         if(NULL == body){
             SpxLogFmt2(c->log,SpxLogError,err,
                     "new request's body to remote storage:%s,"
-                    "host:%s:%d for dsync file:%s is fail.",
+                    "host:%s:%d for csync file:%s is fail.",
                     s->machineid,s->host.ip,s->host.port,
                     fid);
             goto r1;
@@ -2571,7 +2565,7 @@ spx_private err_t ydb_storage_sync_modify_request(
     if(0 != err){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "send request to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2581,7 +2575,7 @@ spx_private err_t ydb_storage_sync_modify_request(
         //timeout
         SpxLogFmt1(c->log,SpxLogError,
                 "response it timeout from  remote storage:%s,"
-                "host:%s:%d for dsync file:%s .",
+                "host:%s:%d for csync file:%s .",
                 s->machineid,s->host.ip,s->host.port,
                 fid);
         goto r1;
@@ -2599,7 +2593,7 @@ spx_private err_t ydb_storage_sync_modify_request(
     yssc->response->header =  spx_read_header_nb(c->log,yssc->sock,&err);
     if(NULL == yssc->response->header){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "recving data for dsync fid:%s,"
+                "recving data for csync fid:%s,"
                 "from remote storage:%s,ip:%s,port:%d is fail.",
                 fid,s->machineid,s->host.ip,s->host.port);
         goto r1;
@@ -2627,7 +2621,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     yssc = spx_alloc_alone(sizeof(*yssc),&err);
     if(NULL == yssc){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "alloc dsync remote object is fail.",
+                "alloc csync remote object is fail.",
                 "fid:%s.",ofid);
         return err;
     }
@@ -2636,7 +2630,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     if(0 >= yssc->sock){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new socket to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2649,7 +2643,7 @@ spx_private err_t ydb_storage_sync_delete_request(
                     true,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "set socket to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2658,7 +2652,7 @@ spx_private err_t ydb_storage_sync_delete_request(
                     s->host.ip,s->host.port,c->timeout))){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "connect to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2668,7 +2662,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     if(NULL == yssc->request){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2678,7 +2672,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     if(NULL == header){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request's header to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2696,7 +2690,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     if(NULL == body){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "new request's body to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2710,7 +2704,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     if(0 != err){
         SpxLogFmt2(c->log,SpxLogError,err,
                 "send request to remote storage:%s,"
-                "host:%s:%d for dsync file:%s is fail.",
+                "host:%s:%d for csync file:%s is fail.",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2720,7 +2714,7 @@ spx_private err_t ydb_storage_sync_delete_request(
         //timeout
         SpxLogFmt1(c->log,SpxLogError,
                 "response it timeout from  remote storage:%s,"
-                "host:%s:%d for dsync file:%s .",
+                "host:%s:%d for csync file:%s .",
                 s->machineid,s->host.ip,s->host.port,
                 ofid);
         goto r1;
@@ -2738,7 +2732,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     yssc->response->header =  spx_read_header_nb(c->log,yssc->sock,&err);
     if(NULL == yssc->response->header){
         SpxLogFmt2(c->log,SpxLogError,err,
-                "recving data for dsync fid:%s,"
+                "recving data for csync fid:%s,"
                 "from remote storage:%s,ip:%s,port:%d is fail.",
                 ofid,s->machineid,s->host.ip,s->host.port);
         goto r1;
@@ -2862,7 +2856,6 @@ err_t ydb_storage_sync_upload(struct ev_loop *loop,\
         struct ydb_storage_dio_context *dc
         ){/*{{{*/
     err_t err = 0;
-    //    struct ydb_storage_configurtion *c = dc->jc->config;
     struct spx_msg_header *rqh = dc->jc->reader_header;
     struct spx_job_context *jc = dc->jc;
     string_t machineid = NULL;
@@ -3125,8 +3118,6 @@ err_t ydb_storage_sync_delete(struct ev_loop *loop,\
     struct spx_job_context *jc = dc->jc;
     struct ydb_storage_configurtion *c = jc->config;
 
-    //    struct spx_msg *ctx = jc->reader_body_ctx;
-    //    size_t len = jc->reader_header->bodylen;
     struct spx_msg_header *repheader = jc->reader_header;
     string_t machineid = NULL;
 
@@ -3268,7 +3259,6 @@ err_t ydb_storage_sync_modify(struct ev_loop *loop,\
         ){/*{{{*/
     err_t err = 0;
     struct ydb_storage_configurtion *c = dc->jc->config;
-    //    struct spx_msg_header *rqh = dc->jc->reader_header;
     struct spx_job_context *jc = dc->jc;
     string_t machineid = NULL;
     bool_t is_has_file = false;
