@@ -225,7 +225,7 @@ spx_private void ydb_storage_dio_do_find_form_chunkfile(
     }
 
     if(io_isdelete){
-        SpxLogFmt2(dc->log,SpxLogError,err,\
+        SpxLogFmt1(dc->log,SpxLogWarn,
                 "the file in the chunkfile:%s "
                 "begin is %lld totalsize:%lld is deleted.",
                 dc->filename,dc->begin,dc->totalsize);

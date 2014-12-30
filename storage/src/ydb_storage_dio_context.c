@@ -142,6 +142,9 @@ err_t ydb_storage_dio_pool_push(\
     if(NULL != dc->date){
         SpxFree(dc->date);
     }
+    if(NULL != dc->sync_machineid){
+        SpxStringFree(dc->sync_machineid);
+    }
 
     dc->jc = NULL;
     dc->tc = NULL;

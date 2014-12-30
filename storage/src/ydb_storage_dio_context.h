@@ -83,6 +83,7 @@ extern "C" {
         struct spx_msg *metadata;//if the file is chunkfile the member store metadata
 
         struct spx_date *date;
+        string_t sync_machineid;// the machineid use for sync means operator machineid
     };
 
     struct ydb_storage_dio_pool{

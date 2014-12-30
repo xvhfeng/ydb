@@ -83,12 +83,6 @@ spx_private err_t ydb_storage_synclog_open(struct ydb_storage_synclog *synclog){
         return synclog->err;
     }
 
-    struct stat buf;
-    memset(&buf,0,sizeof(buf));
-    if(SpxFileExist(synclog->filename)){
-        stat(synclog->filename,&buf);
-    }
-
     string_t basepath = spx_basepath(synclog->filename,&(synclog->err));
     if(NULL == basepath || 0 != synclog->err){
         SpxLogFmt2(synclog->log,SpxLogError,synclog->err,
@@ -110,10 +104,6 @@ spx_private err_t ydb_storage_synclog_open(struct ydb_storage_synclog *synclog){
                 synclog->filename);
         SpxStringFree(synclog->filename);
         return synclog->err;
-    }
-    if(0 != buf.st_size) {
-        fseek(synclog->fp,buf.st_size,SEEK_CUR);
-        synclog->off = buf.st_size;
     }
     setlinebuf(synclog->fp);
     return 0;

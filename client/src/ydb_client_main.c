@@ -66,7 +66,6 @@ int main(int argc,char **argv){
     char *tracker = "10.97.19.31:4150";
     u32_t timeout = 300;
 
-    /*
        ydb_client_upload_test(
        groupname,
        tracker,
@@ -96,13 +95,13 @@ int main(int argc,char **argv){
        jpg,
        jpg105,
        timeout,true);
+
        ydb_client_delete_test(
        groupname,
        tracker,
        jpg,
        jpg254,
        timeout,true);
-       */
 
     ydb_client_modify_test(
             groupname,

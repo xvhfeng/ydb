@@ -121,7 +121,7 @@ err_t ydb_storage_task_module_handler(struct ev_loop *loop,\
             }
         case (YDB_S2S_CSYNC_BEGIN):
             {
-                if(0 != (err = ydb_storage_sync_reply_begin(loop,dc))){
+                if(0 != (err = ydb_storage_sync_reply_make_state_machine(loop,dc))){
                     SpxLog2(jc->log,SpxLogError,err,\
                             "csync begin is fail.");
                 }

@@ -620,6 +620,7 @@ spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_from_tracker
 
     if(!spx_socket_read_timeout(ystc->fd,c->timeout)){
         //timeout
+        *err = EAGAIN;
         SpxLogFmt1(c->log,SpxLogError,
                 "recving data for query base storage "
                 "from remote tracker,ip:%s,port:%d is timeout.",
@@ -862,6 +863,7 @@ spx_private u64_t ydb_storage_dsync_query_begin_timespan_from_tracker(
 
     if(!spx_socket_read_timeout(ystc->fd,c->timeout)){
         //timeout
+        *err = EAGAIN;
         SpxLogFmt1(c->log,SpxLogError,
                 "recving data for query timespan of begin sync "
                 "from remote tracker,ip:%s,port:%d is timeout.",
@@ -1115,6 +1117,7 @@ spx_private err_t ydb_storage_dsync_sync_logfile(
 
     if(!spx_socket_read_timeout(ystc->fd,c->timeout)){
         //timeout
+        err = EAGAIN;
         SpxLogFmt1(c->log,SpxLogError,
                 "recving data for query mountpoint state "
                 "from remote storage:%s,ip:%s,port:%d is timeout.",
@@ -1851,6 +1854,7 @@ spx_private err_t ydb_storage_dsync_upload_request(
 
     if(!spx_socket_read_timeout(ysdc->sock,c->timeout)){
         //timeout
+        err = EAGAIN;
         SpxLogFmt1(c->log,SpxLogError,
                 "response it timeout from  remote storage:%s,"
                 "host:%s:%d for dsync file:%s .",

@@ -320,7 +320,7 @@ err_t ydb_storage_dio_delete_context_from_chunkfile(
                 "the file in the chunkfile:%s "
                 "with begin:%lld totalsize:%lld is not the deleting-file.",
                 fname,cbegin,ctotalsize);
-        err = EPERM;
+        err = ENOENT;
         goto r1;
     }
 
