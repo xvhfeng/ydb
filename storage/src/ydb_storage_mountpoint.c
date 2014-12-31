@@ -165,9 +165,12 @@ err_t ydb_storage_mprtf_reader(struct ydb_storage_configurtion *c){/*{{{*/
             goto r1;
         }
 
-        if(NULL != fgets(line,SpxLineSize,fp)){
+        while(NULL != (fgets(line,SpxLineSize,fp))){
             spx_string_updatelen(line);
             spx_string_strip_linefeed(line);
+            if('#' == *line){
+                continue;
+            }
             if(0 != (err = ydb_storage_mprtf_line_parser(c,line))){
                 fclose(fp);
                 goto r1;
@@ -343,6 +346,17 @@ err_t ydb_storage_mprtf_writer(struct ydb_storage_configurtion *c){/*{{{*/
         SpxLog2(c->log,SpxLogError,err,
                 "new context fot mprtf is fail.");
         goto r1;
+    }
+
+    new_context = spx_string_cat_printf(&err,context,"%s\n",
+            "# mpidx:disksync_force:init_time:last_modify_time:last_freesize:path");
+    if(NULL == new_context){
+        SpxLog2(c->log,SpxLogError,err,
+                "make context for mprtf is fail.");
+        goto r1;
+    } else {
+        context = new_context;
+        new_context = NULL;
     }
 
     // mpidx:disksync_force:init_time:last_modify_time:last_freesize:path

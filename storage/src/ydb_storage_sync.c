@@ -143,7 +143,6 @@ bool_t ydb_storage_sync_consistency(
     return can_running;
 }/*}}}*/
 
-
 spx_private err_t ydb_storage_sync_remote_map_vfree(void **arg){/*{{{*/
     if(NULL != *arg){
         struct ydb_storage_remote **s = (struct ydb_storage_remote **) arg;
@@ -657,6 +656,7 @@ spx_private err_t ydb_storage_sync_query_sync_beginpoint(
 
     if(!spx_socket_read_timeout(ystc->fd,c->timeout)){
         //timeout
+        err = EAGAIN;
         SpxLogFmt1(c->log,SpxLogError,
                 "recv response from remote storage:%s host:%s:%d  "
                 "for query sync beginpoint is timeout.",
@@ -1162,7 +1162,6 @@ r2:
     SpxModuleDispatch(spx_network_module_wakeup_handler,jc);
     return err;
 }/*}}}*/
-
 
 spx_private err_t ydb_storage_sync_doing(
         struct ydb_storage_remote *s

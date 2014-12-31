@@ -130,10 +130,6 @@ spx_private err_t ydb_storage_dsync_data_to_remote_storage(
         struct ydb_storage_remote *s,
         string_t fid);
 
-spx_private void ydb_storage_dsync_over(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_dsync_runtime *dsrt);
-
 spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
         struct ydb_storage_configurtion *c,
         err_t *err);
@@ -184,260 +180,193 @@ err_t ydb_storage_dsync_startup(struct ydb_storage_configurtion *c,
 
     struct ydb_storage_dsync_runtime *dsrt = NULL;
     dsrt = ydb_storage_dsync_runtime_reader(c,&err);
-    bool_t is_send_dsync_over = false;
-    while(true){// for fail twice
-        bool_t is_need_dsync = false;
+
+    if(NULL == dsrt){
+        dsrt = spx_alloc_alone(sizeof(*dsrt),&err);
         if(NULL == dsrt){
-            dsrt = spx_alloc_alone(sizeof(*dsrt),&err);
-            if(NULL == dsrt){
-                SpxLog2(c->log,SpxLogError,err,
-                        "new disksync runtime is fail.");
-                return err;
-            }
-            dsrt->c = c;
-            is_need_dsync = ydb_storage_dsync_confim(c,dsrt);
-            if(!is_need_dsync){
-                if(is_send_dsync_over){
-                    break;
-                } else {
-                    SpxFree(dsrt);
-                    return 0;
-                }
-            }
-            is_send_dsync_over = true;
-            dsrt->step = YDB_STORAGE_DSYNC_LOGFILE;
-        } else {
-            //do the dsync last time
-            is_need_dsync = true;
-            is_send_dsync_over = true;
-            SpxLog1(c->log,SpxLogMark,
-                    "do dsync last time goon.");
+            SpxLog2(c->log,SpxLogError,err,
+                    "new disksync runtime is fail.");
+            return err;
         }
-
-        err = ydb_storage_dsync_total_mounpoint_sync_timespan(c,dsrt);
-        if(0 != err){
+        dsrt->c = c;
+        bool_t is_need_dsync = false;
+        is_need_dsync = ydb_storage_dsync_confim(c,dsrt);
+        if(!is_need_dsync){
+            srt->status = YDB_STORAGE_DSYNCED;
             SpxFree(dsrt);
-            SpxLog2(c->log,SpxLogError,err,
-                    "get mps dsync over date is fail.");
-            break;
+            return 0;
         }
-
-        //get base storage
-        //and the base is the full data
-        //the base storage must be exist
-        if(NULL == base_storage) {
-            base_storage = ydb_storage_dsync_query_base(c,&err);
-            if(NULL == base_storage){
-                SpxLogFmt1(c->log,SpxLogMark,
-                        "no the base storage in the all syncgroup:%s,"
-                        "and then,this storage:%s is upto base storage.",
-                        c->syncgroup,c->machineid);
-                //set all mountpoint is not disksync
-                ydb_storage_dsync_mountpoint_over(dsrt);
-                SpxFree(dsrt);
-                return 0;
-            }
-        }
-
-        //get begin timespan of begining
-        if(0 == dsrt->begin_dsync_timespan){
-            dsrt->begin_dsync_timespan = ydb_storage_dsync_query_begin_timespan(c,&err);
-            if(0 == dsrt->begin_dsync_timespan){
-                SpxLogFmt1(c->log,SpxLogMark,
-                        "no the timespan of begin sync,"
-                        "so use default this startup time:%lld.",
-                        g_ydb_storage_runtime->this_startup_time);
-            } else {
-                if(dsrt->begin_dsync_timespan < g_ydb_storage_runtime->first_statrup_time){
-                    g_ydb_storage_runtime->first_statrup_time = dsrt->begin_dsync_timespan;
-                }
-            }
-        }
-
-        SpxZero(dt_sync_begin);
-        SpxZero(dt_sync_end);
-        SpxZero(dsrt->sync_date_curr);
-
-        spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&dt_sync_begin);
-        spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&(dsrt->sync_date_curr));
-        spx_get_date((time_t *) &(g_ydb_storage_runtime->this_startup_time),
-                &dt_sync_end);
-
-        SpxLogFmt1(c->log,SpxLogInfo,
-                "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d.",
-                dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-                dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-
-        dsrt->timer = spx_periodic_exec_and_async_run(c->log,
-                c->heartbeat,0,
-                ydb_storage_dsync_runtime_writer,dsrt,
-                c->stacksize,
-                &err);
-        if(0 != err){
-            SpxLog2(c->log,SpxLogError,err,
-                    "create new thread for dsync runtime writer is fail.");
-            break;
-        }
-
-        if(YDB_STORAGE_DSYNC_LOGFILE == dsrt->step) {/*{{{*/
-            while(true) {
-                int cmp = spx_date_cmp(&(dsrt->sync_date_curr),&dt_sync_end);
-                if(0 >= cmp ){ // do dsync
-                    SpxLogFmt1(c->log,SpxLogInfo,
-                            "check and sync binlog of date: %d-%d-%d.",
-                            dsrt->sync_date_curr.year,
-                            dsrt->sync_date_curr.month,
-                            dsrt->sync_date_curr.day);
-
-                    //sync binlog
-                    string_t binlog_filename = ydb_storage_binlog_make_filename(c->log,
-                            c->dologpath,c->machineid,(dsrt->sync_date_curr).year,
-                            (dsrt->sync_date_curr).month,(dsrt->sync_date_curr).day,&err);
-
-                    if(!SpxFileExist(binlog_filename)){
-                        err = ydb_storage_dsync_sync_logfile(c,base_storage,
-                                YDB_S2S_SYNC_LOGFILE,
-                                c->machineid,
-                                &(dsrt->sync_date_curr),
-                                binlog_filename);
-                        if(0 != err){
-                            SpxLogFmt2(c->log,SpxLogError,err,
-                                    "sync binlog of  %d-%d-%d is fail.",
-                                    dsrt->sync_date_curr.year,
-                                    dsrt->sync_date_curr.month,
-                                    dsrt->sync_date_curr.day);
-                        }
-                    }
-                    SpxStringFree(binlog_filename);
-                    SpxErrReset;
-                    err = 0;
-                    //sync synclog
-                    err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
-                } else { //no dsync
-                    SpxLogFmt1(c->log,SpxLogInfo,
-                            "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d is over.",
-                            dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-                            dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-                    break;
-                }
-                spx_date_add(&(dsrt->sync_date_curr),1);
-
-                if(0 < c->sync_wait) {
-                    spx_periodic_sleep(c->sync_wait,0);
-                }
-            }
-            dsrt->step = YDB_STORAGE_DSYNC_DATA;
-        }/*}}}*/
-
-        /*
-           SpxZero(dsrt->sync_date_curr);
-           spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&(dsrt->sync_date_curr));
-           SpxLogFmt1(c->log,SpxLogInfo,
-           "sync data from binlog and synclog from %d-%d-%d to %d-%d-%d.",
-           dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-           dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-
-           if(YDB_STORAGE_DSYNC_SYNCLOGFILE == dsrt->step) {
-           while(true) {
-           int cmp = spx_date_cmp(&(dsrt->sync_date_curr),&dt_sync_end);
-           if(0 > cmp ){ // do dsync
-
-           SpxLogFmt1(c->log,SpxLogInfo,
-           "sync data by binlog of date: %d-%d-%d.",
-           dt_sync_curr.year,dt_sync_curr.month,dt_sync_curr.day);
-
-           string_t synclog_fname = ydb_storage_binlog_make_filename(c->log,
-           c->dologpath,c->machineid,(dsrt->sync_date_curr).year,
-           (dsrt->sync_date_curr).month,(dsrt->sync_date_curr).day,&err);
-
-           if(!SpxFileExist(synclog_fname)){
-           SpxLogFmt1(c->log,SpxLogInfo,
-           "no the operator at %d-%d-%d,and then no binlog.",
-           dt_sync_curr.year,dt_sync_curr.month,dt_sync_curr.day);
-           } else {
-           err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
-        //                        err = ydb_storage_dsync_sync_logfile(c,base_storage,
-        //                                YDB_S2S_SYNC_LOGFILE,
-        //                                c->machineid,
-        //                                &(dsrt->sync_date_curr),
-        //                                synclog_fname);
-        if(0 != err){
-        SpxLogFmt2(c->log,SpxLogError,err,
-        "sync binlog of  %d-%d-%d is fail.",
-        dt_sync_curr.year,dt_sync_curr.month,
-        dt_sync_curr,day);
-        }
-        }
-        SpxStringFree(synclog_fname);
-        SpxErrReset;
-        err = 0;
-        //sync synclog
-        //                    err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
-        } else { //no dsync
-        SpxLogFmt1(c->log,SpxLogInfo,
-        "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d is over.",
-        dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-        dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-        break;
-        }
-        spx_date_add(&(dsrt->sync_date_curr),1);
-        }
-        dsrt->step = YDB_STORAGE_DSYNC_DATA;
-        }
-        */
-
-        SpxZero((dsrt->sync_date_curr));
-        spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&(dsrt->sync_date_curr));
-        SpxLogFmt1(c->log,SpxLogInfo,
-                "sync data from binlog and synclog from %d-%d-%d to %d-%d-%d.",
-                dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-                dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-
-        if(YDB_STORAGE_DSYNC_DATA  == dsrt->step){/*{{{*/
-            while(true) {
-                int cmp = spx_date_cmp(&(dsrt->sync_date_curr),&dt_sync_end);
-                if(0 >= cmp ){ // do dsync
-
-                    SpxLogFmt1(c->log,SpxLogInfo,
-                            "sync data by binlog of date: %d-%d-%d.",
-                            dsrt->sync_date_curr.year,
-                            dsrt->sync_date_curr.month,
-                            dsrt->sync_date_curr.day);
-                    err = ydb_storage_dsync_binlog_data(c,dsrt);
-
-                    SpxLogFmt1(c->log,SpxLogInfo,
-                            "sync data by synclog of date: %d-%d-%d.",
-                            dsrt->sync_date_curr.year,
-                            dsrt->sync_date_curr.month,
-                            dsrt->sync_date_curr.day);
-                    err =  ydb_storage_dsync_synclog_data(c,dsrt);
-                } else { //no dsync
-                    SpxLogFmt1(c->log,SpxLogInfo,
-                            "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d is over.",
-                            dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
-                            dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
-                    break;
-                }
-                spx_date_add(&(dsrt->sync_date_curr),1);
-
-            }
-        }/*}}}*/
-
-        //channel the dsync runtime file timer
-        //delete the dsync runtime file
-        //set last-freesize by freesize to mp
+        dsrt->step = YDB_STORAGE_DSYNC_LOGFILE;
+    } else {
+        //do the dsync last time
         SpxLog1(c->log,SpxLogMark,
-                "channel the therad of dsync runtime writer,and the operator is balocking...");
-        spx_periodic_stop(&(dsrt->timer),true);//must blocking to cannel the thread
-        SpxLog1(c->log,SpxLogMark,
-                "the thread if dsync runtime writer is channeled,delete the runtime file.");
-        ydb_storage_dsync_runtime_file_remove(c);
-
-        ydb_storage_dsync_mountpoint_over(dsrt);
-        SpxFree(dsrt);
+                "do dsync last time goon.");
     }
 
-    ydb_storage_dsync_over(c, dsrt);
+
+    //get base storage
+    //and the base is the full data
+    //the base storage must be exist
+    if(NULL == base_storage) {
+        base_storage = ydb_storage_dsync_query_base(c,&err);
+        if(NULL == base_storage){
+            SpxLogFmt1(c->log,SpxLogMark,
+                    "no the base storage in the all syncgroup:%s,"
+                    "and then,this storage:%s is upto base storage.",
+                    c->syncgroup,c->machineid);
+            //set all mountpoint is not disksync
+            ydb_storage_dsync_mountpoint_over(dsrt);
+            SpxFree(dsrt);
+            return 0;
+        }
+    }
+
+    err = ydb_storage_dsync_total_mounpoint_sync_timespan(c,dsrt);
+    if(0 != err){
+        SpxFree(dsrt);
+        SpxLog2(c->log,SpxLogError,err,
+                "get mps dsync over date is fail.");
+        return err;
+    }
+
+    //get begin timespan of begining
+    if(0 == dsrt->begin_dsync_timespan){
+        dsrt->begin_dsync_timespan = ydb_storage_dsync_query_begin_timespan(c,&err);
+        if(0 == dsrt->begin_dsync_timespan){
+            SpxLogFmt1(c->log,SpxLogMark,
+                    "no the timespan of begin sync,"
+                    "so use default this startup time:%lld.",
+                    g_ydb_storage_runtime->this_startup_time);
+        } else {
+            if(dsrt->begin_dsync_timespan < g_ydb_storage_runtime->first_statrup_time){
+                g_ydb_storage_runtime->first_statrup_time = dsrt->begin_dsync_timespan;
+            }
+        }
+    }
+
+    SpxZero(dt_sync_begin);
+    SpxZero(dt_sync_end);
+    SpxZero(dsrt->sync_date_curr);
+
+    spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&dt_sync_begin);
+    spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&(dsrt->sync_date_curr));
+    spx_get_date((time_t *) &(g_ydb_storage_runtime->this_startup_time),
+            &dt_sync_end);
+
+    SpxLogFmt1(c->log,SpxLogInfo,
+            "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d.",
+            dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
+            dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
+
+    dsrt->timer = spx_periodic_exec_and_async_run(c->log,
+            c->heartbeat,0,
+            ydb_storage_dsync_runtime_writer,dsrt,
+            c->stacksize,
+            &err);
+    if(0 != err){
+        SpxLog2(c->log,SpxLogError,err,
+                "create new thread for dsync runtime writer is fail.");
+        return err;
+    }
+
+    if(YDB_STORAGE_DSYNC_LOGFILE == dsrt->step) {/*{{{*/
+        while(true) {
+            int cmp = spx_date_cmp(&(dsrt->sync_date_curr),&dt_sync_end);
+            if(0 >= cmp ){ // do dsync
+                SpxLogFmt1(c->log,SpxLogInfo,
+                        "check and sync binlog of date: %d-%d-%d.",
+                        dsrt->sync_date_curr.year,
+                        dsrt->sync_date_curr.month,
+                        dsrt->sync_date_curr.day);
+
+                //sync binlog
+                string_t binlog_filename = ydb_storage_binlog_make_filename(c->log,
+                        c->dologpath,c->machineid,(dsrt->sync_date_curr).year,
+                        (dsrt->sync_date_curr).month,(dsrt->sync_date_curr).day,&err);
+
+                if(!SpxFileExist(binlog_filename)){
+                    err = ydb_storage_dsync_sync_logfile(c,base_storage,
+                            YDB_S2S_SYNC_LOGFILE,
+                            c->machineid,
+                            &(dsrt->sync_date_curr),
+                            binlog_filename);
+                    if(0 != err){
+                        SpxLogFmt2(c->log,SpxLogError,err,
+                                "sync binlog of  %d-%d-%d is fail.",
+                                dsrt->sync_date_curr.year,
+                                dsrt->sync_date_curr.month,
+                                dsrt->sync_date_curr.day);
+                    }
+                }
+                SpxStringFree(binlog_filename);
+                SpxErrReset;
+                err = 0;
+                //sync synclog
+                err = ydb_storage_dsync_sync_synclogs(c,&(dsrt->sync_date_curr));
+            } else { //no dsync
+                SpxLogFmt1(c->log,SpxLogInfo,
+                        "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d is over.",
+                        dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
+                        dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
+                break;
+            }
+            spx_date_add(&(dsrt->sync_date_curr),1);
+
+            if(0 < c->sync_wait) {
+                spx_periodic_sleep(c->sync_wait,0);
+            }
+        }
+        dsrt->step = YDB_STORAGE_DSYNC_DATA;
+    }/*}}}*/
+
+    SpxZero((dsrt->sync_date_curr));
+    spx_get_date((time_t *) &(dsrt->begin_dsync_timespan),&(dsrt->sync_date_curr));
+    SpxLogFmt1(c->log,SpxLogInfo,
+            "sync data from binlog and synclog from %d-%d-%d to %d-%d-%d.",
+            dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
+            dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
+
+    if(YDB_STORAGE_DSYNC_DATA  == dsrt->step){/*{{{*/
+        while(true) {
+            int cmp = spx_date_cmp(&(dsrt->sync_date_curr),&dt_sync_end);
+            if(0 >= cmp ){ // do dsync
+
+                SpxLogFmt1(c->log,SpxLogInfo,
+                        "sync data by binlog of date: %d-%d-%d.",
+                        dsrt->sync_date_curr.year,
+                        dsrt->sync_date_curr.month,
+                        dsrt->sync_date_curr.day);
+                err = ydb_storage_dsync_binlog_data(c,dsrt);
+
+                SpxLogFmt1(c->log,SpxLogInfo,
+                        "sync data by synclog of date: %d-%d-%d.",
+                        dsrt->sync_date_curr.year,
+                        dsrt->sync_date_curr.month,
+                        dsrt->sync_date_curr.day);
+                err =  ydb_storage_dsync_synclog_data(c,dsrt);
+            } else { //no dsync
+                SpxLogFmt1(c->log,SpxLogInfo,
+                        "check and sync binlog and synclog from %d-%d-%d to %d-%d-%d is over.",
+                        dt_sync_begin.year,dt_sync_begin.month,dt_sync_begin.day,
+                        dt_sync_end.year,dt_sync_end.month,dt_sync_end.day);
+                break;
+            }
+            spx_date_add(&(dsrt->sync_date_curr),1);
+
+        }
+    }/*}}}*/
+
+    //channel the dsync runtime file timer
+    //delete the dsync runtime file
+    //set last-freesize by freesize to mp
+    SpxLog1(c->log,SpxLogMark,
+            "channel the therad of dsync runtime writer,and the operator is balocking...");
+    spx_periodic_stop(&(dsrt->timer),true);//must blocking to cannel the thread
+    SpxLog1(c->log,SpxLogMark,
+            "the thread if dsync runtime writer is channeled,delete the runtime file.");
+    ydb_storage_dsync_runtime_file_remove(c);
+
+    ydb_storage_dsync_mountpoint_over(dsrt);
     SpxFree(dsrt);
     g_ydb_storage_runtime->status = YDB_STORAGE_DSYNCED;
     return err;
@@ -2298,32 +2227,6 @@ return err;
 return 0;
 }/*}}}*/
 
-spx_private void ydb_storage_dsync_over(
-        struct ydb_storage_configurtion *c,
-        struct ydb_storage_dsync_runtime *dsrt
-        ){/*{{{*/
-    err_t err = 0;
-    struct spx_map_iter *iter = spx_map_iter_new(g_ydb_storage_remote,&(err));
-    if(NULL == iter){
-        SpxLog2(c->log,SpxLogError,err,\
-                "init iter of remote storage is fail.");
-        return;
-    }
-    struct spx_map_node *n = NULL;
-    while(NULL != (n = spx_map_iter_next(iter,&err))){
-        if(NULL != n && NULL != n->v){
-            SpxTypeConvert2(struct ydb_storage_remote,s,n->v);
-            s->synclog.d.year = dsrt->sync_date_curr.year;
-            s->synclog.d.month = dsrt->sync_date_curr.month;
-            s->synclog.d.day = dsrt->sync_date_curr.day;
-            s->synclog.off = 0;//can set offset ,because maybe the storage is offline
-            //and the  offset must send by csync begin and with synclog file
-            //stat(fname) for file size
-        }
-    }
-    spx_map_iter_free(&iter);
-    return;
-}/*}}}*/
 
 spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
         struct ydb_storage_configurtion *c,
