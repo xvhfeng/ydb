@@ -169,6 +169,7 @@ err_t ydb_storage_mprtf_reader(struct ydb_storage_configurtion *c){/*{{{*/
             spx_string_updatelen(line);
             spx_string_strip_linefeed(line);
             if('#' == *line){
+                spx_string_clear(line);
                 continue;
             }
             if(0 != (err = ydb_storage_mprtf_line_parser(c,line))){

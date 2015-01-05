@@ -1288,6 +1288,7 @@ spx_private err_t ydb_storage_dsync_from_remote_storage(
             SpxLogFmt2(c->log,SpxLogError,err,
                     "split line:%s in the logfile:%s is fail.",
                     line,logfname);
+            spx_string_clear(line);
             continue;
         }
         switch (**strs){
@@ -1387,6 +1388,7 @@ spx_private err_t ydb_storage_dsync_from_remote_storage(
                     }
 
         }
+        spx_string_clear(line);
         spx_string_free_splitres(strs,count);
         if(0 < c->sync_wait) {
             spx_periodic_sleep(c->sync_wait,0);
@@ -2276,6 +2278,7 @@ spx_private struct ydb_storage_dsync_runtime *ydb_storage_dsync_runtime_reader(
         spx_string_updatelen(line);
         spx_string_strip_linefeed(line);
         if('#' == *line || SpxStringIsEmpty(line)){
+            spx_string_clear(line);
             continue;
         }
         switch(i){

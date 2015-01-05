@@ -1365,6 +1365,7 @@ spx_private err_t ydb_storage_sync_doing(
             int count = 0;
             string_t *strs = spx_string_split(line,"\t",size,&count,&err);
             if(NULL == strs || 0 != err){
+                spx_string_clear(line);
                 continue;
             }
             switch(*line){
@@ -1802,13 +1803,13 @@ err_t ydb_storage_sync_restore(
         spx_string_updatelen(line);
         spx_string_strip_linefeed(line);
         if('#' == *line){
+            spx_string_clear(line);
             continue;
         }
         int count = 0;
         struct ydb_storage_remote *s = NULL;
         string_t *strs = spx_string_split(line,":",len,&count,&err);
-        if(NULL ==  strs || 0 != err || 5 != count){
-
+        if(NULL ==  strs || 0 != err || 9 != count){
             spx_string_clear(line);
             continue;
         }
@@ -1849,6 +1850,7 @@ err_t ydb_storage_sync_restore(
                                  SpxFree(s);
                                  goto r1;
                              }
+                             s->c = c;
                              break;
                          }
                 case (1):{
@@ -1927,6 +1929,7 @@ err_t ydb_storage_sync_restore(
             }
         }
 r1:
+        spx_string_clear(line);
         spx_string_free_splitres(strs,count);
     }
 r2:

@@ -1,4 +1,4 @@
-.SUFFIXES: .c .o
+ .SUFFIXES: .c .o
 
 SPX_SRC_PATH = /opt/src/spx/src/
 SPX_HEADER_PATH = /opt/src/spx/src/include/
