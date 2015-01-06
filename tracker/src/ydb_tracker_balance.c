@@ -66,7 +66,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_loop(
 
     struct ydb_tracker_configurtion *c = (struct ydb_tracker_configurtion *) jc->config;
     struct spx_map *map = spx_map_get(ydb_remote_storages,
-            groupname,spx_string_len(groupname),NULL);
+            groupname,spx_string_rlen(groupname),NULL);
     if(NULL == map){
         jc->err = ENOENT;
         return NULL;
@@ -116,7 +116,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_by_freedisk(
     }
 
     struct spx_map *map = spx_map_get(ydb_remote_storages,
-            groupname,spx_string_len(groupname),NULL);
+            groupname,spx_string_rlen(groupname),NULL);
     if(NULL == map){
         jc->err = ENOENT;
         return NULL;
@@ -203,7 +203,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
     }
 
     struct spx_map *map = spx_map_get(ydb_remote_storages,
-            groupname,spx_string_len(groupname),NULL);
+            groupname,spx_string_rlen(groupname),NULL);
     if(NULL == map){
         jc->err = ENOENT;
         return NULL;
@@ -212,7 +212,7 @@ spx_private struct ydb_remote_storage *ydb_tracker_find_storage_for_operator(\
     time_t now = spx_now();
     struct ydb_tracker_configurtion *c = ToYdbTrackerConfigurtion(jc->config);
     struct ydb_remote_storage *storage = spx_map_get(map,
-            machineid,spx_string_len(machineid),NULL);
+            machineid,spx_string_rlen(machineid),NULL);
     if(NULL != storage){
         if((YDB_STORAGE_RUNNING == storage->status)
                 && (c->heartbeat + storage->last_heartbeat >= (u64_t) now)){

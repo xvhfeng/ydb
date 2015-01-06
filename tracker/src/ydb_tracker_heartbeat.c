@@ -181,7 +181,7 @@ spx_private err_t ydb_remote_storage_report(
         }
     }
 
-    map = spx_map_get(ydb_remote_storages,groupname,spx_string_len(groupname),NULL);
+    map = spx_map_get(ydb_remote_storages,groupname,spx_string_rlen(groupname),NULL);
     if(NULL == map){
         map = spx_map_new(jc->log,
                 spx_pjw,
@@ -199,7 +199,7 @@ spx_private err_t ydb_remote_storage_report(
             goto r1;
         }
         jc->err = spx_map_insert(ydb_remote_storages,
-                groupname,spx_string_len(groupname),map,sizeof(*map));
+                groupname,spx_string_rlen(groupname),map,sizeof(*map));
         if(0 != jc->err){
             SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
                 "not found group:%s from remote storages "
@@ -211,7 +211,7 @@ spx_private err_t ydb_remote_storage_report(
         }
     }
 
-    storage = spx_map_get(map,machineid,spx_string_len(machineid),NULL);
+    storage = spx_map_get(map,machineid,spx_string_rlen(machineid),NULL);
     if(NULL == storage){
         storage = spx_alloc_alone(sizeof(*storage),&(jc->err));
         if(NULL == storage){
@@ -221,7 +221,7 @@ spx_private err_t ydb_remote_storage_report(
                     machineid,groupname,syncgroup);
             goto r1;
         }
-        jc->err = spx_map_insert(map,machineid,spx_string_len(machineid),storage,sizeof(*storage));
+        jc->err = spx_map_insert(map,machineid,spx_string_rlen(machineid),storage,sizeof(*storage));
         if(0 != jc->err){
             SpxLogFmt2(tcontext->log,SpxLogError,jc->err,
                     "insert storage:%s to group:%s with syncgroup:%s."

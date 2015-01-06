@@ -379,7 +379,7 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
 
         struct ydb_storage_remote *remote_storage = NULL;
         remote_storage = spx_map_get(g_ydb_storage_remote,
-                machineid,spx_string_len(machineid),NULL);
+                machineid,spx_string_rlen(machineid),NULL);
         if(NULL != remote_storage){
             SpxStringFree(machineid);//machineid is the same,so not useful
             remote_storage->runtime_state = state;
@@ -409,7 +409,7 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
             remote_storage->host.port = port;
             remote_storage->update_timespan = secs;
             if(0 != (err = spx_map_insert(g_ydb_storage_remote,
-                            machineid,spx_string_len(machineid),
+                            machineid,spx_string_rlen(machineid),
                             remote_storage,sizeof(remote_storage)))){
                 SpxLogFmt2(c->log,SpxLogError,err,
                         "new sync remote storage:%s get from tracker:%s:%d is fail.",
@@ -768,7 +768,7 @@ err_t ydb_storage_sync_reply_sync_beginpoint(struct ev_loop *loop,\
 
     struct ydb_storage_remote *s = NULL;
     s = spx_map_get(g_ydb_storage_remote,machineid,
-            spx_string_len(machineid),NULL);
+            spx_string_rlen(machineid),NULL);
     if(NULL == s ){
         SpxLogFmt1(jc->log,SpxLogError,
                 "not find sync beginpoint of storage:%s is fail.",
@@ -1056,7 +1056,7 @@ err_t ydb_storage_sync_reply_make_state_machine(struct ev_loop *loop,\
 
     struct ydb_storage_remote *s = NULL;
     s = spx_map_get(g_ydb_storage_remote,machineid,
-            spx_string_len(machineid),NULL);
+            spx_string_rlen(machineid),NULL);
     if(NULL == s){
         SpxLogFmt1(jc->log,SpxLogError,
                 "not find storage:%s from remote storages is fail.",
@@ -1066,7 +1066,7 @@ err_t ydb_storage_sync_reply_make_state_machine(struct ev_loop *loop,\
 
     ydb_storage_synclog_clear(&(s->synclog));
     err = ydb_storage_synclog_init(&(s->synclog),
-            c->log,c->dologpath,machineid,
+            c->log,c->dologpath,s->machineid,
             year,month,day,offset);
     if(0 != err){
         SpxLogFmt2(c->log,SpxLogError,err,
@@ -1296,7 +1296,25 @@ spx_private err_t ydb_storage_sync_doing(
             struct stat buf;
             SpxZero(buf);
             lstat(s->read_binlog.fname,&buf);
-            if((u64_t) buf.st_size <= s->read_binlog.offset){
+            if((u64_t) buf.st_size == s->read_binlog.offset){//end of the binlog
+                if (spx_date_is_before(&(s->read_binlog.date))){
+                    SpxLogFmt1(c->log,SpxLogMark,
+                            "the day:%d-%d-%d sync is over."
+                            "then add 1 day.",
+                            s->read_binlog.date.year,
+                            s->read_binlog.date.month,
+                            s->read_binlog.date.day);
+
+                    SpxStringFree(s->read_binlog.fname);
+                    spx_date_add(&(s->read_binlog.date),1);
+                    s->read_binlog.offset = 0;
+                    if(NULL != s->read_binlog.fp) {
+                        fclose(s->read_binlog.fp);
+                        s->read_binlog.fp = NULL;
+                    }
+                    continue;
+                }
+
                 if (s->runtime_state == YDB_STORAGE_RUNNING){
                     SpxLogFmt1(c->log,SpxLogDebug,
                             "remote storage:%s."
@@ -1356,6 +1374,13 @@ spx_private err_t ydb_storage_sync_doing(
             }
         }
 
+
+        SpxLogFmt1(c->log,SpxLogInfo,
+                "sync data of day:%d-%d-%d offset:%lld is to begining...",
+                s->read_binlog.date.year,
+                s->read_binlog.date.month,
+                s->read_binlog.date.day,
+                s->read_binlog.offset);
 
         int size = strlen("\t");
         while(NULL != (fgets(line,SpxLineSize,s->read_binlog.fp))){
@@ -1685,7 +1710,7 @@ err_t ydb_storage_sync_reply_consistency(struct ev_loop *loop,\
 
     struct ydb_storage_remote *s = NULL;
     s = spx_map_get(g_ydb_storage_remote,machineid,
-            spx_string_len(machineid),NULL);
+            spx_string_rlen(machineid),NULL);
     if(NULL == s ){
         SpxLogFmt2(jc->log,SpxLogError,jc->err,\
                 "not found the storage:%s from remote storages.",
@@ -1841,7 +1866,7 @@ err_t ydb_storage_sync_restore(
                                  goto r1;
                              }
                              err = spx_map_insert(g_ydb_storage_remote,s->machineid,
-                                     spx_string_len(machineid),s,sizeof(s));
+                                     spx_string_rlen(machineid),s,sizeof(s));
                              if(0 != err){
                                  SpxLogFmt2(c->log,SpxLogError,err,
                                          "add remote-storage:%s to glb is fail.",
@@ -2931,7 +2956,7 @@ spx_private err_t ydb_storage_sync_log(string_t machineid,
     err_t err = 0;
     struct ydb_storage_remote *s = NULL;
     s = spx_map_get(g_ydb_storage_remote,machineid,
-            spx_string_len(machineid),NULL);
+            spx_string_rlen(machineid),NULL);
     if(NULL == s ){
         err = 0 == err ? ENOENT : err;
         return err;

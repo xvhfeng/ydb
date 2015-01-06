@@ -612,7 +612,7 @@ spx_private struct ydb_storage_remote *ydb_storage_dsync_query_base_from_tracker
                 t->host.ip,t->host.port);
         goto r1;
     }
-    base = spx_map_get(g_ydb_storage_remote,machineid,spx_string_len(machineid),NULL);
+    base = spx_map_get(g_ydb_storage_remote,machineid,spx_string_rlen(machineid),NULL);
     if(NULL == base){
         *err = ENOENT;
         SpxLogFmt2(c->log,SpxLogError,ENOENT,

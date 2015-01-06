@@ -79,7 +79,7 @@ err_t ydb_tracker_query_sync_storage(struct ev_loop *loop,\
 
     struct spx_map *map = NULL;
     map = spx_map_get(ydb_remote_storages,groupname,
-            spx_string_len(groupname),NULL);
+            spx_string_rlen(groupname),NULL);
     if(NULL == map){
         SpxLogFmt1(jc->log,SpxLogError,\
                 "the storages of group:%s is not exist",
@@ -249,7 +249,7 @@ err_t ydb_tracker_query_base_storage(struct ev_loop *loop,\
 
     struct spx_map *map = NULL;
     map = spx_map_get(ydb_remote_storages,groupname,
-            spx_string_len(groupname),NULL);
+            spx_string_rlen(groupname),NULL);
     if(NULL == map){
         SpxLogFmt1(jc->log,SpxLogError,\
                 "the storages of group:%s is not exist",
@@ -395,7 +395,7 @@ err_t ydb_tracker_query_timespan_for_begining_sync(struct ev_loop *loop,\
 
     struct spx_map *map = NULL;
     map = spx_map_get(ydb_remote_storages,groupname,
-            spx_string_len(groupname),NULL);
+            spx_string_rlen(groupname),NULL);
     if(NULL == map){
         SpxLogFmt1(jc->log,SpxLogError,\
                 "the storages of group:%s is not exist",
