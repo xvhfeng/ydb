@@ -43,6 +43,7 @@ void ydb_tracker_network_module_request_body_handler(
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "read body is fail.");
+        spx_job_pool_push(g_spx_job_pool,jcontext);
         return;
     }
 
@@ -51,6 +52,7 @@ void ydb_tracker_network_module_request_body_handler(
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "pop task context from task context pool is fail.");
+        spx_job_pool_push(g_spx_job_pool,jcontext);
         return;
     }
     tcontext->jcontext = jcontext;
@@ -66,6 +68,8 @@ void ydb_tracker_network_module_response_body_handler(
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "write body buffer is fail.");
+        spx_job_pool_push(g_spx_job_pool,jcontext);
+        return;
     }
     ev_io_stop(loop,&(jcontext->watcher));
     if(jcontext->reader_header->is_keepalive){

@@ -52,13 +52,15 @@ void ydb_storage_network_module_request_body_handler(
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "read body is fail.");
+        spx_job_pool_push(g_spx_job_pool,jcontext);
         return;
     }
 
     struct spx_task_context *tcontext = spx_task_pool_pop(g_spx_task_pool,&(jcontext->err));
-    if(0 != jcontext->err){
+    if(NULL == tcontext){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "pop task context from task context pool is fail.");
+        spx_job_pool_push(g_spx_job_pool,jcontext);
         return;
     }
     tcontext->jcontext = jcontext;
@@ -71,12 +73,14 @@ void ydb_storage_network_module_request_body_handler(
 
 void ydb_storage_network_module_response_body_handler(
         struct ev_loop *loop,int fd,struct spx_job_context *jcontext){
+    ev_io_stop(loop,&(jcontext->watcher));
     spx_nio_writer_body_handler(loop,fd,jcontext);//send data for explaning the body first
     if(0 != jcontext->err){
         SpxLog2(jcontext->log,SpxLogError,jcontext->err,\
                 "write body buffer is fail.");
+        spx_job_pool_push(g_spx_job_pool,jcontext);
+        return;
     }
-    ev_io_stop(loop,&(jcontext->watcher));
     if(jcontext->reader_header->is_keepalive){//long connetion mode,but not test
         spx_job_context_reset(jcontext);
         size_t idx = spx_network_module_wakeup_idx(jcontext);

@@ -132,6 +132,14 @@ spx_private err_t ydb_storage_heartbeat_send(struct ev_loop *loop,int protocol,\
 
     jc->lifecycle = SpxNioLifeCycleHeader;
     spx_nio_writer_faster(loop,fd,jc);
+    if(0 != jc->err){
+        err = jc->err;
+        SpxLogFmt2(jc->log,SpxLogError,jc->err,\
+                "call write body handler to client:%s is fail."\
+                "and forced clear jc to pool.",\
+                jc->client_ip);
+        goto r1;
+    }
     return err;
 r1:
     spx_job_context_clear(jc);
@@ -270,6 +278,13 @@ void ydb_storage_shutdown(struct ydb_tracker *tracker,\
 spx_private void ydb_storage_heartbeat_nio_body_writer(\
         struct ev_loop *loop,int fd,struct spx_job_context *jc){/*{{{*/
     spx_nio_writer_body_faster_handler(loop,fd,jc);
+    if(0 != jc->err){
+        SpxLogFmt2(jc->log,SpxLogError,jc->err,\
+                "call write body handler to client:%s is fail."\
+                "and forced clear jc to pool.",\
+                jc->client_ip);
+        return;
+    }
     spx_nio_regedit_reader(loop,jc->fd,jc);
 }/*}}}*/
 
