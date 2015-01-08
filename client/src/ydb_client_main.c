@@ -63,7 +63,7 @@ int main(int argc,char **argv){
     char *wfpath = "img/";
 
     char *groupname = "g001";
-    char *tracker = "10.97.19.31:4150";
+    char *tracker = "10.97.19.9:4150";
     u32_t timeout = 300;
 
        ydb_client_upload_test(

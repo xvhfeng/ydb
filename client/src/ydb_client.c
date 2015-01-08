@@ -704,7 +704,7 @@ spx_private byte_t *ydb_client_find_do(struct spx_host *s,
     if(0 >= fd || 0 != *err){
     }
     spx_set_nb(fd);
-    *err =  spx_socket_set(fd,true,30,3,30,false,0,true,true,30);
+    *err =  spx_socket_set(fd,true,30,10,30,false,0,true,true,30);
     if(0 != *err){
         goto r1;
     }
