@@ -228,7 +228,7 @@ spx_private err_t ydb_storage_sync_query_remote_storage(
         header->protocol = YDB_S2T_QUERY_SYNC_STORAGES;
         header->bodylen = YDB_GROUPNAME_LEN + YDB_MACHINEID_LEN
             + YDB_SYNCGROUP_LEN;
-        header->is_keepalive = true;//persistent connection
+        header->is_keepalive = c->iskeepalive;//persistent connection
         ystc->request->header = header;
     }
 
@@ -631,7 +631,7 @@ spx_private err_t ydb_storage_sync_query_sync_beginpoint(
     ystc->request->header = header;
     header->protocol = YDB_S2S_QUERY_CSYNC_BEGINPOINT;
     header->bodylen = YDB_MACHINEID_LEN;
-    header->is_keepalive = false;//persistent connection
+    header->is_keepalive = c->iskeepalive;//persistent connection
 
     struct spx_msg *body = spx_msg_new(header->bodylen,&err);
     if(NULL == body){
@@ -924,7 +924,7 @@ spx_private err_t ydb_storage_sync_send_make_state_machine(
     ystc->request->header = header;
     header->protocol = YDB_S2S_CSYNC_BEGIN;
     header->bodylen = YDB_MACHINEID_LEN + 3 * sizeof(u32_t) + sizeof(u64_t);
-    header->is_keepalive = false;//persistent connection
+    header->is_keepalive = c->iskeepalive;//persistent connection
 
     struct spx_msg *body = spx_msg_new(ystc->request->header->bodylen,&err);
     if(NULL == body){
@@ -1590,7 +1590,7 @@ spx_private err_t ydb_storage_sync_send_consistency(
         ystc->request->header = header;
         header->protocol = YDB_S2S_RESTORE_CSYNC_OVER;
         header->bodylen = YDB_MACHINEID_LEN;
-        header->is_keepalive = false;//persistent connection
+        header->is_keepalive = c->iskeepalive;//persistent connection
     }
 
     if(NULL == ystc->request->body){
@@ -2310,7 +2310,7 @@ spx_private err_t ydb_storage_sync_upload_request(
         }
     }
     header->err = is_no_file ? ENOENT : 0;
-    header->is_keepalive = false;//persistent connection
+    header->is_keepalive = c->iskeepalive;//persistent connection
     yssc->request->header = header;
 
     struct spx_msg *body = NULL;
@@ -2622,7 +2622,7 @@ spx_private err_t ydb_storage_sync_modify_request(
         }
     }
     header->err = is_no_file ? ENOENT : 0;
-    header->is_keepalive = false;//persistent connection
+    header->is_keepalive = c->iskeepalive;//persistent connection
     yssc->request->header = header;
 
     struct spx_msg *body = NULL;
@@ -2794,7 +2794,7 @@ spx_private err_t ydb_storage_sync_delete_request(
     header->bodylen = sizeof(u64_t)
         +  YDB_MACHINEID_LEN
         +spx_string_len(ofid);
-    header->is_keepalive = false;//persistent connection
+    header->is_keepalive = c->iskeepalive;//persistent connection
     yssc->request->header = header;
 
     struct spx_msg *body = NULL;

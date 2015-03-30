@@ -176,6 +176,7 @@ void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err){/*{{{*/
     c->disksync_timespan = SpxDayTick;
     c->disksync_busysize = 512 * SpxMB;
     c->sync_threads_count = 3;
+    c->iskeepalive = false;
 
     return c;
 }/*}}}*/
@@ -960,6 +961,23 @@ void ydb_storage_config_line_parser(string_t line,void *config,err_t *err){
         goto r1;
     }
 
+    //iskeepalive
+    if(0 == spx_string_casecmp(*kv,"iskeepalive")){
+        if(1 == count){
+            SpxLogFmt1(c->log,SpxLogWarn,\
+                    "iskeepalive use default:%s.",spx_bool_desc[c->iskeepalive]);
+        } else {
+            string_t s = *(kv + 1);
+            if(0 == spx_string_casecmp(s,spx_bool_desc[false])){
+                c->iskeepalive = false;
+            } else if(0 == spx_string_casecmp(s,spx_bool_desc[true])){
+                c->iskeepalive = true;
+            } else {
+                c->iskeepalive = false;
+            }
+        }
+        goto r1;
+    }
 
     //lazysize
     if(0 == spx_string_casecmp(*kv,"lazysize")){

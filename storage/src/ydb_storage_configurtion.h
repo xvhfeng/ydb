@@ -151,6 +151,7 @@ struct ydb_tracker{
         struct spx_time sync_end;
         u32_t disksync_timespan;
         u64_t disksync_busysize;
+        bool_t iskeepalive;
     };
 
     void *ydb_storage_config_before_handle(SpxLogDelegate *log,err_t *err);
